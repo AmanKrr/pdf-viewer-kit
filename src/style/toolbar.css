@@ -1,0 +1,141 @@
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200");
+@import "./variable.css";
+
+.a-toolbar-items {
+  width: 100%;
+  height: var(--toolbarHeight);
+  align-items: center;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  background-color: var(--pdf-viewer-toolbar-theme);
+  /* background-color: var(--pdf-viewer-toolbar-dark-theme); */
+  padding: 5px 10px;
+  display: flex;
+  box-sizing: border-box;
+}
+
+.pdf-loading .a-toolbar-items {
+  display: none;
+}
+
+.a-toolbar-items .a-toolbar-item {
+  width: 30px;
+  height: 30px;
+  margin-left: 5px;
+}
+
+.a-toolbar-items .a-toolbar-item-separator {
+  margin-left: 10px;
+  width: 1px;
+  height: 22px;
+  background-color: #bebebe;
+}
+
+.a-toolbar-items .a-toolbar-item .a-toolbar-button {
+  width: inherit;
+  height: inherit;
+  border: none;
+  border-radius: 2px;
+  background-color: transparent;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.3s linear;
+}
+
+.a-toolbar-items .a-toolbar-item .a-toolbar-button:hover {
+  background-color: #4b4b4b;
+}
+
+.a-toolbar-items .a-toolbar-item .a-toolbar-button:active {
+  transform: scale(0.9);
+  transition: transfrom 0.3s linear;
+}
+
+.a-toolbar-items .a-toolbar-item .a-toolbar-button .a-toolbar-icon::before {
+  font-family: 'Material Symbols Outlined';
+  color: #777777;
+  height: inherit;
+  font-size: 1rem;
+  display: block;
+}
+
+.a-toolbar-items .a-toolbar-item .a-toolbar-button:hover .a-toolbar-icon::before {
+  color: #d5d5d5;
+}
+
+.a-toolbar-button .a-first-page-container-icon::before {
+  content: '\eac3';
+  font-size: 1.2rem !important;
+}
+
+.a-toolbar-button .a-previous-page-container-icon::before {
+  content: '\e5e0';
+  width: 8px;
+}
+
+.a-toolbar-button .a-next-page-container-icon::before {
+  content: '\e5e1';
+  width: 14px;
+}
+
+.a-toolbar-button .a-last-page-container-icon::before {
+  content: '\eac9';
+  font-size: 1.2rem !important;
+}
+
+/* page number */
+.a-toolbar-item.a-page-number-container {
+  /* width: 150px !important; */
+  width: fit-content;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.a-toolbar-item.a-page-number-container .a-page-input-container {
+  /* height: 30px; */
+  min-width: 50px;
+}
+
+.a-toolbar-item.a-page-number-container .a-page-input-container .a-current-page-number-input-field {
+  height: 22px;
+  width: 50px;
+  border: 1px solid rgb(169, 169, 169);
+  border-radius: 3px;
+  outline: none;
+  text-align: center;
+}
+
+.a-toolbar-item.a-page-number-container .a-page-input-container input::-webkit-outer-spin-button,
+.a-toolbar-item.a-page-number-container .a-page-input-container input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+
+.a-toolbar-item.a-page-number-container .a-page-input-container .a-current-page-number-input-field:hover {
+  border: 1px solid #4b4b4b;
+}
+
+.a-toolbar-item.a-page-number-container div p {
+  font-size: 14px;
+}
+
+.a-toolbar-item.a-page-number-container div:nth-child(2) {
+  margin-left: 8px;
+}
+
+.a-toolbar-item.a-page-number-container div:last-child {
+  margin-left: 5px;
+}
+
+/* Zoom in and Zoom out */
+.a-toolbar-button .a-zoom-out-container-icon::before {
+  content: '\e900';
+  font-size: 1.4rem !important;
+}
+
+.a-toolbar-button .a-zoom-in-container-icon::before {
+  content: '\e8ff';
+  font-size: 1.4rem !important;
+}

@@ -1,0 +1,1 @@
+class IPDFPrintServiceFactory{static initGlobals(){}static get supportsPrinting(){return!1}static createPrintService(){throw new Error("Not implemented: createPrintService")}}export{IPDFPrintServiceFactory};

@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "allowSyntheticDefaultImports":true,
+    "target": "ES6",
+    "module": "ES6",
+    "declaration": true,
+    "outDir": "./ts-build",
+    "strict": true,
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "jsx": "react-jsx",
+    "moduleResolution": "node",
+    "removeComments": false,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "downlevelIteration": true,
+    "forceConsistentCasingInFileNames": true,
+  },
+  "include": ["src/**/*.ts", "src/**/*tsx","src/**/*.css"],
+  "exclude": ["node_modules"]
+}

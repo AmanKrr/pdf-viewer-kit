@@ -1,0 +1,81 @@
+{
+  "name": "pdf-kit",
+  "description": "PDF-Kit is a versatile, framework-agnostic library designed to render, manipulate, and interact with PDF documents seamlessly. Whether you're building a React, Next.js, Angular, or any other frontend application, PDF-Kit provides you with a well-structured, modular, and feature-rich solution for embedding PDF viewers into your web applications.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "author": "Aman Kumar",
+  "private": false,
+  "version": "0.1.0",
+  "keywords": [
+    "pdf",
+    "react",
+    "viewer"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AmanKrr/pdf-kit.git"
+  },
+  "scripts": {
+    "clean": "rimraf dist/ ts-build/",
+    "copy-files": "copyfiles -u 1 src/**/*.css src/assets/**/* ts-build/",
+    "build": "npm run clean && tsc && npm run copy-files && node minifyBuild.js",
+    "semantic-release": "semantic-release"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "lodash": "^4.17.21",
+    "pdfjs-dist": "^4.8.69"
+  },
+  "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^11.1.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/npm": "^11.0.2",
+    "@semantic-release/release-notes-generator": "^12.1.0",
+    "@types/lodash": "^4.14.202",
+    "@types/node": "20.11.6",
+    "@types/react": "^17.0.0",
+    "copyfiles": "^2.4.1",
+    "rimraf": "^5.0.5",
+    "semantic-release": "^23.0.0",
+    "typescript": "^4.0.0",
+    "uglify-js": "^3.17.4",
+    "uglifycss": "^0.0.29"
+  },
+  "release": {
+    "repositoryUrl": "https://github.com/AmanKrr/pdf-kit.git",
+    "branches": [
+      "main",
+      {
+        "name": "beta-preview",
+        "prerelease": true
+      }
+    ],
+    "plugins": [
+      "@semantic-release/commit-analyzer",
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/changelog",
+      [
+        "@semantic-release/npm",
+        {
+          "npmPublish": false
+        }
+      ],
+      [
+        "@semantic-release/git",
+        {
+          "assets": [
+            "CHANGELOG.md",
+            "package.json",
+            "package.lock.json"
+          ]
+        }
+      ]
+    ],
+    "ci": false,
+    "dryRun": false
+  }
+}
