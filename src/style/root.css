@@ -25,15 +25,18 @@
 }
 
 .a-page-container {
-  position: absolute;
+  position: relative;
   min-width: var(--min-pdf-width);
   visibility: visible;
   min-width: 100%;
   width: max-content;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  /* justify-content: center; */
+  justify-content: flex-start;
   align-items: center;
+  /* transform-origin: 0px 0px;
+  transform: translate(20px, 20px); */
 }
 
 .a-page-view {
@@ -42,8 +45,8 @@
   border-width: 1px;
   box-shadow: none;
   box-sizing: border-box;
-  position: relative;
-  margin: 10px;
+  /* position: absolute; */
+  /* margin: 10px; */
 }
 
 /* Loading overlay */

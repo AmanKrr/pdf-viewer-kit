@@ -2,6 +2,8 @@ import { PageViewport } from 'pdfjs-dist';
 import { aPdfViewerClassNames, aPdfViewerIds } from '../../constant/ElementIdClass';
 
 class PageElement {
+  public static gap = 15;
+
   /**
    * Creates a container div for a PDF page.
    * @param pageNumber - The page number.
@@ -10,8 +12,13 @@ class PageElement {
    * @param specificPage - The specific page number to render.
    * @returns The created container div.
    */
-  static createPageContainerDiv(pageNumber: number, viewport: PageViewport): HTMLDivElement {
+  static createPageContainerDiv(pageNumber: number, viewport: PageViewport, pagePositionInfo: Map<number, number>): HTMLDivElement {
     const div = document.createElement('div');
+
+    // styles
+    div.style.position = 'absolute';
+    div.style.top = `${pagePositionInfo.get(pageNumber)}px`;
+
     div.id = `pageContainer-${pageNumber}`;
     div.classList.add(aPdfViewerClassNames._A_PAGE_VIEW);
 
@@ -48,7 +55,7 @@ class PageElement {
    * @param containerId - The ID of the container element.
    * @returns An object containing references to the created container elements.
    */
-  static containerCreation(containerId: string) {
+  static containerCreation(containerId: string, scale: number) {
     // Create parent container for the PDF viewer.
     const pdfParentViewer = document.createElement('div');
     pdfParentViewer.setAttribute('class', aPdfViewerClassNames._A_PDF_VIEWER + ' pdf-loading');
@@ -67,6 +74,7 @@ class PageElement {
     const pageContainer = document.createElement('div');
     pageContainer.classList.add(aPdfViewerClassNames._A_PAGE_CONTAINER);
     pageContainer.setAttribute('id', aPdfViewerIds._MAIN_PAGE_VIEWER_CONTAINER);
+    pageContainer.style.setProperty('--scale-factor', String(scale));
 
     // Append containers to parent container.
     pageParentViewer.appendChild(pageContainer);
