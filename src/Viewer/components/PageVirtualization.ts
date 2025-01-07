@@ -1,6 +1,5 @@
-import { PDFDocumentProxy } from 'pdfjs-dist';
+import { PageViewport, PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import TextLayer from './TextLayer';
-import Annotation from './Annotation';
 import PdfState from './PdfState';
 import { RenderParameters } from 'pdfjs-dist/types/src/display/api';
 import PageElement from './PageElement';
@@ -15,8 +14,6 @@ class PageVirtualization {
   private container: HTMLElement | null = null;
   private pageBuffer: number = 3; // Number of pages to keep in the buffer around the viewport.
   private totalPages: number;
-  private textLayer: TextLayer | null = null;
-  private annotationLayer: Annotation | null = null;
   private pdf: PDFDocumentProxy;
   private renderedPages: Set<number> = new Set();
   private lastScrollTop: number = 0;
@@ -38,8 +35,6 @@ class PageVirtualization {
     parentContainer: HTMLElement,
     container: HTMLElement,
     totalPages: number,
-    textLayer: TextLayer | null = null,
-    annotationLayer: Annotation | null = null,
     pageBuffer = 3,
   ) {
     this.options = options;
@@ -47,8 +42,6 @@ class PageVirtualization {
     this.parentContainer = parentContainer;
     this.container = container.parentElement;
     this.pageBuffer = pageBuffer;
-    this.textLayer = textLayer;
-    this.annotationLayer = annotationLayer;
     this.pdf = PdfState.getInstance()._pdfInstance;
 
     this.calculatePagePositioning().then(() => {
@@ -287,6 +280,13 @@ class PageVirtualization {
       annotationMode: 2,
     };
     await page.render(renderContext).promise;
+
+    if (this.options && !this.options.disableTextSelection) {
+      const debounceTextRender = debounce(async (pageWrapper: HTMLElement, container: HTMLElement, page: PDFPageProxy, viewport: PageViewport) => {
+        await new TextLayer(pageWrapper, container.firstChild as HTMLElement, page, viewport).createTextLayer();
+      }, 200);
+      await debounceTextRender(pageWrapper, this.container.firstChild as HTMLElement, page, viewport);
+    }
   }
 
   /**

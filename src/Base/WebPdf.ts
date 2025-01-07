@@ -5,8 +5,6 @@ import WebViewer from '../Viewer/components/WebViewer';
 import WebUiUtils from '../utils/WebUiUtils';
 import PdfState from '../Viewer/components/PdfState';
 import PageElement from '../Viewer/components/PageElement';
-import TextLayer from '../Viewer/components/TextLayer';
-import Annotation from '../Viewer/components/Annotation';
 import PageVirtualization from '../Viewer/components/PageVirtualization';
 
 import '../style/toolbar.css';
@@ -65,9 +63,7 @@ class WebPdf extends WebViewer {
       PdfState.getInstance().setPdfInstance(pdf);
 
       // Initialize components for text layer, annotation layer, and page virtualization.
-      const textLayer = new TextLayer();
-      const annotationLayer = new Annotation();
-      const pageVirtualization = new PageVirtualization(this.loadOptions, internalContainers['parent'], container, pdf.numPages, textLayer, annotationLayer);
+      const pageVirtualization = new PageVirtualization(this.loadOptions, internalContainers['parent'], container, pdf.numPages);
 
       // Create and return a WebViewer instance configured with the loaded PDF.
       const viewer = new WebViewer(pdf, uiLoading, pageVirtualization);
