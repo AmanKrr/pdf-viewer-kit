@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/AmanKrr/pdf-kit/compare/v1.2.0...v1.3.0) (2025-01-14)
+
+
+### Features
+
+* **pdf-state:** add support for handling multiple PDF instances ([cee309d](https://github.com/AmanKrr/pdf-kit/commit/cee309ded6adeeeebc850bdaafba35d36f0fd418))
+
 # [1.2.0](https://github.com/AmanKrr/pdf-kit/compare/v1.1.0...v1.2.0) (2025-01-07)
 
 
