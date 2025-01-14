@@ -21,8 +21,8 @@ class WebUiUtils {
     return loadingElement;
   }
 
-  static hideLoading(loadingElement: HTMLElement) {
-    const pdfContainer = document.querySelector(`.${aPdfViewerClassNames._A_PDF_VIEWER}`);
+  static hideLoading(loadingElement: HTMLElement, containerId: string) {
+    const pdfContainer = document.querySelector(`#${containerId} .${aPdfViewerClassNames._A_PDF_VIEWER}`);
     if (pdfContainer) {
       pdfContainer.classList.remove(aPdfViewerClassNames._PDF_LOADING);
     }
@@ -31,7 +31,7 @@ class WebUiUtils {
     }
   }
 
-  static Observer(callback: (pageNumber: number) => void) {
+  static Observer(callback: (pageNumber: number) => void, containerId: string) {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -45,12 +45,14 @@ class WebUiUtils {
     ); // Adjust the threshold as needed
 
     // Query all page containers
-    const pageContainers = document.getElementsByClassName(aPdfViewerClassNames._A_PAGE_VIEW);
+    const pageContainers = document.querySelectorAll(`#${containerId} .${aPdfViewerClassNames._A_PAGE_VIEW}`);
 
     // Observe each page container using the same observer instance
-    Array.from(pageContainers).forEach((pageContainer) => {
-      observer.observe(pageContainer);
-    });
+    if (pageContainers) {
+      Array.from(pageContainers).forEach((pageContainer) => {
+        observer.observe(pageContainer);
+      });
+    }
   }
 
   /**

@@ -1,4 +1,4 @@
-export interface ToolbarButtonConfig {
+interface ToolbarButtonConfig {
   id: string;
   label: string;
   icon?: svg;
@@ -10,7 +10,7 @@ export interface ToolbarButtonConfig {
   hide: boolean;
 }
 
-export interface ToolbarOptions {
+interface ToolbarOptions {
   zoomIn: boolean;
   zoomOut: boolean;
   rotate: boolean;
@@ -34,7 +34,7 @@ export interface ToolbarOptions {
   // Add more toolbar options as needed
 }
 
-export interface ToolbarClass {
+interface ToolbarClass {
   zoomIn: string;
   zoomOut: string;
   rotate: string;

@@ -14,10 +14,11 @@ class PageVirtualization {
   private container: HTMLElement | null = null;
   private pageBuffer: number = 3; // Number of pages to keep in the buffer around the viewport.
   private totalPages: number;
-  private pdf: PDFDocumentProxy;
+  private pdf!: PDFDocumentProxy;
   private renderedPages: Set<number> = new Set();
   private lastScrollTop: number = 0;
   private pagePosition: Map<number, number> = new Map();
+  private pdfState!: PdfState;
 
   /**
    * Constructor initializes the PageVirtualization with required parameters.
@@ -30,19 +31,14 @@ class PageVirtualization {
    * @param annotationLayer - Annotation layer instance (optional).
    * @param pageBuffer - Number of extra pages to render around the viewport (default: 3).
    */
-  constructor(
-    options: LoadOptions,
-    parentContainer: HTMLElement,
-    container: HTMLElement,
-    totalPages: number,
-    pageBuffer = 3,
-  ) {
+  constructor(options: LoadOptions, parentContainer: HTMLElement, container: HTMLElement, totalPages: number, pageBuffer = 3) {
     this.options = options;
     this.totalPages = totalPages;
     this.parentContainer = parentContainer;
     this.container = container.parentElement;
     this.pageBuffer = pageBuffer;
-    this.pdf = PdfState.getInstance()._pdfInstance;
+    this.pdfState = PdfState.getInstance(options.containerId);
+    this.pdf = this.pdfState.pdfInstance;
 
     this.calculatePagePositioning().then(() => {
       if (this.isThereSpecificPageToRender == null || this.isThereSpecificPageToRender == undefined) {
@@ -82,7 +78,7 @@ class PageVirtualization {
     let isScaleChangeActive = false;
 
     // Listener for scaleChange event
-    PdfState.getInstance().on('scaleChange', () => {
+    this.pdfState.on('scaleChange', () => {
       isScaleChangeActive = true;
       setTimeout(() => (isScaleChangeActive = false), 300);
     });
@@ -113,7 +109,7 @@ class PageVirtualization {
 
     for (let pageNumber = 1; pageNumber <= this.totalPages; pageNumber++) {
       const page = await this.pdf.getPage(pageNumber);
-      const scale = PdfState.getInstance()._scale;
+      const scale = this.pdfState.scale;
       const viewport = page.getViewport({ scale });
       const pageHeight = viewport.height;
 
@@ -165,7 +161,7 @@ class PageVirtualization {
    * Precalculate page positions and set container dimensions.
    */
   async calculatePagePositioning() {
-    const scale = PdfState.getInstance()._scale;
+    const scale = this.pdfState.scale;
     let pageHeight = PageElement.gap;
     let pageWidth = Number.NEGATIVE_INFINITY;
 
@@ -265,7 +261,7 @@ class PageVirtualization {
     if (!this.container) return;
 
     const page = await this.pdf.getPage(pageNumber);
-    const scale = PdfState.getInstance()._scale;
+    const scale = this.pdfState.scale;
     const viewport = page.getViewport({ scale });
 
     const pageWrapper = PageElement.createPageContainerDiv(pageNumber, viewport, this.pagePosition);
@@ -314,7 +310,7 @@ class PageVirtualization {
    */
   private async getViewport(pageNumber: number) {
     const page = await this.pdf.getPage(pageNumber);
-    const scale = PdfState.getInstance()._scale;
+    const scale = this.pdfState.scale;
     const viewport = page.getViewport({ scale });
     return viewport;
   }
@@ -325,7 +321,7 @@ class PageVirtualization {
    * @param pageNumber - The number of the page to be removed.
    */
   private removePage(pageNumber: number): void {
-    const pageElement = document.getElementById(`pageContainer-${pageNumber}`);
+    const pageElement = document.querySelector(`#${this.options?.containerId} #pageContainer-${pageNumber}`);
     if (pageElement) pageElement.remove();
   }
 

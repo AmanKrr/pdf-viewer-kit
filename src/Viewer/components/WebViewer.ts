@@ -5,59 +5,73 @@ import throttle from 'lodash/throttle';
 import PdfState from './PdfState';
 import Toolbar from './Toolbar';
 import PageVirtualization from './PageVirtualization';
-import EventEmitter from '../event/EventUtils';
+import WebPdf from '../../Base/WebPdf';
 
 /**
  * A class for managing and interacting with a PDF viewer in the browser.
  */
 class WebViewer {
   private __Observer;
-  private totalPages: number;
-  private pageVirtualization!: PageVirtualization;
+  private __pageVirtualization!: PageVirtualization;
+  private __viewerOptions!: ViewerLoadOptions;
+  private __pdfInstance!: PDFDocumentProxy;
+  private __pdfState!: PdfState;
 
   /**
    * Initializes the WebViewer instance.
    * @param pdfInstance - The PDF document instance.
-   * @param uiLoading - The loading spinner element.
+   * @param viewerOptions - Configuration for viewer.
    * @param pageVirtualization - The instance for page virtualization.
    */
-  constructor(pdfInstance: PDFDocumentProxy, uiLoading: HTMLElement, pageVirtualization: PageVirtualization) {
-    PdfState.getInstance().setPdfInstance(pdfInstance);
-    PdfState.getInstance().setUiLoading(uiLoading);
-    this.pageVirtualization = pageVirtualization;
+  constructor(pdfInstance: PDFDocumentProxy, viewerOptions: ViewerLoadOptions, pageVirtualization: PageVirtualization) {
+    this.__pdfInstance = pdfInstance;
+    this.__viewerOptions = viewerOptions;
+    this.__pageVirtualization = pageVirtualization;
 
-    this.totalPages = pdfInstance.numPages;
     this.__Observer = throttle(WebUiUtils.Observer, 200);
+    this.__pdfState = PdfState.getInstance(viewerOptions.containerId);
 
-    new Toolbar('', [], this);
+    new Toolbar(this.__viewerOptions.containerId, this.__viewerOptions.customToolbarItems ?? [], this);
     this.addEvents();
   }
 
   /**
    * Retrieves the current page number being viewed.
    *
-   * This getter fetches the current page number from the PdfState singleton,
+   * This getter fetches the current page number from the PdfState,
    * which holds the shared state of the PDF viewer.
    *
    * @returns The current page number.
    */
   get currentPageNumber() {
-    return PdfState.getInstance()._currentPage;
+    return this.__pdfState.currentPage;
+  }
+
+  /**
+   * Retrieves the total page number in a pdf.
+   *
+   * This getter fetches the total page number from the PdfState,
+   * which holds the shared state of the PDF viewer.
+   *
+   * @returns The current page number.
+   */
+  get totalPages() {
+    return this.__pdfState.pdfInstance?.numPages;
   }
 
   /**
    * Adds event listeners to the viewer for user interactions.
    */
   private addEvents() {
-    const mainViewer = document.getElementById(aPdfViewerIds['_MAIN_VIEWER_CONTAINER']);
+    const mainViewer = document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds['_MAIN_VIEWER_CONTAINER']}`);
     if (mainViewer) {
       mainViewer.addEventListener('scroll', () => {
         // Update the current page number on scroll.
         const updateCurrentPage = (pageNumber: number) => {
-          PdfState.getInstance().setPageNumber(pageNumber);
+          this.__pdfState.currentPage = pageNumber;
           this.updateCurrentPageInput();
         };
-        this.__Observer(updateCurrentPage);
+        this.__Observer(updateCurrentPage, this.__viewerOptions.containerId);
       });
     }
   }
@@ -66,8 +80,12 @@ class WebViewer {
    * Navigates to the next page.
    */
   public nextPage() {
-    if (this.currentPageNumber < this.totalPages) {
-      PdfState.getInstance().setPageNumber(this.currentPageNumber + 1);
+    if (this.totalPages == undefined) {
+      console.error(`nextPage: ${this.totalPages} is not a valid total page count.`);
+    }
+
+    if (this.currentPageNumber < this.totalPages!) {
+      this.__pdfState.currentPage = this.currentPageNumber + 1;
       this.goToPage(this.currentPageNumber);
     }
   }
@@ -77,7 +95,7 @@ class WebViewer {
    */
   public previousPage(): void {
     if (this.currentPageNumber > 1) {
-      PdfState.getInstance().setPageNumber(this.currentPageNumber - 1);
+      this.__pdfState.currentPage = this.currentPageNumber - 1;
       this.goToPage(this.currentPageNumber);
     }
   }
@@ -87,7 +105,7 @@ class WebViewer {
    */
   public firstPage(): void {
     if (this.currentPageNumber > 1) {
-      PdfState.getInstance().setPageNumber(1);
+      this.__pdfState.currentPage = 1;
       this.goToPage(this.currentPageNumber);
     }
   }
@@ -96,8 +114,12 @@ class WebViewer {
    * Navigates to the last page.
    */
   public lastPage(): void {
-    if (this.currentPageNumber < this.totalPages) {
-      PdfState.getInstance().setPageNumber(this.totalPages);
+    if (this.totalPages == undefined) {
+      console.error(`nextPage: ${this.totalPages} is not a valid total page count.`);
+    }
+
+    if (this.currentPageNumber < this.totalPages!) {
+      this.__pdfState.currentPage = this.totalPages!;
       this.goToPage(this.currentPageNumber);
     }
   }
@@ -115,21 +137,20 @@ class WebViewer {
    * Zooms into the PDF by incrementing the scale.
    */
   async zoomIn() {
-    const pdfState = PdfState.getInstance();
-    const currentScale = pdfState._scale;
+    const currentScale = this.__pdfState.scale;
     const currentPage = this.currentPageNumber;
 
     if (currentScale < 4.0) {
       const newScale = currentScale + 0.5;
       const scrollOffset = this.getScrollOffsetRelativeToPage(currentPage);
 
-      pdfState.setScale(newScale);
+      this.__pdfState.scale = newScale;
       this.applyCssScale(newScale);
 
       requestAnimationFrame(async () => {
-        await this.pageVirtualization.calculatePagePositioning();
+        await this.__pageVirtualization.calculatePagePositioning();
         this.adjustScrollPosition(currentPage, scrollOffset, currentScale, newScale);
-        await this.pageVirtualization.redrawVisiblePages(currentPage);
+        await this.__pageVirtualization.redrawVisiblePages(currentPage);
       });
     }
   }
@@ -138,21 +159,20 @@ class WebViewer {
    * Zooms out of the PDF by decrementing the scale.
    */
   async zoomOut() {
-    const pdfState = PdfState.getInstance();
-    const currentScale = pdfState._scale;
+    const currentScale = this.__pdfState.scale;
     const currentPage = this.currentPageNumber;
 
     if (currentScale > 0.5) {
       const newScale = currentScale - 0.5;
       const scrollOffset = this.getScrollOffsetRelativeToPage(currentPage);
 
-      pdfState.setScale(newScale);
+      this.__pdfState.scale = newScale;
       this.applyCssScale(newScale);
 
       requestAnimationFrame(async () => {
-        await this.pageVirtualization.calculatePagePositioning();
+        await this.__pageVirtualization.calculatePagePositioning();
         this.adjustScrollPosition(currentPage, scrollOffset, currentScale, newScale);
-        await this.pageVirtualization.redrawVisiblePages(currentPage);
+        await this.__pageVirtualization.redrawVisiblePages(currentPage);
       });
     }
   }
@@ -163,8 +183,8 @@ class WebViewer {
    * @returns The scroll offset from the top of the page.
    */
   private getScrollOffsetRelativeToPage(targetPage: number): number {
-    const pageTop = this.pageVirtualization.cachedPagePosition.get(targetPage) || 0;
-    const scrollTop = document.getElementById(`${aPdfViewerIds['_MAIN_VIEWER_CONTAINER']}`)!.scrollTop;
+    const pageTop = this.__pageVirtualization.cachedPagePosition.get(targetPage) || 0;
+    const scrollTop = document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds['_MAIN_VIEWER_CONTAINER']}`)!.scrollTop;
 
     return scrollTop - pageTop;
   }
@@ -177,18 +197,18 @@ class WebViewer {
    * @param newScale - The new scale factor.
    */
   private adjustScrollPosition(targetPage: number, relativeScrollOffset: number, previousScale: number, newScale: number): void {
-    const pageTop = this.pageVirtualization.cachedPagePosition.get(targetPage) || 0;
+    const pageTop = this.__pageVirtualization.cachedPagePosition.get(targetPage) || 0;
     const scaledOffset = relativeScrollOffset * (newScale / previousScale);
     const newScrollTop = pageTop + scaledOffset;
 
-    document.getElementById(`${aPdfViewerIds['_MAIN_VIEWER_CONTAINER']}`)!.scrollTop = newScrollTop;
+    document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds['_MAIN_VIEWER_CONTAINER']}`)!.scrollTop = newScrollTop;
   }
 
   /**
    * Updates the current page number input field.
    */
   private updateCurrentPageInput() {
-    const currentPageInputField = document.getElementById(aPdfViewerIds._CURRENT_PAGE_INPUT);
+    const currentPageInputField = document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds._CURRENT_PAGE_INPUT}`);
     if (currentPageInputField) {
       (currentPageInputField as HTMLInputElement).value = String(this.currentPageNumber);
     }
@@ -199,12 +219,15 @@ class WebViewer {
    * @param pageNumber - The target page number.
    */
   private goToPage(pageNumber: number) {
-    // pageContainer-1
-    if (pageNumber >= 1 && pageNumber <= this.totalPages) {
-      const pagePosition = this.pageVirtualization.cachedPagePosition;
+    if (this.totalPages == undefined) {
+      console.error(`nextPage: ${this.totalPages} is not a valid total page count.`);
+    }
+
+    if (pageNumber >= 1 && pageNumber <= this.totalPages!) {
+      const pagePosition = this.__pageVirtualization.cachedPagePosition;
       const position = pagePosition?.get(pageNumber);
       if (position != undefined && position >= 0) {
-        const scrollElement = document.querySelector(`#${aPdfViewerIds['_MAIN_VIEWER_CONTAINER']}`);
+        const scrollElement = document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds['_MAIN_VIEWER_CONTAINER']}`);
         if (scrollElement) {
           scrollElement.scrollTop = position;
         }
@@ -214,16 +237,12 @@ class WebViewer {
     }
   }
 
-  // scrollPageIntoView({ pageNumber, destArray = null, allowNegativeOffset = false, ignoreDestinationZoom = false }) {
-  //   // this.goToPage(pageNumber);
-  // }
-
   /**
    * Applies CSS scaling to the viewer.
    * @param scaleFactor - The scale factor to apply.
    */
   private applyCssScale(scaleFactor: number): void {
-    const pageViewerContainer = document.getElementById(aPdfViewerIds._MAIN_PAGE_VIEWER_CONTAINER);
+    const pageViewerContainer = document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds._MAIN_PAGE_VIEWER_CONTAINER}`) as HTMLElement;
     if (pageViewerContainer) {
       pageViewerContainer.style.setProperty('--scale-factor', String(scaleFactor));
     }
@@ -255,7 +274,7 @@ class WebViewer {
         await this.zoomOut();
         break;
       case 'currentPageNumber':
-        PdfState.getInstance().setPageNumber(parseInt((event.target as HTMLInputElement).value));
+        this.__pdfState.currentPage = parseInt((event.target as HTMLInputElement).value);
         if (event && (event as KeyboardEvent).key === 'Enter') {
           (event.target as HTMLInputElement).blur();
           this.goToPage(this.currentPageNumber);

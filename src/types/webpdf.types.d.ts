@@ -8,8 +8,11 @@ interface LoadOptions {
   maxDefaultZoomLevel?: number; // Optional maximum default zoom level for the viewer.
   password?: string; // Optional password for encrypted PDF documents.
   printMode?: boolean; // Optional flag to enable print mode for the viewer.
-  toolbarItems?: string[]; // Optional array of toolbar items to display in the viewer.
+  toolbarItems?: Partial<ToolbarOptions> | {}; // Optional array of toolbar items to display in the viewer.
   styleSheets?: string; // Optional custom style sheets for the viewer.
   preventTextCopy?: boolean; // Optional flag to prevent text copying from the viewer.
   renderSpecificPageOnly?: number | null; // Optional flag to render a specific page only.
+  customToolbarItems?: ToolbarButtonConfig[];
 }
+
+type ViewerLoadOptions = Omit<LoadOptions, 'password'>;

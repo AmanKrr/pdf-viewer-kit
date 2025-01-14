@@ -1,22 +1,18 @@
 import { aPdfViewerClassNames, aPdfViewerIds } from '../../constant/ElementIdClass';
-import { ToolbarButtonConfig, ToolbarClass, ToolbarOptions } from '../../types/toolbar.types';
 import WebUiUtils from '../../utils/WebUiUtils';
 import PdfState from './PdfState';
 import WebViewer from './WebViewer';
 
 class Toolbar {
-  private container: HTMLElement;
-  private buttons: ToolbarButtonConfig[];
   private toolbar!: ToolbarOptions;
-  // private customToolbar: CustomToolbarItem[];
   private toolbarClass!: ToolbarClass;
   private toolbarConfig: ToolbarButtonConfig[];
-  private _viewer;
+  private _viewer!: WebViewer;
+  private __pdfState!: PdfState;
 
-  constructor(containerId: string, toolbarConfig: ToolbarButtonConfig[], webViewer: WebViewer) {
-    this.container = document.getElementById(containerId)!;
-    this.buttons = [];
+  constructor(containerId: string, customToolbarItems: ToolbarButtonConfig[] | [], webViewer: WebViewer) {
     this._viewer = webViewer;
+    this.__pdfState = PdfState.getInstance(containerId);
 
     // Initialize toolbar with default values
     this.toolbar = {
@@ -67,7 +63,7 @@ class Toolbar {
       // Add more toolbar options as needed
     };
 
-    // this.toolbarConfig = toolbarConfig;
+    this.toolbarConfig = customToolbarItems;
     this.toolbarConfig = this.getToolbarData();
     this.renderToolbar();
     // this.customToolbar = [];
@@ -169,7 +165,7 @@ class Toolbar {
   }
 
   private renderToolbar(): void {
-    const toolbarContainer = document.getElementById('toolbarContainer');
+    const toolbarContainer = document.querySelector(`#${this.__pdfState.containerId} #toolbarContainer`) as HTMLElement;
     if (!toolbarContainer) return;
 
     toolbarContainer.innerHTML = ''; // Clear existing toolbar
@@ -193,8 +189,7 @@ class Toolbar {
       }
     });
 
-    console.log('here', PdfState.getInstance());
-    WebUiUtils.hideLoading(PdfState.getInstance()._uiLoading);
+    WebUiUtils.hideLoading(this.__pdfState.uiLoading, this.__pdfState.containerId);
   }
 
   // Helper method to create a button based on config
@@ -238,7 +233,7 @@ class Toolbar {
     pageInputField.setAttribute('class', aPdfViewerClassNames._A_CURRENT_PAGE_NUMBER_INPUT_FIELD);
     pageInputField.setAttribute('autocomplete', 'off');
     pageInputField.setAttribute('aria-label', 'Current page number');
-    pageInputField.value = String(PdfState.getInstance()._currentPage);
+    pageInputField.value = String(viewer.currentPageNumber);
 
     // Attach event handlers for input and keydown
     pageInputField.oninput = (e) => viewer.toolbarButtonClick('currentPageNumber', e);
@@ -256,7 +251,7 @@ class Toolbar {
     // Create the total pages container
     const totalPageContainer = document.createElement('div');
     const totalPagePara = document.createElement('p');
-    totalPagePara.textContent = String(PdfState.getInstance()._pdfInstance.numPages);
+    totalPagePara.textContent = String(viewer.totalPages);
     totalPageContainer.appendChild(totalPagePara);
 
     // Combine all components into the toolbar option container

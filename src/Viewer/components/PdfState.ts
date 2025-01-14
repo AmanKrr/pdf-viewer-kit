@@ -1,79 +1,107 @@
 import EventEmitter from '../event/EventUtils';
+import { PDFDocumentProxy } from 'pdfjs-dist';
 
 class PdfState extends EventEmitter {
-  private static instance: PdfState;
+  private static pdfStates: Map<string, PdfState> = new Map();
 
-  // Shared state
-  public _scale: number = 1.0;
-  public _pdfInstance: any = null;
-  public _isLoading: boolean = true;
-  public _currentPage: number = 1;
-
-  // shared element
-  public _uiLoading!: HTMLElement;
+  private _scale: number = 1.0;
+  private _pdfInstance!: PDFDocumentProxy; // Replace `any` with a specific type if possible
+  private _isLoading: boolean = true;
+  private _currentPage: number = 1;
+  private _containerId: string = '';
+  private _uiLoading!: HTMLElement;
 
   private constructor() {
     super();
   }
 
-  static getInstance(): PdfState {
-    if (!PdfState.instance) {
-      PdfState.instance = new PdfState();
+  static getInstance(id: string): PdfState {
+    if (!id) {
+      throw new Error('Invalid ID: ID cannot be null or empty.');
     }
-    return PdfState.instance;
+
+    if (this.pdfStates.has(id)) {
+      return this.pdfStates.get(id)!;
+    } else {
+      const newState = new PdfState();
+      this.pdfStates.set(id, newState);
+      return newState;
+    }
+  }
+
+  static removeInstance(id: string): void {
+    if (this.pdfStates.has(id)) {
+      this.pdfStates.delete(id);
+    } else {
+      console.warn(`PDF State with ID "${id}" does not exist.`);
+    }
+  }
+
+  static listInstances(): string[] {
+    return Array.from(this.pdfStates.keys());
   }
 
   get scale(): number {
     return this._scale;
   }
 
-  get pdfInstance(): any {
-    return this._pdfInstance;
-  }
-
-  get isLoading(): boolean {
-    return this._isLoading;
-  }
-
-  get currentPageNumber(): number {
-    return this._currentPage;
-  }
-
-  get uiLoading(): HTMLElement {
-    return this._uiLoading;
-  }
-
-  setScale(newScale: number): void {
+  set scale(newScale: number) {
     if (this._scale !== newScale) {
       this._scale = newScale;
       this.emit('scaleChange', newScale);
     }
   }
 
-  setPdfInstance(instance: any): void {
+  get pdfInstance(): PDFDocumentProxy {
+    return this._pdfInstance;
+  }
+
+  set pdfInstance(instance: PDFDocumentProxy) {
     if (this._pdfInstance !== instance) {
       this._pdfInstance = instance;
       this.emit('pdfInstanceChange', instance);
     }
   }
 
-  setLoading(isLoading: boolean, uiLoading: HTMLElement): void {
-    if (this._isLoading !== isLoading) {
-      this._isLoading = isLoading;
-      this._uiLoading = uiLoading;
-      this.emit('loadingChange', isLoading);
+  get isLoading(): boolean {
+    return this._isLoading;
+  }
+
+  set isLoading(value: boolean) {
+    if (this._isLoading !== value) {
+      this._isLoading = value;
+      this.emit('loadingChange', value);
     }
   }
 
-  setPageNumber(pageNumber: number): void {
+  get currentPage(): number {
+    return this._currentPage;
+  }
+
+  set currentPage(pageNumber: number) {
     if (this._currentPage !== pageNumber) {
       this._currentPage = pageNumber;
+      // this.emit('pageChange', pageNumber);
     }
   }
 
-  setUiLoading(uiLoading: HTMLElement): void {
-    if (this._uiLoading !== uiLoading) {
-      this._uiLoading = uiLoading;
+  get containerId(): string {
+    return this._containerId;
+  }
+
+  set containerId(id: string) {
+    if (this._containerId !== id) {
+      this._containerId = id;
+    }
+  }
+
+  get uiLoading(): HTMLElement {
+    return this._uiLoading;
+  }
+
+  set uiLoading(element: HTMLElement) {
+    if (this._uiLoading !== element) {
+      this._uiLoading = element;
     }
   }
 }

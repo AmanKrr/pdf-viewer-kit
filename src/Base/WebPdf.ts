@@ -16,23 +16,21 @@ import '../style/annotationlayer.css';
  * A class responsible for loading and managing PDF documents in a web viewer.
  * Inherits functionality from WebViewer.
  */
-class WebPdf extends WebViewer {
+class WebPdf {
   // Default options for configuring the PDF viewer during the load process.
   private static loadOptions: LoadOptions = {
     containerId: '',
     document: '',
     disableTextSelection: false,
-    maxDefaultZoomLevel: 400,
+    maxDefaultZoomLevel: 5,
     password: '',
     printMode: false,
-    toolbarItems: [],
+    toolbarItems: {},
     styleSheets: '',
     preventTextCopy: false,
     renderSpecificPageOnly: null,
+    customToolbarItems: [],
   };
-
-  public isloading = true;
-  private static scale = PdfState.getInstance()._scale;
 
   /**
    * Loads a PDF document into the web viewer.
@@ -41,12 +39,15 @@ class WebPdf extends WebViewer {
    * @returns A Promise that resolves to a WebViewer instance upon successful load, or `undefined` on failure.
    */
   static async load(options: LoadOptions) {
+    const pdfStates = PdfState.getInstance(options.containerId);
+    pdfStates.containerId = options.containerId;
     // Create the necessary container elements for the PDF viewer.
-    const internalContainers = PageElement.containerCreation(options.containerId, this.scale);
-    const container = document.getElementById(internalContainers.injectElementId)!;
+    const internalContainers = PageElement.containerCreation(options.containerId, pdfStates.scale);
+    const container = document.querySelector(`#${options.containerId} #${internalContainers.injectElementId}`)! as HTMLElement;
 
     // Display a loading spinner in the viewer container.
     const uiLoading = WebUiUtils.showLoading();
+    pdfStates.uiLoading = uiLoading;
     internalContainers.parent.prepend(uiLoading.parentNode!);
 
     try {
@@ -57,16 +58,26 @@ class WebPdf extends WebViewer {
       };
 
       // Fetch the PDF document using the specified source.
-      const pdf: PDFDocumentProxy = await pdfjsLib.getDocument(options.document).promise;
+      const initiateLoadPdf = pdfjsLib.getDocument(options.document);
+
+      // Track progress while fetching pdf.
+      // initiateLoadPdf.onProgress = function (data: any) {
+      //   console.log('data', data);
+      //   console.log('loaded : ' + data.loaded);
+      //   console.log('total : ' + data.total);
+      // };
+
+      const pdf: PDFDocumentProxy = await initiateLoadPdf.promise;
 
       // Store the PDF instance in a shared state.
-      PdfState.getInstance().setPdfInstance(pdf);
+      pdfStates.pdfInstance = pdf;
 
       // Initialize components for text layer, annotation layer, and page virtualization.
       const pageVirtualization = new PageVirtualization(this.loadOptions, internalContainers['parent'], container, pdf.numPages);
 
       // Create and return a WebViewer instance configured with the loaded PDF.
-      const viewer = new WebViewer(pdf, uiLoading, pageVirtualization);
+      const { password, ...neededOptions } = this.loadOptions;
+      const viewer = new WebViewer(pdf, neededOptions, pageVirtualization);
       return viewer;
     } catch (err) {
       // Handle errors during the document loading process.
