@@ -5,7 +5,7 @@ This product includes software developed by the Mozilla Foundation (https://mozi
 Apache License, Version 2.0: http://www.apache.org/licenses/LICENSE-2.0
 
 Modifications:
-- This software, "My PDF-Kit," has been built on top of PDF.js with additional features and functionality added by [Your Name or Organization].
+- This software, "My PDF-Kit," has been built on top of PDF.js with additional features and functionality added by Aman Kumar.
 - For details of changes, see the CHANGELOG file in this repository.
 
 Trademarks:
