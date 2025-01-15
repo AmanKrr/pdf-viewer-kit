@@ -115,7 +115,7 @@ class WebViewer {
    */
   public lastPage(): void {
     if (this.totalPages == undefined) {
-      console.error(`nextPage: ${this.totalPages} is not a valid total page count.`);
+      console.error(`lastPage: ${this.totalPages} is not a valid total page count.`);
     }
 
     if (this.currentPageNumber < this.totalPages!) {
@@ -220,7 +220,7 @@ class WebViewer {
    */
   private goToPage(pageNumber: number) {
     if (this.totalPages == undefined) {
-      console.error(`nextPage: ${this.totalPages} is not a valid total page count.`);
+      console.error(`goToPage: ${this.totalPages} is not a valid total page count.`);
     }
 
     if (pageNumber >= 1 && pageNumber <= this.totalPages!) {
