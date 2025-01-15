@@ -189,7 +189,7 @@ class Toolbar {
       }
     });
 
-    WebUiUtils.hideLoading(this.__pdfState.uiLoading, this.__pdfState.containerId);
+    // WebUiUtils.hideLoading(this.__pdfState.uiLoading, this.__pdfState.containerId);
   }
 
   // Helper method to create a button based on config

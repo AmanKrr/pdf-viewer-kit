@@ -4,6 +4,8 @@ import PdfState from './PdfState';
 import { RenderParameters } from 'pdfjs-dist/types/src/display/api';
 import PageElement from './PageElement';
 import { debounce, throttle } from 'lodash';
+import ThumbnailViewer from './ThumbnailViewer';
+import WebUiUtils from '../../utils/WebUiUtils';
 
 /**
  * Handles virtualization of PDF pages, rendering only those visible within the viewport.
@@ -40,13 +42,15 @@ class PageVirtualization {
     this.pdfState = PdfState.getInstance(options.containerId);
     this.pdf = this.pdfState.pdfInstance;
 
-    this.calculatePagePositioning().then(() => {
+    this.calculatePagePositioning().then(async () => {
       if (this.isThereSpecificPageToRender == null || this.isThereSpecificPageToRender == undefined) {
-        this.renderInitialPages();
+        await this.renderInitialPages();
         this.attachScrollListener();
       } else {
-        this.renderInitialPages();
+        await this.renderInitialPages();
       }
+
+      await this.generateThumbnail();
     });
   }
 
@@ -155,6 +159,20 @@ class PageVirtualization {
         await this.renderPage(pageNumber);
       }
     }
+  }
+
+  private async generateThumbnail() {
+    const isSpecificPage = this.isThereSpecificPageToRender;
+    const thumbnailContainer = ThumbnailViewer.createThumbnailContainer(this.options!.containerId);
+    for (let pageNumber = 1; pageNumber <= (isSpecificPage ?? this.totalPages); pageNumber++) {
+      await new ThumbnailViewer({
+        container: thumbnailContainer as HTMLElement,
+        pageNumber: pageNumber,
+        pdfDocument: this.pdf,
+        linkService: null,
+      }).initThumbnail();
+    }
+    WebUiUtils.hideLoading(PdfState.getInstance(this.options!.containerId).uiLoading, this.options!.containerId);
   }
 
   /**

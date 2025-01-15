@@ -79,7 +79,11 @@ class PageElement {
     // Append containers to parent container.
     pageParentViewer.appendChild(pageContainer);
     pdfParentViewer.appendChild(toolbarParent);
-    pdfParentViewer.appendChild(pageParentViewer);
+
+    const sidebarAndPageViewerWrapper = document.createElement('div');
+    sidebarAndPageViewerWrapper.classList.add(aPdfViewerClassNames._A_VIEWER_WRAPPER);
+    sidebarAndPageViewerWrapper.appendChild(pageParentViewer);
+    pdfParentViewer.appendChild(sidebarAndPageViewerWrapper);
 
     // Append parent container to specified wrapper container.
     const wrapperContainer = document.getElementById(containerId)!;

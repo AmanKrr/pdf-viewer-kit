@@ -13,6 +13,7 @@ export const aPdfViewerClassNames = {
   _PDF_LOADING: 'pdf-loading',
   _A_PDF_VIEWER: 'a-pdf-viewer',
   _A_TOOLBAR_ITEMS: 'a-toolbar-items',
+  _A_VIEWER_WRAPPER: 'a-viewer-wrapper',
   _A_VIEWER_CONTAINER: 'a-viewer-container',
   _A_PAGE_CONTAINER: 'a-page-container',
   _A_PAGE_VIEW: 'a-page-view',
@@ -34,4 +35,6 @@ export const aPdfViewerClassNames = {
   _A_PAGE_NUMBER_CONTAINER: 'a-page-number-container',
   _A_PAGE_INPUT_CONTAINER: 'a-page-input-container',
   _A_CURRENT_PAGE_NUMBER_INPUT_FIELD: 'a-current-page-number-input-field',
+  _A_SIDEBAR_CONTAINER: 'a-sidebar-container',
+  _A_INNER_SIDEBAR_CONTAINER_CONTENT: 'a-inner-sidebar-container-content',
 };

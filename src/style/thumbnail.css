@@ -1,0 +1,52 @@
+.a-sidebar-container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background-color: rgb(207, 207, 207);
+  width: max-content;
+  min-height: calc(100% - 40px);
+  overflow: auto;
+  padding: 10px 40px;
+}
+
+.pdf-loading .a-sidebar-container {
+  display: none;
+}
+
+.a-inner-sidebar-container-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.thumbnail {
+  width: max-content;
+  height: max-content;
+  margin-bottom: 20px;
+  padding: 4px;
+  border-radius: 1px;
+}
+
+.thumbnail:hover {
+  background-color: rgb(184, 184, 248);
+  color: white;
+}
+
+.thumbnail-active {
+  background-color: rgb(184, 184, 248);
+  color: white;
+}
+
+.thumbnail:last-child {
+  margin-bottom: 0;
+}
+
+.pagenumber-label {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #777777;
+}

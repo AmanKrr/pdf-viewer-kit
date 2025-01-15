@@ -11,6 +11,7 @@ import '../style/toolbar.css';
 import '../style/root.css';
 import '../style/textlayer.css';
 import '../style/annotationlayer.css';
+import '../style/thumbnail.css';
 
 /**
  * A class responsible for loading and managing PDF documents in a web viewer.
