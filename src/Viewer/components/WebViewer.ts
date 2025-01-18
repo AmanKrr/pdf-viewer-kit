@@ -16,12 +16,12 @@
 
 import { PDFDocumentProxy } from 'pdfjs-dist';
 import WebUiUtils from '../../utils/WebUiUtils';
-import { aPdfViewerIds } from '../../constant/ElementIdClass';
+import { aPdfViewerClassNames, aPdfViewerIds } from '../../constant/ElementIdClass';
 import throttle from 'lodash/throttle';
 import PdfState from './PdfState';
 import Toolbar from './Toolbar';
 import PageVirtualization from './PageVirtualization';
-import WebPdf from '../../Base/WebPdf';
+import { debounce } from 'lodash';
 
 /**
  * A class for managing and interacting with a PDF viewer in the browser.
@@ -32,6 +32,7 @@ class WebViewer {
   private __viewerOptions!: ViewerLoadOptions;
   private __pdfInstance!: PDFDocumentProxy;
   private __pdfState!: PdfState;
+  private __cachedSideBarElement: HTMLElement | undefined;
 
   /**
    * Initializes the WebViewer instance.
@@ -39,16 +40,54 @@ class WebViewer {
    * @param viewerOptions - Configuration for viewer.
    * @param pageVirtualization - The instance for page virtualization.
    */
-  constructor(pdfInstance: PDFDocumentProxy, viewerOptions: ViewerLoadOptions, pageVirtualization: PageVirtualization) {
+  constructor(pdfInstance: PDFDocumentProxy, viewerOptions: ViewerLoadOptions, parentContainer: HTMLElement, pageParentContainer: HTMLElement) {
     this.__pdfInstance = pdfInstance;
     this.__viewerOptions = viewerOptions;
-    this.__pageVirtualization = pageVirtualization;
 
     this.__Observer = throttle(WebUiUtils.Observer, 200);
     this.__pdfState = PdfState.getInstance(viewerOptions.containerId);
 
+    // Initialize components for text layer, annotation layer, and page virtualization.
+    this.__pageVirtualization = new PageVirtualization(this.__viewerOptions, parentContainer, pageParentContainer, this.__pdfInstance.numPages, this);
+
     new Toolbar(this.__viewerOptions.containerId, this.__viewerOptions.customToolbarItems ?? [], this);
     this.addEvents();
+  }
+
+  /**
+   * Adds event listeners to the viewer for user interactions.
+   */
+  private addEvents() {
+    const mainViewer = document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds['_MAIN_VIEWER_CONTAINER']}`);
+    if (mainViewer) {
+      mainViewer.addEventListener('scroll', () => {
+        // Update the current page number on scroll.
+        const updateCurrentPage = (pageNumber: number) => {
+          this.__pdfState.currentPage = pageNumber;
+          this.updateCurrentPageInput();
+        };
+        this.__Observer(updateCurrentPage, this.__viewerOptions.containerId);
+        debounce(() => {
+          this.syncThumbnailScrollWithMainPageContainer();
+        }, 600)();
+      });
+    }
+  }
+
+  private syncThumbnailScrollWithMainPageContainer() {
+    const pageNumber = this.currentPageNumber;
+
+    const previousActiveThumbnail = document.querySelector(`.thumbnail.thumbnail-active`);
+    if (previousActiveThumbnail) {
+      if (previousActiveThumbnail.classList.contains('thumbnail-active')) {
+        previousActiveThumbnail.classList.remove('thumbnail-active');
+      }
+    }
+    const thumbnailToBeActive = document.querySelector(`[data-page-number="${pageNumber}"]`);
+    if (thumbnailToBeActive) {
+      thumbnailToBeActive.classList.add('thumbnail-active');
+      thumbnailToBeActive.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
   }
 
   /**
@@ -75,20 +114,23 @@ class WebViewer {
     return this.__pdfState.pdfInstance?.numPages;
   }
 
-  /**
-   * Adds event listeners to the viewer for user interactions.
-   */
-  private addEvents() {
-    const mainViewer = document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds['_MAIN_VIEWER_CONTAINER']}`);
-    if (mainViewer) {
-      mainViewer.addEventListener('scroll', () => {
-        // Update the current page number on scroll.
-        const updateCurrentPage = (pageNumber: number) => {
-          this.__pdfState.currentPage = pageNumber;
-          this.updateCurrentPageInput();
-        };
-        this.__Observer(updateCurrentPage, this.__viewerOptions.containerId);
-      });
+  public toogleThumbnailViewer() {
+    const thumbnailSidebarElement = this.__cachedSideBarElement ?? document.querySelector(`#${this.__viewerOptions.containerId} .${aPdfViewerClassNames['_A_SIDEBAR_CONTAINER']}`);
+
+    if (!thumbnailSidebarElement) {
+      console.error(`Invalid sidebar container element ${thumbnailSidebarElement}.`);
+      return;
+    }
+
+    if (!this.__cachedSideBarElement) {
+      this.__cachedSideBarElement = thumbnailSidebarElement as HTMLElement;
+    }
+
+    if (this.__cachedSideBarElement.classList.contains('active')) {
+      this.__cachedSideBarElement.classList.remove('active');
+    } else {
+      this.__cachedSideBarElement.classList.add('active');
+      this.syncThumbnailScrollWithMainPageContainer();
     }
   }
 
@@ -234,7 +276,7 @@ class WebViewer {
    * Navigates to a specific page by number.
    * @param pageNumber - The target page number.
    */
-  private goToPage(pageNumber: number) {
+  public goToPage(pageNumber: number) {
     if (this.totalPages == undefined) {
       console.error(`goToPage: ${this.totalPages} is not a valid total page count.`);
     }
@@ -246,10 +288,12 @@ class WebViewer {
         const scrollElement = document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds['_MAIN_VIEWER_CONTAINER']}`);
         if (scrollElement) {
           scrollElement.scrollTop = position;
+          this.__pdfState.currentPage = pageNumber;
+          this.updateCurrentPageInput();
         }
       }
     } else {
-      console.error('Invalid page number.');
+      console.error(`Invalid ${pageNumber} page number.`);
     }
   }
 
@@ -294,6 +338,7 @@ class WebViewer {
         if (event && (event as KeyboardEvent).key === 'Enter') {
           (event.target as HTMLInputElement).blur();
           this.goToPage(this.currentPageNumber);
+          this.syncThumbnailScrollWithMainPageContainer();
         }
         break;
       case 'rotate':

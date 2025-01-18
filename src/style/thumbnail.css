@@ -15,6 +15,10 @@
 */
 
 .a-sidebar-container {
+  display: none;
+}
+
+.a-sidebar-container.active {
   position: relative;
   display: flex;
   justify-content: center;
@@ -46,8 +50,9 @@
 }
 
 .thumbnail:hover {
-  background-color: rgb(184, 184, 248);
+  background-color: rgb(173, 173, 173);
   color: white;
+  box-shadow: 5px 3px 5px 1px #c7c7c9;
 }
 
 .thumbnail-active {

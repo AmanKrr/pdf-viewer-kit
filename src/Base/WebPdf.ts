@@ -89,12 +89,9 @@ class WebPdf {
       // Store the PDF instance in a shared state.
       pdfStates.pdfInstance = pdf;
 
-      // Initialize components for text layer, annotation layer, and page virtualization.
-      const pageVirtualization = new PageVirtualization(this.loadOptions, internalContainers['parent'], container, pdf.numPages);
-
       // Create and return a WebViewer instance configured with the loaded PDF.
       const { password, ...neededOptions } = this.loadOptions;
-      const viewer = new WebViewer(pdf, neededOptions, pageVirtualization);
+      const viewer = new WebViewer(pdf, neededOptions, internalContainers['parent'], container);
       return viewer;
     } catch (err) {
       // Handle errors during the document loading process.

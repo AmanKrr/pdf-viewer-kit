@@ -21,7 +21,8 @@ import { RenderParameters } from 'pdfjs-dist/types/src/display/api';
 import PageElement from './PageElement';
 import { debounce, throttle } from 'lodash';
 import ThumbnailViewer from './ThumbnailViewer';
-import WebUiUtils from '../../utils/WebUiUtils';
+import WebViewer from './WebViewer';
+import { PDFLinkService } from '../service/LinkService';
 
 /**
  * Handles virtualization of PDF pages, rendering only those visible within the viewport.
@@ -37,6 +38,10 @@ class PageVirtualization {
   private lastScrollTop: number = 0;
   private pagePosition: Map<number, number> = new Map();
   private pdfState!: PdfState;
+  private pdfViewer!: WebViewer;
+  public pageRenderComplete: Promise<boolean> = new Promise((resolve) => {
+    resolve(false);
+  });
 
   /**
    * Constructor initializes the PageVirtualization with required parameters.
@@ -49,7 +54,7 @@ class PageVirtualization {
    * @param annotationLayer - Annotation layer instance (optional).
    * @param pageBuffer - Number of extra pages to render around the viewport (default: 3).
    */
-  constructor(options: LoadOptions, parentContainer: HTMLElement, container: HTMLElement, totalPages: number, pageBuffer = 3) {
+  constructor(options: LoadOptions, parentContainer: HTMLElement, container: HTMLElement, totalPages: number, pdfViewer: WebViewer, pageBuffer = 3) {
     this.options = options;
     this.totalPages = totalPages;
     this.parentContainer = parentContainer;
@@ -57,6 +62,7 @@ class PageVirtualization {
     this.pageBuffer = pageBuffer;
     this.pdfState = PdfState.getInstance(options.containerId);
     this.pdf = this.pdfState.pdfInstance;
+    this.pdfViewer = pdfViewer;
 
     this.calculatePagePositioning().then(async () => {
       if (this.isThereSpecificPageToRender == null || this.isThereSpecificPageToRender == undefined) {
@@ -177,18 +183,25 @@ class PageVirtualization {
     }
   }
 
-  private async generateThumbnail() {
+  public async generateThumbnail() {
     const isSpecificPage = this.isThereSpecificPageToRender;
     const thumbnailContainer = ThumbnailViewer.createThumbnailContainer(this.options!.containerId);
-    for (let pageNumber = 1; pageNumber <= (isSpecificPage ?? this.totalPages); pageNumber++) {
-      await new ThumbnailViewer({
+    const linkService = new PDFLinkService({ pdfState: this.pdfState, pdfViewer: this.pdfViewer });
+    for (let pageNumber = isSpecificPage ?? 1; pageNumber <= (isSpecificPage ?? this.totalPages); pageNumber++) {
+      const thumbnail = new ThumbnailViewer({
         container: thumbnailContainer as HTMLElement,
         pageNumber: pageNumber,
         pdfDocument: this.pdf,
-        linkService: null,
-      }).initThumbnail();
+        linkService: linkService,
+      });
+      await thumbnail.initThumbnail();
+
+      if (pageNumber === isSpecificPage || pageNumber === this.pdfState.currentPage) {
+        console.log(pageNumber, this.pdfState.currentPage);
+        thumbnail.activeThumbnail = this.pdfState.currentPage;
+      }
     }
-    WebUiUtils.hideLoading(PdfState.getInstance(this.options!.containerId).uiLoading, this.options!.containerId);
+    // WebUiUtils.hideLoading(PdfState.getInstance(this.options!.containerId).uiLoading, this.options!.containerId);
   }
 
   /**

@@ -16,16 +16,17 @@
 
 import { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import { aPdfViewerClassNames } from '../../constant/ElementIdClass';
+import { PDFThumbnailViewOptions } from '../../types/thumbnail.types';
+import { PDFLinkService } from '../service/LinkService';
 
 class ThumbnailViewer {
-  private __pdfInstance!: PDFDocumentProxy;
   private __enableHWA = false;
   private __canvasWidth = 98;
 
   private container: HTMLElement;
   private pdfDocument: PDFDocumentProxy;
   private pageNumber: number;
-  private linkService: { goToPage: (pageNumber: number) => void } | null;
+  private linkService: PDFLinkService | null;
   private canvas: HTMLCanvasElement | null = null;
 
   constructor(options: PDFThumbnailViewOptions) {
@@ -56,7 +57,7 @@ class ThumbnailViewer {
   }
 
   get totalPages() {
-    return this.__pdfInstance.numPages;
+    return this.pdfDocument.numPages;
   }
 
   public async initThumbnail() {
@@ -68,43 +69,22 @@ class ThumbnailViewer {
     await this.renderThumbnail(thumbnailDiv);
   }
 
-  // private async renderThumbnail(thumbnailDiv: HTMLElement) {
-  //   const page: PDFPageProxy = await this.pdfDocument.getPage(this.pageNumber);
+  set activeThumbnail(pageNumber: number) {
+    if (pageNumber < 0 || pageNumber > this.totalPages) {
+      console.error(`${pageNumber} is invalid page number.`);
+      return;
+    }
 
-  //   // Set thumbnail scale
-  //   const scale = 0.2;
-  //   const viewport = page.getViewport({ scale });
+    if (!this.linkService) {
+      console.log(`this.linkService is ${this.linkService}`);
+      return;
+    }
 
-  //   // Create and configure canvas
-  //   this.canvas = document.createElement('canvas');
-  //   this.canvas.width = viewport.width;
-  //   this.canvas.height = viewport.height;
-
-  //   const ctx = this.canvas.getContext('2d');
-  //   if (!ctx) {
-  //     throw new Error('Canvas context is not available.');
-  //   }
-
-  //   // Render the page onto the canvas
-  //   await page.render({ canvasContext: ctx, viewport }).promise;
-
-  //   // Convert canvas to image
-  //   const img = document.createElement('img');
-  //   img.src = this.canvas.toDataURL();
-  //   img.className = 'thumbnail-image';
-
-  //   // Append image to the thumbnail container
-  //   thumbnailDiv.appendChild(img);
-
-  //   // pageNumber
-  //   const label = document.createElement('div');
-  //   label.classList.add('pagenumber-label');
-  //   label.textContent = `${this.pageNumber}`;
-  //   thumbnailDiv.append(label);
-
-  //   // Add click event for navigation
-  //   // thumbnailDiv.addEventListener('click', () => this.linkService.goToPage(this.pageNumber));
-  // }
+    const thumbnailToBeActive = this.container.querySelector(`[data-page-number="${pageNumber}"]`);
+    if (thumbnailToBeActive) {
+      this.thumbnailDestination(thumbnailToBeActive as HTMLElement, pageNumber);
+    }
+  }
 
   private async renderThumbnail(thumbnailDiv: HTMLElement) {
     const page: PDFPageProxy = await this.pdfDocument.getPage(this.pageNumber);
@@ -149,10 +129,31 @@ class ThumbnailViewer {
     thumbnailDiv.append(label);
 
     // Add click event for navigation
-    // thumbnailDiv.addEventListener('click', () => this.linkService?.goToPage(this.pageNumber));
+    thumbnailDiv.addEventListener('click', () => this.thumbnailDestination(thumbnailDiv));
 
-    this.canvas.width = 0;
-    this.canvas.height = 0;
+    // free up memory as soon as canvas work is done
+    this.destroy();
+  }
+
+  private thumbnailDestination(thumbnailDiv: HTMLElement, pageNumber: number = -1) {
+    if (!this.linkService) {
+      console.log(`this.linkService is ${this.linkService}`);
+      return;
+    }
+
+    const previousActiveThumbnail = this.container.querySelector(`.thumbnail.thumbnail-active`);
+    const pagenumber = pageNumber > 0 ? pageNumber : this.pageNumber;
+    if (previousActiveThumbnail) {
+      if (previousActiveThumbnail.classList.contains('thumbnail-active')) {
+        previousActiveThumbnail.classList.remove('thumbnail-active');
+      }
+    }
+    if (thumbnailDiv) {
+      thumbnailDiv.classList.add('thumbnail-active');
+      if (this.linkService.currentPageNumber !== pageNumber) {
+        this.linkService?.goToPage(pagenumber);
+      }
+    }
   }
 
   public destroy() {

@@ -22,6 +22,7 @@ interface ToolbarOptions {
   lastPage: boolean;
   search: boolean;
   pageNumber: boolean;
+  thumbnail: boolean;
   annotation: {
     signature: boolean;
     drawing: boolean;
@@ -46,6 +47,7 @@ interface ToolbarClass {
   lastPage: string;
   search: string;
   pageNumber: string;
+  thumbnail: string;
   annotation: {
     signature: string;
     drawing: string;

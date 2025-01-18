@@ -43,6 +43,7 @@ class Toolbar {
       print: false,
       download: false,
       search: false,
+      thumbnail: false,
       annotation: {
         signature: false,
         drawing: false,
@@ -67,6 +68,7 @@ class Toolbar {
       print: 'a-print-container',
       download: 'a-download-container',
       search: 'a-search-container',
+      thumbnail: 'a-thumbnail-view-container',
       annotation: {
         signature: '',
         drawing: '',
@@ -120,11 +122,20 @@ class Toolbar {
   public getToolbarData(): ToolbarButtonConfig[] {
     const toolbarConfig: ToolbarButtonConfig[] = [
       {
+        id: 'thumbnailBtn',
+        label: 'View thumbnail',
+        icon: 'view-thumbnail',
+        onClick: (viewer: WebViewer) => this._viewer.toogleThumbnailViewer(),
+        hide: false,
+        class: this.toolbarClass['thumbnail'] + '-icon',
+      },
+      {
         id: 'firstPage',
         label: 'First Page',
         icon: 'first-page-icon',
         onClick: (viewer: WebViewer) => this._viewer.firstPage(),
         hide: false,
+        isSeparatorBefore: true,
         class: this.toolbarClass['firstPage'] + '-icon',
       },
       {
@@ -205,7 +216,7 @@ class Toolbar {
       }
     });
 
-    // WebUiUtils.hideLoading(this.__pdfState.uiLoading, this.__pdfState.containerId);
+    WebUiUtils.hideLoading(this.__pdfState.uiLoading, this.__pdfState.containerId);
   }
 
   // Helper method to create a button based on config

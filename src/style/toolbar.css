@@ -81,6 +81,11 @@
   color: #d5d5d5;
 }
 
+.a-toolbar-button .a-thumbnail-view-container-icon::before {
+  content: '\f734';
+  font-size: 1.2rem !important;
+}
+
 .a-toolbar-button .a-first-page-container-icon::before {
   content: '\eac3';
   font-size: 1.2rem !important;
