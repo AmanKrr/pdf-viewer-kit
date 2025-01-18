@@ -3,7 +3,8 @@
  */
 interface LoadOptions {
   containerId: string; // The ID of the container element where the PDF viewer will be inserted.
-  document: string | Blob | ArrayBuffer; // Union type for different document types: string, Blob, or ArrayBuffer.
+  document?: string | url; // Union type for different document types: string, Blob, or ArrayBuffer.
+  data?: ArrayBuffer | Blob;
   disableTextSelection?: boolean; // Optional flag to disable text selection in the viewer.
   maxDefaultZoomLevel?: number; // Optional maximum default zoom level for the viewer.
   password?: string; // Optional password for encrypted PDF documents.
@@ -13,6 +14,16 @@ interface LoadOptions {
   preventTextCopy?: boolean; // Optional flag to prevent text copying from the viewer.
   renderSpecificPageOnly?: number | null; // Optional flag to render a specific page only.
   customToolbarItems?: ToolbarButtonConfig[];
+  withCredentials?: boolean;
+  httpHeaders?: any;
 }
 
-type ViewerLoadOptions = Omit<LoadOptions, 'password'>;
+type ViewerLoadOptions = Omit<LoadOptions, 'password', 'withCredentials', 'httpHeaders'>;
+
+interface GetDocumentOptions {
+  url: string | url; // Union type for different document types: string, Blob, or ArrayBuffer.
+  password?: string; // Optional password for encrypted PDF documents.
+  withCredentials?: boolean;
+  httpHeaders?: any;
+  data?: ArrayBuffer | Blob;
+}

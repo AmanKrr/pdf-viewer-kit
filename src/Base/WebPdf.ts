@@ -69,13 +69,20 @@ class WebPdf {
 
     try {
       // Merge user-specified options with default options.
+      const { password, withCredentials, data, httpHeaders, document, ...rest } = options;
       this.loadOptions = {
-        ...this.loadOptions,
+        ...rest,
         ...options,
       };
 
       // Fetch the PDF document using the specified source.
-      const initiateLoadPdf = pdfjsLib.getDocument(options.document);
+      const initiateLoadPdf = pdfjsLib.getDocument({
+        url: document,
+        password: password,
+        withCredentials: withCredentials,
+        data: data,
+        httpHeaders: httpHeaders,
+      } as GetDocumentOptions);
 
       // Track progress while fetching pdf.
       // initiateLoadPdf.onProgress = function (data: any) {
@@ -84,14 +91,26 @@ class WebPdf {
       //   console.log('total : ' + data.total);
       // };
 
+      // TO_DO PASSWORD PROMPT
+      // initiateLoadPdf.onPassword = function (updatePassword: any, reason: any) {
+      //   console.log('password ask', updatePassword, reason);
+      //   if (reason === 1) {
+      //     // need a password
+      //     var new_password = prompt('Please enter a password:');
+      //     updatePassword(new_password);
+      //   } else {
+      //     // Invalid password
+      //     var new_password = prompt('Invalid! Please enter a password:');
+      //     updatePassword(new_password);
+      //   }
+      // };
+
       const pdf: PDFDocumentProxy = await initiateLoadPdf.promise;
 
       // Store the PDF instance in a shared state.
       pdfStates.pdfInstance = pdf;
 
-      // Create and return a WebViewer instance configured with the loaded PDF.
-      const { password, ...neededOptions } = this.loadOptions;
-      const viewer = new WebViewer(pdf, neededOptions, internalContainers['parent'], container);
+      const viewer = new WebViewer(pdf, this.loadOptions, internalContainers['parent'], container);
       return viewer;
     } catch (err) {
       // Handle errors during the document loading process.
