@@ -197,7 +197,6 @@ class PageVirtualization {
       await thumbnail.initThumbnail();
 
       if (pageNumber === isSpecificPage || pageNumber === this.pdfState.currentPage) {
-        console.log(pageNumber, this.pdfState.currentPage);
         thumbnail.activeThumbnail = this.pdfState.currentPage;
       }
     }
