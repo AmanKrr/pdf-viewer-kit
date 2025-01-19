@@ -72,6 +72,66 @@
   min-height: calc(100% - 40px);
 }
 
+/* Password viewer */
+.a-password-viewer {
+  position: absolute;
+  z-index: 999;
+  padding: 8px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: rgb(42, 42, 42);
+  border-radius: 0.3em;
+  min-height: 110px;
+  min-width: 300px;
+}
+
+.a-password-viewer form {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  font-size: 1rem;
+  color: #dee2e6;
+  height: max-content;
+}
+
+.a-password-viewer form label {
+  font-weight: bold;
+  font-size: 0.8rem;
+}
+
+.a-password-viewer form input {
+  margin-top: 5px;
+  font-size: 0.8rem;
+  background-color: #505050;
+  border: 1px solid #505050;
+  border-radius: 2px;
+}
+
+.a-password-viewer form input[type="password"]:focus {
+  outline: none !important;
+  border: 1px solid #a0a0a0 !important;
+}
+
+.a-password-viewer form input[type="submit"] {
+  margin-top: 10px;
+  font-size: 0.8rem;
+  background-color: #6f6f6f;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  border-radius: 2px;
+  color: #dee2e6;
+  min-height: 25px;
+}
+
+.a-password-viewer form {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Loading overlay */
 .pdf-loading #loading-container {
   display: block;

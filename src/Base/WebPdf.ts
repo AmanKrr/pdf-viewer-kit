@@ -21,7 +21,7 @@ import WebViewer from '../Viewer/components/WebViewer';
 import WebUiUtils from '../utils/WebUiUtils';
 import PdfState from '../Viewer/components/PdfState';
 import PageElement from '../Viewer/components/PageElement';
-import PageVirtualization from '../Viewer/components/PageVirtualization';
+import PasswordManager from '../Viewer/manager/Password';
 
 import '../style/toolbar.css';
 import '../style/root.css';
@@ -69,7 +69,7 @@ class WebPdf {
 
     try {
       // Merge user-specified options with default options.
-      const { password, withCredentials, data, httpHeaders, document, ...rest } = options;
+      const { password, ...rest } = options;
       this.loadOptions = {
         ...rest,
         ...options,
@@ -77,11 +77,11 @@ class WebPdf {
 
       // Fetch the PDF document using the specified source.
       const initiateLoadPdf = pdfjsLib.getDocument({
-        url: document,
+        url: options.document,
         password: password,
-        withCredentials: withCredentials,
-        data: data,
-        httpHeaders: httpHeaders,
+        withCredentials: options.withCredentials,
+        data: options.data,
+        httpHeaders: options.httpHeaders,
       } as GetDocumentOptions);
 
       // Track progress while fetching pdf.
@@ -91,24 +91,30 @@ class WebPdf {
       //   console.log('total : ' + data.total);
       // };
 
-      // TO_DO PASSWORD PROMPT
-      // initiateLoadPdf.onPassword = function (updatePassword: any, reason: any) {
-      //   console.log('password ask', updatePassword, reason);
-      //   if (reason === 1) {
-      //     // need a password
-      //     var new_password = prompt('Please enter a password:');
-      //     updatePassword(new_password);
-      //   } else {
-      //     // Invalid password
-      //     var new_password = prompt('Invalid! Please enter a password:');
-      //     updatePassword(new_password);
-      //   }
-      // };
+      let passwordManager: PasswordManager | null = null;
+      initiateLoadPdf.onPassword = function (updatePassword: (pass: string) => void, reason: any) {
+        if (reason === 1) {
+          // create password viewer for input password
+          if (!passwordManager) {
+            passwordManager = new PasswordManager(internalContainers['parent'], updatePassword);
+          }
+        } else {
+          // Invalid password
+          if (passwordManager) {
+            passwordManager.onError = 'Incorrect! Enter password again :';
+          }
+        }
+      };
 
       const pdf: PDFDocumentProxy = await initiateLoadPdf.promise;
 
       // Store the PDF instance in a shared state.
       pdfStates.pdfInstance = pdf;
+
+      // once got correct password and pdf has been opened. Destroy the viewer so that memory is released.
+      if (passwordManager) {
+        (passwordManager as PasswordManager).destroy();
+      }
 
       const viewer = new WebViewer(pdf, this.loadOptions, internalContainers['parent'], container);
       return viewer;
