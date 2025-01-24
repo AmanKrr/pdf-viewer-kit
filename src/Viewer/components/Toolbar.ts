@@ -128,6 +128,7 @@ class Toolbar {
         onClick: (viewer: WebViewer) => this._viewer.toogleThumbnailViewer(),
         hide: false,
         class: this.toolbarClass['thumbnail'] + '-icon',
+        group: 1,
       },
       {
         id: 'firstPage',
@@ -137,6 +138,7 @@ class Toolbar {
         hide: false,
         isSeparatorBefore: true,
         class: this.toolbarClass['firstPage'] + '-icon',
+        group: 1,
       },
       {
         id: 'previousPage',
@@ -145,6 +147,7 @@ class Toolbar {
         onClick: (viewer: WebViewer) => this._viewer.previousPage(),
         hide: false,
         class: this.toolbarClass['previousPage'] + '-icon',
+        group: 1,
       },
       {
         id: 'nextPage',
@@ -153,6 +156,7 @@ class Toolbar {
         onClick: (viewer: WebViewer) => this._viewer.nextPage(),
         hide: false,
         class: this.toolbarClass['nextPage'] + '-icon',
+        group: 1,
       },
       {
         id: 'lastPage',
@@ -161,6 +165,7 @@ class Toolbar {
         onClick: (viewer: WebViewer) => this._viewer.lastPage(),
         hide: false,
         class: this.toolbarClass['lastPage'] + '-icon',
+        group: 1,
       },
       {
         id: 'pageNumber',
@@ -169,6 +174,7 @@ class Toolbar {
         render: () => Toolbar.renderPageNumberControls(this._viewer),
         onClick: (p) => console.log('clicked'),
         hide: false,
+        group: 1,
       },
       {
         id: 'zoomIn',
@@ -178,6 +184,7 @@ class Toolbar {
         isSeparatorBefore: true,
         hide: false,
         class: this.toolbarClass['zoomIn'] + '-icon',
+        group: 1,
       },
       {
         id: 'zoomOut',
@@ -186,36 +193,59 @@ class Toolbar {
         onClick: (viewer: WebViewer) => this._viewer.zoomOut(),
         class: this.toolbarClass['zoomOut'] + '-icon',
         hide: false,
+        group: 1,
+      },
+      {
+        id: 'search',
+        label: 'Search',
+        icon: 'search-icon',
+        onClick: () => {
+          this._viewer.search();
+        },
+        class: this.toolbarClass['search'] + '-icon',
+        hide: false,
+        group: 2,
+      },
+      {
+        id: 'download',
+        label: 'Download',
+        icon: 'download-icon',
+        onClick: (viewer: WebViewer) => this._viewer.zoomOut(),
+        class: this.toolbarClass['download'] + '-icon',
+        hide: false,
+        group: 2,
       },
     ];
     return toolbarConfig;
   }
 
   private renderToolbar(): void {
-    const toolbarContainer = document.querySelector(`#${this.__pdfState.containerId} #toolbarContainer`) as HTMLElement;
-    if (!toolbarContainer) return;
+    const toolbarContainerGroupOne = document.querySelector(`#${this.__pdfState.containerId} #toolbarContainer #${aPdfViewerIds._TOOLBAR_GROUP_1}`) as HTMLElement;
+    const toolbarContainerGroupTwo = document.querySelector(`#${this.__pdfState.containerId} #toolbarContainer #${aPdfViewerIds._TOOLBAR_GROUP_2}`) as HTMLElement;
+    if (!toolbarContainerGroupOne || !toolbarContainerGroupTwo) return;
 
-    toolbarContainer.innerHTML = ''; // Clear existing toolbar
+    toolbarContainerGroupOne.textContent = ''; // Clear existing toolbar
+    toolbarContainerGroupTwo.textContent = ''; // Clear existing toolbar
 
     this.toolbarConfig.forEach((item) => {
       if (item['hide']) return;
+      const container = item['group'] === 1 ? toolbarContainerGroupOne : toolbarContainerGroupTwo;
 
       if (item.isSeparatorBefore) {
-        this.addSeparator(toolbarContainer);
+        this.addSeparator(container);
       }
 
       if (item.type === 'custom' && item.render) {
         // Custom rendering logic
         const customElement = item.render(this);
-        toolbarContainer.appendChild(customElement);
+        container.appendChild(customElement);
       } else {
         const button = this.createToolbarButton(item);
         const parentWrapper = this.parentWrapper(item);
         parentWrapper.appendChild(button);
-        toolbarContainer.appendChild(parentWrapper);
+        container.appendChild(parentWrapper);
       }
     });
-
     WebUiUtils.hideLoading(this.__pdfState.uiLoading, this.__pdfState.containerId);
   }
 

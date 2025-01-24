@@ -1,5 +1,7 @@
 export const aPdfViewerIds = {
   _TOOLBAR_CONTAINER: 'toolbarContainer',
+  _TOOLBAR_GROUP_1: 'toolbarGroupOne',
+  _TOOLBAR_GROUP_2: 'toolbarGroupTwo',
   _MAIN_VIEWER_CONTAINER: 'mainViewerContainer',
   _MAIN_PAGE_VIEWER_CONTAINER: 'mainPageViewerContainer',
   _TEXT_LAYER: 'text-Layer',
@@ -20,6 +22,7 @@ export const aPdfViewerClassNames = {
   _A_TEXT_LAYER: 'a-text-layer',
   _A_ANNOTATION_LAYER: 'a-annotation-layer',
   _A_TOOLBAR_ITEM: 'a-toolbar-item',
+  _TOOLBAR_GROUP: 'toolbarGroup',
   _A_TOOLBAR_TOOLTIP: 'a-toolbar-tooltip',
   _A_TOOLBAR_BUTTON: 'a-toolbar-button',
   _A_TOOLBAR_ICON: 'a-toolbar-icon',

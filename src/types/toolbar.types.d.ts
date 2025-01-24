@@ -8,6 +8,7 @@ interface ToolbarButtonConfig {
   onClick: (params: any) => void;
   render?: (params: any | null = null) => HTMLElement;
   hide: boolean;
+  group: 1 | 2;
 }
 
 interface ToolbarOptions {

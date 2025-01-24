@@ -81,6 +81,16 @@ class PageElement {
     toolbarParent.classList.add(aPdfViewerClassNames._A_TOOLBAR_ITEMS);
     toolbarParent.setAttribute('id', aPdfViewerIds._TOOLBAR_CONTAINER);
 
+    const groupOneParent = document.createElement('div');
+    groupOneParent.setAttribute('id', aPdfViewerIds._TOOLBAR_GROUP_1);
+    groupOneParent.classList.add(aPdfViewerClassNames._TOOLBAR_GROUP);
+    toolbarParent.appendChild(groupOneParent);
+
+    const groupTwoParent = document.createElement('div');
+    groupTwoParent.setAttribute('id', aPdfViewerIds._TOOLBAR_GROUP_2);
+    groupTwoParent.classList.add(aPdfViewerClassNames._TOOLBAR_GROUP);
+    toolbarParent.appendChild(groupTwoParent);
+
     // Create main page viewer container.
     const pageParentViewer = document.createElement('div');
     pageParentViewer.classList.add(aPdfViewerClassNames._A_VIEWER_CONTAINER);

@@ -22,6 +22,7 @@ import PdfState from './PdfState';
 import Toolbar from './Toolbar';
 import PageVirtualization from './PageVirtualization';
 import { debounce } from 'lodash';
+import PdfSearch from '../manager/PdfSearch';
 
 /**
  * A class for managing and interacting with a PDF viewer in the browser.
@@ -49,7 +50,7 @@ class WebViewer {
 
     // Initialize components for text layer, annotation layer, and page virtualization.
     this.__pageVirtualization = new PageVirtualization(this.__viewerOptions, parentContainer, pageParentContainer, this.__pdfInstance.numPages, this);
-
+    new PdfSearch(this.__pdfState);
     new Toolbar(this.__viewerOptions.containerId, this.__viewerOptions.customToolbarItems ?? [], this);
     this.addEvents();
   }
@@ -183,12 +184,17 @@ class WebViewer {
   }
 
   /**
-   * Searches for a query in the PDF.
-   * @param query - The search query string.
+   * Enable Search box.
    */
-  public search(query: string): void {
-    // Implement search logic here
-    console.log(`Performing search for: ${query}`);
+  public search(): void {
+    const searchContainer = document.querySelector('.a-search-container');
+    if (searchContainer) {
+      if ((searchContainer as HTMLElement).classList.contains('a-search-hidden')) {
+        (searchContainer as HTMLElement).classList.remove('a-search-hidden');
+      } else {
+        (searchContainer as HTMLElement).classList.add('a-search-hidden');
+      }
+    }
   }
 
   /**
