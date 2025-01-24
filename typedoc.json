@@ -1,0 +1,14 @@
+{
+  "entryPoints": ["src"],
+  "entryPointStrategy": "expand",
+  "out": "docs",
+  "exclude": ["src/pdfjs-lib.d.ts", "src/constant/**/*", "src/types/**/*", "src/index.ts"], 
+  "excludeExternals": true,
+  "excludeNotDocumented": false,
+  "includeVersion": true,
+  "excludePrivate": false,
+  "visibilityFilters": {
+    "private": true,
+    "protected": true,
+  }
+}
