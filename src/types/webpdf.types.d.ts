@@ -2,28 +2,71 @@
  * Represents the options for loading a PDF document in the web viewer.
  */
 interface LoadOptions {
-  containerId: string; // The ID of the container element where the PDF viewer will be inserted.
-  document?: string | url; // Union type for different document types: string, Blob, or ArrayBuffer.
+  /** The ID of the container element where the PDF viewer will be inserted. */
+  containerId: string;
+
+  /** The source URL or path of the PDF document. */
+  document?: string | URL;
+
+  /** Raw PDF data provided as an `ArrayBuffer` or `Blob`. */
   data?: ArrayBuffer | Blob;
-  disableTextSelection?: boolean; // Optional flag to disable text selection in the viewer.
-  maxDefaultZoomLevel?: number; // Optional maximum default zoom level for the viewer.
-  password?: string; // Optional password for encrypted PDF documents.
-  printMode?: boolean; // Optional flag to enable print mode for the viewer.
-  toolbarItems?: Partial<ToolbarOptions> | {}; // Optional array of toolbar items to display in the viewer.
-  styleSheets?: string; // Optional custom style sheets for the viewer.
-  preventTextCopy?: boolean; // Optional flag to prevent text copying from the viewer.
-  renderSpecificPageOnly?: number | null; // Optional flag to render a specific page only.
+
+  /** If `true`, text selection will be disabled in the viewer. */
+  disableTextSelection?: boolean;
+
+  /** The maximum zoom level allowed in the viewer (optional). */
+  maxDefaultZoomLevel?: number;
+
+  /** The password required to open an encrypted PDF (optional). */
+  password?: string;
+
+  /** If `true`, enables print mode for the viewer (optional). */
+  printMode?: boolean;
+
+  /** Toolbar configuration, allowing partial customization (optional). */
+  toolbarItems?: Partial<ToolbarOptions> | {};
+
+  /** Custom CSS stylesheets for customizing the viewer UI (optional). */
+  styleSheets?: string;
+
+  /** If `true`, prevents text copying in the viewer (optional). */
+  preventTextCopy?: boolean;
+
+  /** Specifies a specific page number to render only that page (optional). */
+  renderSpecificPageOnly?: number | null;
+
+  /** Custom toolbar items that can be added to the viewer (optional). */
   customToolbarItems?: ToolbarButtonConfig[];
+
+  /** If `true`, enables credentials for cross-origin requests (optional). */
   withCredentials?: boolean;
-  httpHeaders?: any;
+
+  /** HTTP headers to be used for fetching the PDF document (optional). */
+  httpHeaders?: Record<string, string>;
 }
 
+/**
+ * Represents viewer options for loading a PDF, excluding sensitive properties.
+ * This omits `password`, `withCredentials`, and `httpHeaders` for security reasons.
+ */
 type ViewerLoadOptions = Omit<LoadOptions, 'password', 'withCredentials', 'httpHeaders'>;
 
+/**
+ * Options used when retrieving a PDF document from a URL or other sources.
+ */
 interface GetDocumentOptions {
-  url: string | url; // Union type for different document types: string, Blob, or ArrayBuffer.
-  password?: string; // Optional password for encrypted PDF documents.
+  /** The URL or path to the PDF document. */
+  url: string | URL;
+
+  /** The password required to unlock an encrypted PDF (optional). */
+  password?: string;
+
+  /** If `true`, enables credentials for cross-origin requests (optional). */
   withCredentials?: boolean;
-  httpHeaders?: any;
+
+  /** HTTP headers to be included when fetching the PDF document (optional). */
+  httpHeaders?: Record<string, string>;
+
+  /** Raw PDF data provided as an `ArrayBuffer` or `Blob` (optional). */
   data?: ArrayBuffer | Blob;
 }

@@ -18,12 +18,18 @@ import { aPdfViewerClassNames } from '../../constant/ElementIdClass';
 import PdfState from '../components/PdfState';
 import Trie from './Trie';
 
+/**
+ * Options for search behavior.
+ */
 interface SearchOptions {
   matchCase: boolean;
   wholeWord: boolean;
   regex: boolean;
 }
 
+/**
+ * Represents a bounding box for highlighting search matches.
+ */
 interface MatchBoundingBox {
   x: number;
   y: number;
@@ -31,27 +37,37 @@ interface MatchBoundingBox {
   height: number;
 }
 
+/**
+ * Represents a search result, including the page number, total matches, and match positions.
+ */
 interface SearchResult {
   pageNumber: number;
   totalMatches: number;
   matchPositions: { startIndex: number; length: number; bbox?: MatchBoundingBox }[];
 }
 
+/**
+ * Handles PDF text extraction, search, and highlighting in the viewer.
+ */
 class PdfSearch {
-  // private pdfDocument: PDFDocumentProxy;
   private textIndex: Map<number, string> = new Map();
   private trie: Trie = new Trie();
   private pdfState: PdfState;
   private currentMatchIndex: number = 0;
   private matches: SearchResult[] = [];
 
+  /**
+   * Initializes the PDF search module.
+   *
+   * @param {PdfState} pdfState - The PDF state instance managing document interactions.
+   */
   constructor(pdfState: PdfState) {
     this.pdfState = pdfState;
     this.createSearchLayout();
   }
 
   /**
-   * Extracts and indexes text from the PDF.
+   * Extracts text from all pages and indexes it for search.
    */
   async extractPdfContent(): Promise<void> {
     for (let i = 1; i <= this.pdfState.pdfInstance.numPages; i++) {
@@ -61,6 +77,8 @@ class PdfSearch {
 
   /**
    * Extracts text from a specific page and caches it.
+   *
+   * @param {number} pageNumber - The page number to extract text from.
    */
   private async extractPageText(pageNumber: number): Promise<void> {
     if (this.textIndex.has(pageNumber)) return;
@@ -68,8 +86,8 @@ class PdfSearch {
     const page = await this.pdfState.pdfInstance.getPage(pageNumber);
     const textContent = await page.getTextContent();
     const extractedText = textContent.items
-      .map((item: any) => (item.str != '' ? item.str : '@REMOVE-1-1'))
-      .filter((item) => item != '@REMOVE-1-1')
+      .map((item: any) => (item.str !== '' ? item.str : '@REMOVE-1-1'))
+      .filter((item) => item !== '@REMOVE-1-1')
       .join(' ');
 
     this.textIndex.set(pageNumber, extractedText);
@@ -80,6 +98,10 @@ class PdfSearch {
 
   /**
    * Searches for a term in the indexed PDF text.
+   *
+   * @param {string} searchTerm - The term to search for.
+   * @param {SearchOptions} options - The search options.
+   * @returns {Promise<SearchResult[]>} An array of search results.
    */
   async search(searchTerm: string, options: SearchOptions): Promise<SearchResult[]> {
     this.removeHighlights();
@@ -108,11 +130,19 @@ class PdfSearch {
     return results;
   }
 
-  removeHighlights() {
+  /**
+   * Removes all existing search highlights.
+   */
+  removeHighlights(): void {
     document.querySelectorAll('.a-highlight').forEach((el) => el.remove());
     this.matches = [];
   }
 
+  /**
+   * Highlights search matches in the document.
+   *
+   * @param {number | null} pageNumber - The page number to highlight matches on (or all if null).
+   */
   async highlightMatches(pageNumber: number | null = null): Promise<void> {
     for (const result of this.matches) {
       const page = await this.pdfState.pdfInstance.getPage(pageNumber ?? result.pageNumber);
@@ -125,12 +155,10 @@ class PdfSearch {
         const itemText = item.str;
         if (!itemText) continue;
 
-        // Loop through matches on this page
         for (const match of result.matchPositions) {
           const matchIndex = match.startIndex;
           const matchEnd = matchIndex + match.length;
 
-          // If the match falls within this item's text
           if (matchIndex >= textIndex && matchEnd <= textIndex + itemText.length) {
             const relativeStart = matchIndex - textIndex;
             const relativeEnd = relativeStart + match.length;
@@ -139,13 +167,22 @@ class PdfSearch {
           }
         }
 
-        textIndex += itemText.length + 1; // Account for spaces between items
+        textIndex += itemText.length + 1;
       }
     }
   }
 
   /**
-   * Creates highlights at precise character locations with correct Y-position.
+   * Creates visual highlights on the PDF page for matched search terms.
+   *
+   * This method calculates the precise position and dimensions of the highlighted text
+   * and dynamically overlays a semi-transparent highlight on the corresponding text elements.
+   *
+   * @param {any} item - The text item containing the matched characters.
+   * @param {number} pageNumber - The page number where the highlight should be applied.
+   * @param {number} start - The starting index of the matched text within the text item.
+   * @param {number} end - The ending index of the matched text within the text item.
+   * @param {any} viewport - The viewport object containing the page transformation details.
    */
   private createCharacterHighlight(item: any, pageNumber: number, start: number, end: number, viewport: any): void {
     const fontSize = Math.abs(item.transform[0]); // Get font size from scale factor
@@ -155,17 +192,23 @@ class PdfSearch {
     const adjustedY = viewport.height - item.transform[5];
 
     for (let i = start; i < end; i++) {
+      // Create the highlight element
       const highlight = document.createElement('div');
       highlight.classList.add('a-highlight');
+
+      // Positioning the highlight
       highlight.style.position = 'absolute';
       highlight.style.left = `${item.transform[4] + i * charWidth}px`;
-      highlight.style.top = `${adjustedY - fontSize}px`; // Adjust Y position
+      highlight.style.top = `${adjustedY - fontSize}px`; // Adjust Y position to align with text
       highlight.style.width = `${charWidth}px`;
       highlight.style.height = `${fontSize}px`;
+
+      // Highlight styling
       highlight.style.backgroundColor = 'yellow';
       highlight.style.opacity = '0.5';
-      highlight.style.pointerEvents = 'none';
+      highlight.style.pointerEvents = 'none'; // Prevent interaction with highlights
 
+      // Append highlight to the corresponding page container
       const pageElement = document.querySelector(`#pageContainer-${pageNumber}`);
       if (pageElement) pageElement.appendChild(highlight);
     }
@@ -173,6 +216,10 @@ class PdfSearch {
 
   /**
    * Constructs the appropriate regex pattern for searching.
+   *
+   * @param {string} searchTerm - The search term.
+   * @param {SearchOptions} options - The search options.
+   * @returns {RegExp} The constructed regex pattern.
    */
   private constructSearchPattern(searchTerm: string, options: SearchOptions): RegExp {
     if (options.regex) {
@@ -185,20 +232,14 @@ class PdfSearch {
   }
 
   /**
-   * Returns auto-suggestions based on the search prefix.
+   * Creates a UI for the search feature.
    */
-  getAutoSuggestions(prefix: string): string[] {
-    return this.trie.search(prefix);
-  }
-
-  createSearchLayout() {
+  createSearchLayout(): void {
     const parentContainer = document.querySelector(`#${this.pdfState.containerId} .${aPdfViewerClassNames._A_PDF_VIEWER}`);
     if (parentContainer) {
       const container = document.createElement('div');
-      container.classList.add('a-search-container');
-      container.classList.add('a-search-hidden');
+      container.classList.add('a-search-container', 'a-search-hidden');
 
-      // Search Bar
       const searchBar = document.createElement('div');
       searchBar.classList.add('a-search-bar');
 
@@ -212,51 +253,8 @@ class PdfSearch {
         }
       };
 
-      // const matchCounter = document.createElement('span');
-      // matchCounter.classList.add('a-match-counter');
-      // matchCounter.textContent = '0/0';
-
-      // const separator = document.createElement('div');
-      // separator.classList.add('a-separator');
-
-      // const upButton = document.createElement('button');
-      // upButton.classList.add('a-search-nav', 'up');
-      // upButton.textContent = '▲';
-
-      // const downButton = document.createElement('button');
-      // downButton.classList.add('a-search-nav', 'down');
-      // downButton.textContent = '▼';
-
       searchBar.appendChild(input);
-      // searchBar.appendChild(matchCounter);
-      // searchBar.appendChild(separator);
-      // searchBar.appendChild(upButton);
-      // searchBar.appendChild(downButton);
-
-      // Options Container
-      const optionsContainer = document.createElement('div');
-      optionsContainer.classList.add('a-options-container');
-
-      const options = ['Match Case', 'Whole Word', 'Regex'];
-      options.forEach((option) => {
-        const label = document.createElement('label');
-        label.classList.add('a-option-label');
-
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.classList.add('a-search-option');
-        checkbox.dataset.option = option.toLowerCase().replace(' ', '-');
-
-        label.appendChild(checkbox);
-        label.appendChild(document.createTextNode(option));
-        optionsContainer.appendChild(label);
-      });
-
-      // Append to container
       container.appendChild(searchBar);
-      container.appendChild(optionsContainer);
-      // return container;
-
       parentContainer.appendChild(container);
     }
   }

@@ -2,7 +2,7 @@
   Copyright 2025 Aman Kumar
 
   Licensed under the Apache License, Version 2.0 (the "License");
-  you may not use this file except in compliance with the License.
+  You may not use this file except in compliance with the License.
   You may obtain a copy of the License at
 
       http://www.apache.org/licenses/LICENSE-2.0
@@ -14,8 +14,12 @@
   limitations under the License.
 */
 
+/* Importing variable definitions */
 @import "./variable.css";
 
+/* ========================== */
+/* PDF Viewer Container */
+/* ========================== */
 
 .a-pdf-viewer {
   position: relative;
@@ -29,17 +33,25 @@
   /* background-color: var(--pdf-viewer-dark-theme); */
 }
 
+/* ========================== */
+/* Viewer and Page Containers */
+/* ========================== */
+
+/* Container for the entire PDF viewer */
 .a-viewer-container {
   width: 100%;
   min-height: calc(100% - 40px);
+  /* Adjusting for toolbar height */
   overflow: auto;
   position: relative;
 }
 
+/* Hide the page container when PDF is loading */
 .pdf-loading .a-page-container {
   visibility: hidden;
 }
 
+/* The main container for pages */
 .a-page-container {
   position: relative;
   min-width: var(--min-pdf-width);
@@ -48,23 +60,20 @@
   width: max-content;
   display: flex;
   flex-direction: column;
-  /* justify-content: center; */
   justify-content: flex-start;
   align-items: center;
-  /* transform-origin: 0px 0px;
-  transform: translate(20px, 20px); */
 }
 
+/* Individual page styling */
 .a-page-view {
   border-color: #dee2e6;
   border-style: solid;
   border-width: 1px;
   box-shadow: none;
   box-sizing: border-box;
-  /* position: absolute; */
-  /* margin: 10px; */
 }
 
+/* Wrapper for the viewer to align PDF with sidebar */
 .a-viewer-wrapper {
   display: flex;
   flex-direction: row;
@@ -72,7 +81,10 @@
   min-height: calc(100% - 40px);
 }
 
-/* Password viewer */
+/* ========================== */
+/* Password Input Box Styling */
+/* ========================== */
+
 .a-password-viewer {
   position: absolute;
   z-index: 999;
@@ -109,11 +121,13 @@
   border-radius: 2px;
 }
 
+/* Password input focus effect */
 .a-password-viewer form input[type="password"]:focus {
   outline: none !important;
   border: 1px solid #a0a0a0 !important;
 }
 
+/* Submit button styling */
 .a-password-viewer form input[type="submit"] {
   margin-top: 10px;
   font-size: 0.8rem;
@@ -126,17 +140,26 @@
   min-height: 25px;
 }
 
+/* Styles the form inside the password input modal */
 .a-password-viewer form {
   padding: 10px;
+  /* Adds spacing inside the form */
   display: flex;
+  /* Uses flexbox for layout */
   flex-direction: column;
+  /* Stacks form elements vertically */
 }
 
-/* Loading overlay */
+/* ========================== */
+/* Loading Spinner Overlay */
+/* ========================== */
+
+/* Show loading container when PDF is loading */
 .pdf-loading #loading-container {
   display: block;
 }
 
+/* The loading container covers the entire viewer while loading */
 #loading-container {
   position: absolute;
   top: 0;
@@ -147,6 +170,7 @@
   display: none;
 }
 
+/* Centering the spinner */
 .loading {
   display: flex;
   justify-content: center;
@@ -155,6 +179,7 @@
   height: 100%;
 }
 
+/* Spinner animation */
 .spinner {
   border: 8px solid rgba(0, 0, 0, 0.1);
   border-left-color: #333;
@@ -164,6 +189,7 @@
   animation: spin 1s linear infinite;
 }
 
+/* Spinner keyframes */
 @keyframes spin {
   to {
     transform: rotate(360deg);

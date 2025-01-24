@@ -19,6 +19,9 @@ import { aPdfViewerClassNames } from '../../constant/ElementIdClass';
 import { PDFThumbnailViewOptions } from '../../types/thumbnail.types';
 import { PDFLinkService } from '../service/LinkService';
 
+/**
+ * Manages the creation, rendering, and interaction of PDF thumbnails in the sidebar.
+ */
 class ThumbnailViewer {
   private __enableHWA = false;
   private __canvasWidth = 98;
@@ -29,6 +32,11 @@ class ThumbnailViewer {
   private linkService: PDFLinkService | null;
   private canvas: HTMLCanvasElement | null = null;
 
+  /**
+   * Constructs a `ThumbnailViewer` instance.
+   *
+   * @param {PDFThumbnailViewOptions} options - Configuration options for the thumbnail.
+   */
   constructor(options: PDFThumbnailViewOptions) {
     const { container, pdfDocument, pageNumber, linkService } = options;
     this.container = container;
@@ -37,7 +45,13 @@ class ThumbnailViewer {
     this.linkService = linkService || null;
   }
 
-  static createThumbnailContainer(parentContainerId: string) {
+  /**
+   * Creates the thumbnail sidebar container and attaches it to the PDF viewer.
+   *
+   * @param {string} parentContainerId - The ID of the parent PDF viewer container.
+   * @returns {HTMLElement | undefined} The created inner thumbnail container.
+   */
+  static createThumbnailContainer(parentContainerId: string): HTMLElement | undefined {
     const thumbnailContainer = document.createElement('div');
     thumbnailContainer.classList.add(aPdfViewerClassNames._A_SIDEBAR_CONTAINER);
 
@@ -56,11 +70,19 @@ class ThumbnailViewer {
     return innerThumbnailContent;
   }
 
-  get totalPages() {
+  /**
+   * Retrieves the total number of pages in the PDF document.
+   *
+   * @returns {number} The total number of pages.
+   */
+  get totalPages(): number {
     return this.pdfDocument.numPages;
   }
 
-  public async initThumbnail() {
+  /**
+   * Initializes and renders the thumbnail for the current page.
+   */
+  public async initThumbnail(): Promise<void> {
     const thumbnailDiv = document.createElement('div');
     thumbnailDiv.className = 'thumbnail';
     thumbnailDiv.dataset.pageNumber = this.pageNumber.toString();
@@ -69,9 +91,14 @@ class ThumbnailViewer {
     await this.renderThumbnail(thumbnailDiv);
   }
 
+  /**
+   * Sets the active thumbnail and navigates to the corresponding page in the PDF viewer.
+   *
+   * @param {number} pageNumber - The page number to be set as active.
+   */
   set activeThumbnail(pageNumber: number) {
     if (pageNumber < 0 || pageNumber > this.totalPages) {
-      console.error(`${pageNumber} is invalid page number.`);
+      console.error(`${pageNumber} is an invalid page number.`);
       return;
     }
 
@@ -86,7 +113,12 @@ class ThumbnailViewer {
     }
   }
 
-  private async renderThumbnail(thumbnailDiv: HTMLElement) {
+  /**
+   * Renders the thumbnail image for the corresponding PDF page.
+   *
+   * @param {HTMLElement} thumbnailDiv - The container for the thumbnail.
+   */
+  private async renderThumbnail(thumbnailDiv: HTMLElement): Promise<void> {
     const page: PDFPageProxy = await this.pdfDocument.getPage(this.pageNumber);
 
     // Set thumbnail scale
@@ -131,11 +163,17 @@ class ThumbnailViewer {
     // Add click event for navigation
     thumbnailDiv.addEventListener('click', () => this.thumbnailDestination(thumbnailDiv));
 
-    // free up memory as soon as canvas work is done
+    // Free up memory as soon as canvas work is done
     this.destroy();
   }
 
-  private thumbnailDestination(thumbnailDiv: HTMLElement, pageNumber: number = -1) {
+  /**
+   * Navigates to the corresponding page when a thumbnail is clicked.
+   *
+   * @param {HTMLElement} thumbnailDiv - The clicked thumbnail element.
+   * @param {number} [pageNumber=-1] - The page number to navigate to.
+   */
+  private thumbnailDestination(thumbnailDiv: HTMLElement, pageNumber: number = -1): void {
     if (!this.linkService) {
       console.log(`this.linkService is ${this.linkService}`);
       return;
@@ -143,11 +181,13 @@ class ThumbnailViewer {
 
     const previousActiveThumbnail = this.container.querySelector(`.thumbnail.thumbnail-active`);
     const pagenumber = pageNumber > 0 ? pageNumber : this.pageNumber;
+
     if (previousActiveThumbnail) {
       if (previousActiveThumbnail.classList.contains('thumbnail-active')) {
         previousActiveThumbnail.classList.remove('thumbnail-active');
       }
     }
+
     if (thumbnailDiv) {
       thumbnailDiv.classList.add('thumbnail-active');
       if (this.linkService.currentPageNumber !== pageNumber) {
@@ -156,8 +196,10 @@ class ThumbnailViewer {
     }
   }
 
-  public destroy() {
-    // Cleanup canvas and DOM elements
+  /**
+   * Cleans up resources and removes the canvas to free memory.
+   */
+  public destroy(): void {
     this.canvas?.remove();
     this.canvas = null;
   }

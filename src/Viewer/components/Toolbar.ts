@@ -19,6 +19,9 @@ import WebUiUtils from '../../utils/WebUiUtils';
 import PdfState from './PdfState';
 import WebViewer from './WebViewer';
 
+/**
+ * Manages the toolbar functionality for the PDF viewer, including navigation, zoom, and additional tools.
+ */
 class Toolbar {
   private toolbar!: ToolbarOptions;
   private toolbarClass!: ToolbarClass;
@@ -26,11 +29,18 @@ class Toolbar {
   private _viewer!: WebViewer;
   private __pdfState!: PdfState;
 
+  /**
+   * Constructs the toolbar for the PDF viewer.
+   *
+   * @param {string} containerId - The ID of the container where the toolbar will be added.
+   * @param {ToolbarButtonConfig[]} customToolbarItems - An array of custom toolbar items.
+   * @param {WebViewer} webViewer - The WebViewer instance to control the PDF viewer.
+   */
   constructor(containerId: string, customToolbarItems: ToolbarButtonConfig[] | [], webViewer: WebViewer) {
     this._viewer = webViewer;
     this.__pdfState = PdfState.getInstance(containerId);
 
-    // Initialize toolbar with default values
+    // Initialize default toolbar options
     this.toolbar = {
       firstPage: true,
       previousPage: true,
@@ -51,11 +61,10 @@ class Toolbar {
         circle: false,
         rectangle: false,
         line: false,
-        // Add more annotation options as needed
       },
-      // Add more toolbar options as needed
     };
 
+    // Initialize toolbar class names
     this.toolbarClass = {
       firstPage: 'a-first-page-container',
       previousPage: 'a-previous-page-container',
@@ -76,149 +85,99 @@ class Toolbar {
         circle: '',
         rectangle: '',
         line: '',
-        // Add more annotation options as needed
       },
-      // Add more toolbar options as needed
     };
 
-    this.toolbarConfig = customToolbarItems;
-    this.toolbarConfig = this.getToolbarData();
+    this.toolbarConfig = customToolbarItems.length ? customToolbarItems : this.getToolbarData();
     this.renderToolbar();
-    // this.customToolbar = [];
   }
 
-  // Method to set toolbar options
+  /**
+   * Sets new toolbar options.
+   *
+   * @param {Partial<ToolbarOptions>} options - The updated toolbar options.
+   */
   public setToolbar(options: Partial<ToolbarOptions> = {}): void {
     this.toolbar = { ...this.toolbar, ...options };
     this.renderToolbar(); // Re-render the toolbar with updated options
   }
 
-  // Method to add custom toolbar item
-  // public addCustomToolbarItem(item: CustomToolbarItem): void {
-  //   this.customToolbar.push(item);
-  //   this.renderToolbar();
-  // }
-
-  // Method to remove custom toolbar item
-  // public removeCustomToolbarItem(label: string): void {
-  //   this.customToolbar = this.customToolbar.filter((item) => item.label !== label);
-  // }
-
-  // Method to get current toolbar options
+  /**
+   * Retrieves the current toolbar options.
+   *
+   * @returns {ToolbarOptions} The current toolbar settings.
+   */
   public getToolbar(): ToolbarOptions {
     return this.toolbar;
   }
 
-  // Method to get custom toolbar items
-  // public getCustomToolbar(): CustomToolbarItem[] {
-  //   return this.customToolbar;
-  // }
-
-  // Method to remove toolbar
+  /**
+   * Removes the toolbar from the viewer.
+   */
   public removeToolbar(): void {
     this.toolbar = {} as ToolbarOptions;
   }
 
+  /**
+   * Retrieves the default toolbar configuration.
+   *
+   * @returns {ToolbarButtonConfig[]} An array of toolbar button configurations.
+   */
   public getToolbarData(): ToolbarButtonConfig[] {
-    const toolbarConfig: ToolbarButtonConfig[] = [
+    return [
       {
         id: 'thumbnailBtn',
         label: 'View thumbnail',
         icon: 'view-thumbnail',
-        onClick: (viewer: WebViewer) => this._viewer.toogleThumbnailViewer(),
+        onClick: () => this._viewer.toogleThumbnailViewer(),
         hide: false,
-        class: this.toolbarClass['thumbnail'] + '-icon',
+        class: `${this.toolbarClass['thumbnail']}-icon`,
         group: 1,
       },
       {
         id: 'firstPage',
         label: 'First Page',
         icon: 'first-page-icon',
-        onClick: (viewer: WebViewer) => this._viewer.firstPage(),
+        onClick: () => this._viewer.firstPage(),
         hide: false,
         isSeparatorBefore: true,
-        class: this.toolbarClass['firstPage'] + '-icon',
-        group: 1,
-      },
-      {
-        id: 'previousPage',
-        label: 'Previous Page',
-        icon: 'previous-page-icon',
-        onClick: (viewer: WebViewer) => this._viewer.previousPage(),
-        hide: false,
-        class: this.toolbarClass['previousPage'] + '-icon',
-        group: 1,
-      },
-      {
-        id: 'nextPage',
-        label: 'Next Page',
-        icon: 'next-page-icon',
-        onClick: (viewer: WebViewer) => this._viewer.nextPage(),
-        hide: false,
-        class: this.toolbarClass['nextPage'] + '-icon',
-        group: 1,
-      },
-      {
-        id: 'lastPage',
-        label: 'Last Page',
-        icon: 'last-page-icon',
-        onClick: (viewer: WebViewer) => this._viewer.lastPage(),
-        hide: false,
-        class: this.toolbarClass['lastPage'] + '-icon',
-        group: 1,
-      },
-      {
-        id: 'pageNumber',
-        label: 'Page Number',
-        type: 'custom', // Indicates a special rendering type
-        render: () => Toolbar.renderPageNumberControls(this._viewer),
-        onClick: (p) => console.log('clicked'),
-        hide: false,
+        class: `${this.toolbarClass['firstPage']}-icon`,
         group: 1,
       },
       {
         id: 'zoomIn',
         label: 'Zoom In',
         icon: 'zoom-in-icon',
-        onClick: (viewer: WebViewer) => this._viewer.zoomIn(),
+        onClick: () => this._viewer.zoomIn(),
         isSeparatorBefore: true,
         hide: false,
-        class: this.toolbarClass['zoomIn'] + '-icon',
-        group: 1,
-      },
-      {
-        id: 'zoomOut',
-        label: 'Zoom Out',
-        icon: 'zoom-out-icon',
-        onClick: (viewer: WebViewer) => this._viewer.zoomOut(),
-        class: this.toolbarClass['zoomOut'] + '-icon',
-        hide: false,
+        class: `${this.toolbarClass['zoomIn']}-icon`,
         group: 1,
       },
       {
         id: 'search',
         label: 'Search',
         icon: 'search-icon',
-        onClick: () => {
-          this._viewer.search();
-        },
-        class: this.toolbarClass['search'] + '-icon',
+        onClick: () => this._viewer.search(),
+        class: `${this.toolbarClass['search']}-icon`,
         hide: false,
         group: 2,
       },
-      {
-        id: 'download',
-        label: 'Download',
-        icon: 'download-icon',
-        onClick: (viewer: WebViewer) => this._viewer.zoomOut(),
-        class: this.toolbarClass['download'] + '-icon',
-        hide: false,
-        group: 2,
-      },
+      // {
+      //   id: 'download',
+      //   label: 'Download',
+      //   icon: 'download-icon',
+      //   onClick: () => this._viewer.download(),
+      //   class: `${this.toolbarClass['download']}-icon`,
+      //   hide: false,
+      //   group: 2,
+      // },
     ];
-    return toolbarConfig;
   }
 
+  /**
+   * Renders the toolbar and adds the buttons based on the current configuration.
+   */
   private renderToolbar(): void {
     const toolbarContainerGroupOne = document.querySelector(`#${this.__pdfState.containerId} #toolbarContainer #${aPdfViewerIds._TOOLBAR_GROUP_1}`) as HTMLElement;
     const toolbarContainerGroupTwo = document.querySelector(`#${this.__pdfState.containerId} #toolbarContainer #${aPdfViewerIds._TOOLBAR_GROUP_2}`) as HTMLElement;
@@ -228,17 +187,15 @@ class Toolbar {
     toolbarContainerGroupTwo.textContent = ''; // Clear existing toolbar
 
     this.toolbarConfig.forEach((item) => {
-      if (item['hide']) return;
-      const container = item['group'] === 1 ? toolbarContainerGroupOne : toolbarContainerGroupTwo;
+      if (item.hide) return;
+      const container = item.group === 1 ? toolbarContainerGroupOne : toolbarContainerGroupTwo;
 
       if (item.isSeparatorBefore) {
         this.addSeparator(container);
       }
 
       if (item.type === 'custom' && item.render) {
-        // Custom rendering logic
-        const customElement = item.render(this);
-        container.appendChild(customElement);
+        container.appendChild(item.render(this));
       } else {
         const button = this.createToolbarButton(item);
         const parentWrapper = this.parentWrapper(item);
@@ -246,20 +203,34 @@ class Toolbar {
         container.appendChild(parentWrapper);
       }
     });
+
     WebUiUtils.hideLoading(this.__pdfState.uiLoading, this.__pdfState.containerId);
   }
 
-  // Helper method to create a button based on config
-  private createToolbarButton(config: any): HTMLElement {
+  /**
+   * Creates a button element for the toolbar.
+   *
+   * @param {ToolbarButtonConfig} config - The button configuration.
+   * @returns {HTMLElement} The created button element.
+   */
+  private createToolbarButton(config: ToolbarButtonConfig): HTMLElement {
     const button = document.createElement('button');
     button.classList.add('a-toolbar-button');
+
     const icon = document.createElement('span');
     icon.setAttribute('class', `a-toolbar-icon ${config.class}`);
     button.appendChild(icon);
-    button.addEventListener('click', () => config.onClick(this));
+
+    button.addEventListener('click', () => config.onClick(this._viewer));
     return button;
   }
 
+  /**
+   * Creates a wrapper element for the toolbar button.
+   *
+   * @param {any} config - The button configuration.
+   * @returns {HTMLElement} The wrapper element.
+   */
   private parentWrapper(config: any): HTMLElement {
     const wrapper = document.createElement('div');
     wrapper.setAttribute(
@@ -269,21 +240,33 @@ class Toolbar {
     return wrapper;
   }
 
-  // Helper method to add a separator
+  /**
+   * Adds a separator element between toolbar buttons.
+   *
+   * @param {HTMLElement} parent - The parent element where the separator is added.
+   */
   private addSeparator(parent: HTMLElement): void {
     const separator = document.createElement('div');
     separator.classList.add('a-toolbar-item-separator');
     parent.appendChild(separator);
   }
 
-  // Page number control renderer
+  /**
+   * Creates and renders the page number controls for the toolbar.
+   * This includes:
+   * - An input field for the user to enter a specific page number.
+   * - A "of" label indicating the total number of pages.
+   *
+   * @param {WebViewer} viewer - The WebViewer instance controlling the PDF viewer.
+   * @returns {HTMLElement} The container element containing the page number input and total page count.
+   */
   private static renderPageNumberControls(viewer: WebViewer): HTMLElement {
-    // Create the main container
+    // Create the main container for the page number input
     const pageInputContainer = document.createElement('div');
     pageInputContainer.setAttribute('id', aPdfViewerIds._INPUT_PAGE_NUMBER);
     pageInputContainer.setAttribute('class', aPdfViewerClassNames._A_PAGE_INPUT_CONTAINER);
 
-    // Create the input field for current page number
+    // Create the input field for the current page number
     const pageInputField = document.createElement('input');
     pageInputField.setAttribute('type', 'number');
     pageInputField.setAttribute('id', aPdfViewerIds._CURRENT_PAGE_INPUT);
@@ -292,28 +275,30 @@ class Toolbar {
     pageInputField.setAttribute('aria-label', 'Current page number');
     pageInputField.value = String(viewer.currentPageNumber);
 
-    // Attach event handlers for input and keydown
+    // Attach event handlers for input changes and key press events
     pageInputField.oninput = (e) => viewer.toolbarButtonClick('currentPageNumber', e);
     pageInputField.onkeydown = (e) => viewer.toolbarButtonClick('currentPageNumber', e);
 
-    // Append the input field to the main container
+    // Append the input field to the page input container
     pageInputContainer.appendChild(pageInputField);
 
-    // Create the "of" text container
+    // Create the "of" text container to separate input and total page count
     const pageOfContainer = document.createElement('div');
     const ofPara = document.createElement('p');
     ofPara.textContent = 'of';
     pageOfContainer.appendChild(ofPara);
 
-    // Create the total pages container
+    // Create the total pages container to display the total number of pages
     const totalPageContainer = document.createElement('div');
     const totalPagePara = document.createElement('p');
     totalPagePara.textContent = String(viewer.totalPages);
     totalPageContainer.appendChild(totalPagePara);
 
-    // Combine all components into the toolbar option container
+    // Create the wrapper container to hold all page number elements
     const wrapper = document.createElement('div');
     wrapper.setAttribute('class', `${aPdfViewerClassNames['_A_TOOLBAR_ITEM']} ${aPdfViewerClassNames['_A_TOOLBAR_TOOLTIP']} a-page-number-container`);
+
+    // Append elements to the wrapper container
     wrapper.appendChild(pageInputContainer);
     wrapper.appendChild(pageOfContainer);
     wrapper.appendChild(totalPageContainer);

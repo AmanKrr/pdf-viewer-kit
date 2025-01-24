@@ -20,6 +20,7 @@ import { PageViewport, PDFPageProxy, TextLayer as pdfjsTextLayer } from 'pdfjs-d
 
 /**
  * Manages the creation and rendering of a text layer for a specific page in the PDF viewer.
+ * The text layer overlays text content extracted from the PDF, enabling text selection and interactions.
  */
 class TextLayer extends PageElement {
   private pageWrapper!: HTMLElement;
@@ -28,12 +29,12 @@ class TextLayer extends PageElement {
   private viewport!: PageViewport;
 
   /**
-   * Constructs a `TextLayer` instance.
+   * Constructs a `TextLayer` instance for a given PDF page.
    *
-   * @param pageWrapper - The HTML element wrapping the current page.
-   * @param container - The HTML container for the text layer.
-   * @param page - The PDF page proxy object representing the current page.
-   * @param viewport - The viewport defining the dimensions and scale of the text layer.
+   * @param {HTMLElement} pageWrapper - The HTML element wrapping the current PDF page.
+   * @param {HTMLElement} container - The HTML container for the text layer.
+   * @param {PDFPageProxy} page - The PDF.js page proxy object representing the current page.
+   * @param {PageViewport} viewport - The viewport defining the dimensions and scale of the text layer.
    */
   constructor(pageWrapper: HTMLElement, container: HTMLElement, page: PDFPageProxy, viewport: PageViewport) {
     super();
@@ -44,13 +45,15 @@ class TextLayer extends PageElement {
   }
 
   /**
-   * Creates and renders the text layer for the current page.
+   * Creates and renders the text layer for the current PDF page.
    *
-   * This method retrieves text content from the PDF page, creates a text layer div, and uses
-   * PDF.js's `TextLayer` to render the text content into the layer. Each rendered text element
-   * is assigned a click handler for further interactivity.
+   * This method:
+   * - Retrieves text content from the PDF page.
+   * - Creates a text layer `<div>` with appropriate styles and dimensions.
+   * - Uses PDF.js's `TextLayer` class to render the extracted text into the layer.
+   * - Assigns a click handler to each text element for future interactions.
    *
-   * @returns A Promise that resolves to the text layer HTMLDivElement.
+   * @returns {Promise<HTMLDivElement>} A promise that resolves to the created text layer `<div>`.
    */
   async createTextLayer(): Promise<HTMLDivElement> {
     // Create a text layer div with appropriate class and ID based on viewport dimensions.
@@ -60,25 +63,36 @@ class TextLayer extends PageElement {
     // Retrieve the text content of the current page.
     const textContent = await this.page.getTextContent();
 
-    // ########################## Render text layer changed after 4.0.379 ##########################
-    // pdfjsLib.renderTextLayer({
-    //   textContentSource: textContent,
-    //   container: textLayerDiv,
-    //   viewport: viewport,
-    // });
+    /**
+     * Text layer rendering was changed after `pdfjs 4.0.379`.
+     * The old approach using `renderTextLayer` is deprecated.
+     *
+     * Old method:
+     * ```js
+     * pdfjsLib.renderTextLayer({
+     *   textContentSource: textContent,
+     *   container: textLayerDiv,
+     *   viewport: viewport,
+     * });
+     * ```
+     *
+     * New approach (introduced in `pdfjs 4.8.69`):
+     * - Create a new instance of `TextLayer` and call `render()`.
+     */
 
-    // ########################## Now need to create instance 4.8.69 ##########################
-    // Create a new instance of PDF.js's internal TextLayer for rendering the text content.
+    // Create an instance of PDF.js's internal TextLayer for rendering text content.
     const pdfJsInternalTextLayer = new pdfjsTextLayer({
       textContentSource: textContent,
       container: textLayerDiv,
       viewport: this.viewport,
     });
+
     // Render the text layer into the container.
     pdfJsInternalTextLayer.render();
-    // Attach a click event handler to each text div for potential interactivity.
+
+    // Attach a click event handler to each text div for future interactivity.
     pdfJsInternalTextLayer.textDivs.forEach((ele) => {
-      ele.onclick = (e) => console.log('Coming soon');
+      ele.onclick = (e) => console.log('Coming soon'); // Placeholder for future interaction
     });
 
     return textLayerDiv;

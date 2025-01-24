@@ -14,10 +14,16 @@
   limitations under the License.
 */
 
+/* ========================== */
+/* Sidebar Container Styles */
+/* ========================== */
+
+/* Default state: sidebar is hidden */
 .a-sidebar-container {
   display: none;
 }
 
+/* Active state: sidebar is displayed */
 .a-sidebar-container.active {
   position: relative;
   display: flex;
@@ -26,14 +32,21 @@
   background-color: rgb(207, 207, 207);
   width: max-content;
   min-height: calc(100% - 40px);
+  /* Adjust height to match viewer minus toolbar */
   overflow: auto;
   padding: 10px 40px;
 }
 
+/* Hide sidebar when PDF is loading */
 .pdf-loading .a-sidebar-container {
   display: none;
 }
 
+/* ========================== */
+/* Sidebar Content Layout */
+/* ========================== */
+
+/* Container for sidebar items */
 .a-inner-sidebar-container-content {
   display: flex;
   flex-direction: column;
@@ -41,6 +54,11 @@
   align-items: center;
 }
 
+/* ========================== */
+/* Thumbnail Styling */
+/* ========================== */
+
+/* Default styling for thumbnails */
 .thumbnail {
   width: max-content;
   height: max-content;
@@ -49,21 +67,29 @@
   border-radius: 1px;
 }
 
+/* Hover effect on thumbnails */
 .thumbnail:hover {
   background-color: rgb(173, 173, 173);
   color: white;
   box-shadow: 5px 3px 5px 1px #c7c7c9;
 }
 
+/* Active state: highlights the currently selected page */
 .thumbnail-active {
   background-color: rgb(184, 184, 248);
   color: white;
 }
 
+/* Remove bottom margin for the last thumbnail */
 .thumbnail:last-child {
   margin-bottom: 0;
 }
 
+/* ========================== */
+/* Page Number Label Styling */
+/* ========================== */
+
+/* Styling for the page number displayed below thumbnails */
 .pagenumber-label {
   margin-top: 8px;
   text-align: center;

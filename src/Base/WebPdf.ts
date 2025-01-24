@@ -14,7 +14,7 @@
   limitations under the License.
 */
 
-// If your using webpack to create the build, use the webpack referenced file instead of /pdf.js
+// If using Webpack to create the build, use the Webpack-referenced file instead of /pdf.js.
 import { PDFDocumentProxy } from 'pdfjs-dist';
 import * as pdfjsLib from 'pdfjs-dist/webpack.mjs';
 import WebViewer from '../Viewer/components/WebViewer';
@@ -23,6 +23,7 @@ import PdfState from '../Viewer/components/PdfState';
 import PageElement from '../Viewer/components/PageElement';
 import PasswordManager from '../Viewer/manager/Password';
 
+// Import stylesheets for different PDF UI layers.
 import '../style/toolbar.css';
 import '../style/root.css';
 import '../style/textlayer.css';
@@ -30,34 +31,38 @@ import '../style/annotationlayer.css';
 import '../style/thumbnail.css';
 
 /**
- * A class responsible for loading and managing PDF documents in a web viewer.
- * Inherits functionality from WebViewer.
+ * Class responsible for loading and managing PDF documents within a web viewer.
+ * Extends functionalities from `WebViewer` and integrates PDF.js for rendering.
  */
 class WebPdf {
-  // Default options for configuring the PDF viewer during the load process.
+  /**
+   * Default options used when loading a PDF document.
+   * These settings can be overridden by passing custom options.
+   */
   private static loadOptions: LoadOptions = {
-    containerId: '',
-    document: '',
-    disableTextSelection: false,
-    maxDefaultZoomLevel: 5,
-    password: '',
-    printMode: false,
-    toolbarItems: {},
-    styleSheets: '',
-    preventTextCopy: false,
-    renderSpecificPageOnly: null,
-    customToolbarItems: [],
+    containerId: '', // ID of the container where the PDF will be displayed
+    document: '', // URL or file source of the PDF document
+    disableTextSelection: false, // Option to enable/disable text selection
+    maxDefaultZoomLevel: 5, // Maximum zoom level allowed
+    password: '', // Password for encrypted PDFs
+    printMode: false, // Enable or disable print mode
+    toolbarItems: {}, // Custom toolbar items
+    styleSheets: '', // External stylesheets for customization
+    preventTextCopy: false, // Disable text copying in PDF
+    renderSpecificPageOnly: null, // Load only a specific page
+    customToolbarItems: [], // Additional toolbar buttons
   };
 
   /**
    * Loads a PDF document into the web viewer.
    *
-   * @param options - Configuration options for loading the document.
-   * @returns A Promise that resolves to a WebViewer instance upon successful load, or `undefined` on failure.
+   * @param {LoadOptions} options - Configuration options for loading the document.
+   * @returns {Promise<WebViewer | undefined>} Resolves to a `WebViewer` instance upon successful load or `undefined` on failure.
    */
-  static async load(options: LoadOptions) {
+  static async load(options: LoadOptions): Promise<WebViewer | undefined> {
     const pdfStates = PdfState.getInstance(options.containerId);
     pdfStates.containerId = options.containerId;
+
     // Create the necessary container elements for the PDF viewer.
     const internalContainers = PageElement.containerCreation(options.containerId, pdfStates.scale);
     const container = document.querySelector(`#${options.containerId} #${internalContainers.injectElementId}`)! as HTMLElement;
@@ -75,53 +80,62 @@ class WebPdf {
         ...options,
       };
 
-      // Fetch the PDF document using the specified source.
+      /**
+       * Initiates loading of the PDF document.
+       * Supports fetching from URLs, local files, and encrypted PDFs.
+       */
       const initiateLoadPdf = pdfjsLib.getDocument({
-        url: options.document,
-        password: password,
-        withCredentials: options.withCredentials,
-        data: options.data,
-        httpHeaders: options.httpHeaders,
+        url: options.document, // PDF source URL
+        password: password, // Password (if required)
+        withCredentials: options.withCredentials, // Send credentials if needed
+        data: options.data, // Raw binary PDF data
+        httpHeaders: options.httpHeaders, // Custom HTTP headers
       } as GetDocumentOptions);
 
-      // Track progress while fetching pdf.
-      // initiateLoadPdf.onProgress = function (data: any) {
-      //   console.log('data', data);
-      //   console.log('loaded : ' + data.loaded);
-      //   console.log('total : ' + data.total);
-      // };
+      // Track progress while fetching the PDF (Commented out but can be enabled for debugging)
+      /*
+      initiateLoadPdf.onProgress = function (data: any) {
+        console.log('Data:', data);
+        console.log('Loaded:', data.loaded);
+        console.log('Total:', data.total);
+      };
+      */
 
       let passwordManager: PasswordManager | null = null;
+
+      /**
+       * Handles password-protected PDFs.
+       * If a password is required, prompts the user for input.
+       */
       initiateLoadPdf.onPassword = function (updatePassword: (pass: string) => void, reason: any) {
         if (reason === 1) {
-          // create password viewer for input password
+          // Request password from the user.
           if (!passwordManager) {
             passwordManager = new PasswordManager(internalContainers['parent'], updatePassword);
           }
         } else {
-          // Invalid password
+          // Handle incorrect password attempt.
           if (passwordManager) {
-            passwordManager.onError = 'Incorrect! Enter password again :';
+            passwordManager.onError = 'Incorrect! Enter password again:';
           }
         }
       };
 
+      // Load the PDF document and store its instance.
       const pdf: PDFDocumentProxy = await initiateLoadPdf.promise;
-
-      // Store the PDF instance in a shared state.
       pdfStates.pdfInstance = pdf;
 
-      // once got correct password and pdf has been opened. Destroy the viewer so that memory is released.
+      // Once the correct password is entered and the PDF is opened, destroy the password prompt to free memory.
       if (passwordManager) {
         (passwordManager as PasswordManager).destroy();
       }
 
+      // Initialize the WebViewer instance with the loaded PDF.
       const viewer = new WebViewer(pdf, this.loadOptions, internalContainers['parent'], container);
       return viewer;
     } catch (err) {
       // Handle errors during the document loading process.
-      console.error('Error', err);
-      // this.hideLoading();
+      console.error('Error loading PDF:', err);
       return undefined;
     }
   }

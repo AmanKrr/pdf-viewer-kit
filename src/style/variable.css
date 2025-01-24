@@ -14,11 +14,26 @@
   limitations under the License.
 */
 
+/* ========================== */
+/* Global CSS Variables */
+/* ========================== */
+
 :root {
+  /* Defines the height of the toolbar */
   --toolbarHeight: 40px;
+
+  /* Minimum width allowed for the PDF viewer */
   --min-pdf-width: 400px;
+
+  /* Default light theme background color for the PDF viewer */
   --pdf-viewer-theme: #eaecef;
+
+  /* Default light theme background color for the toolbar */
   --pdf-viewer-toolbar-theme: #f8f9fa;
+
+  /* Default dark theme background color for the PDF viewer */
   --pdf-viewer-dark-theme: #222222;
+
+  /* Default dark theme background color for the toolbar */
   --pdf-viewer-toolbar-dark-theme: #2d2d2d;
 }

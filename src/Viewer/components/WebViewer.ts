@@ -25,7 +25,11 @@ import { debounce } from 'lodash';
 import PdfSearch from '../manager/PdfSearch';
 
 /**
- * A class for managing and interacting with a PDF viewer in the browser.
+ * Manages the PDF viewer instance and provides various functionalities, including:
+ * - Page navigation
+ * - Zooming
+ * - Searching
+ * - Toolbar interactions
  */
 class WebViewer {
   private __Observer;
@@ -37,9 +41,11 @@ class WebViewer {
 
   /**
    * Initializes the WebViewer instance.
-   * @param pdfInstance - The PDF document instance.
-   * @param viewerOptions - Configuration for viewer.
-   * @param pageVirtualization - The instance for page virtualization.
+   *
+   * @param {PDFDocumentProxy} pdfInstance - The PDF.js document instance.
+   * @param {ViewerLoadOptions} viewerOptions - Configuration for the viewer.
+   * @param {HTMLElement} parentContainer - The parent container where the viewer is rendered.
+   * @param {HTMLElement} pageParentContainer - The container holding the PDF pages.
    */
   constructor(pdfInstance: PDFDocumentProxy, viewerOptions: ViewerLoadOptions, parentContainer: HTMLElement, pageParentContainer: HTMLElement) {
     this.__pdfInstance = pdfInstance;
@@ -48,7 +54,7 @@ class WebViewer {
     this.__Observer = throttle(WebUiUtils.Observer, 200);
     this.__pdfState = PdfState.getInstance(viewerOptions.containerId);
 
-    // Initialize components for text layer, annotation layer, and page virtualization.
+    // Initialize page virtualization, search, and toolbar components
     this.__pageVirtualization = new PageVirtualization(this.__viewerOptions, parentContainer, pageParentContainer, this.__pdfInstance.numPages, this);
     new PdfSearch(this.__pdfState);
     new Toolbar(this.__viewerOptions.containerId, this.__viewerOptions.customToolbarItems ?? [], this);
@@ -56,7 +62,7 @@ class WebViewer {
   }
 
   /**
-   * Adds event listeners to the viewer for user interactions.
+   * Adds event listeners for scrolling and updates page number input dynamically.
    */
   private addEvents() {
     const mainViewer = document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds['_MAIN_VIEWER_CONTAINER']}`);
@@ -75,14 +81,14 @@ class WebViewer {
     }
   }
 
+  /**
+   * Synchronizes the thumbnail sidebar scroll position with the currently viewed page.
+   */
   private syncThumbnailScrollWithMainPageContainer() {
     const pageNumber = this.currentPageNumber;
-
     const previousActiveThumbnail = document.querySelector(`.thumbnail.thumbnail-active`);
     if (previousActiveThumbnail) {
-      if (previousActiveThumbnail.classList.contains('thumbnail-active')) {
-        previousActiveThumbnail.classList.remove('thumbnail-active');
-      }
+      previousActiveThumbnail.classList.remove('thumbnail-active');
     }
     const thumbnailToBeActive = document.querySelector(`[data-page-number="${pageNumber}"]`);
     if (thumbnailToBeActive) {
@@ -91,30 +97,19 @@ class WebViewer {
     }
   }
 
-  /**
-   * Retrieves the current page number being viewed.
-   *
-   * This getter fetches the current page number from the PdfState,
-   * which holds the shared state of the PDF viewer.
-   *
-   * @returns The current page number.
-   */
+  /** @returns {number} The currently active page number. */
   get currentPageNumber() {
     return this.__pdfState.currentPage;
   }
 
-  /**
-   * Retrieves the total page number in a pdf.
-   *
-   * This getter fetches the total page number from the PdfState,
-   * which holds the shared state of the PDF viewer.
-   *
-   * @returns The current page number.
-   */
+  /** @returns {number} The total number of pages in the PDF document. */
   get totalPages() {
     return this.__pdfState.pdfInstance?.numPages;
   }
 
+  /**
+   * Toggles the visibility of the thumbnail viewer sidebar.
+   */
   public toogleThumbnailViewer() {
     const thumbnailSidebarElement = this.__cachedSideBarElement ?? document.querySelector(`#${this.__viewerOptions.containerId} .${aPdfViewerClassNames['_A_SIDEBAR_CONTAINER']}`);
 
@@ -136,11 +131,13 @@ class WebViewer {
   }
 
   /**
-   * Navigates to the next page.
+   * Navigates to the next page in the PDF viewer.
+   * If already on the last page, does nothing.
    */
-  public nextPage() {
-    if (this.totalPages == undefined) {
+  public nextPage(): void {
+    if (this.totalPages === undefined) {
       console.error(`nextPage: ${this.totalPages} is not a valid total page count.`);
+      return;
     }
 
     if (this.currentPageNumber < this.totalPages!) {
@@ -150,7 +147,8 @@ class WebViewer {
   }
 
   /**
-   * Navigates to the previous page.
+   * Navigates to the previous page in the PDF viewer.
+   * If already on the first page, does nothing.
    */
   public previousPage(): void {
     if (this.currentPageNumber > 1) {
@@ -160,7 +158,7 @@ class WebViewer {
   }
 
   /**
-   * Navigates to the first page.
+   * Navigates to the first page of the PDF.
    */
   public firstPage(): void {
     if (this.currentPageNumber > 1) {
@@ -170,11 +168,12 @@ class WebViewer {
   }
 
   /**
-   * Navigates to the last page.
+   * Navigates to the last page of the PDF.
    */
   public lastPage(): void {
-    if (this.totalPages == undefined) {
+    if (this.totalPages === undefined) {
       console.error(`lastPage: ${this.totalPages} is not a valid total page count.`);
+      return;
     }
 
     if (this.currentPageNumber < this.totalPages!) {
@@ -184,23 +183,20 @@ class WebViewer {
   }
 
   /**
-   * Enable Search box.
+   * Toggles the visibility of the search box in the viewer.
    */
   public search(): void {
     const searchContainer = document.querySelector('.a-search-container');
     if (searchContainer) {
-      if ((searchContainer as HTMLElement).classList.contains('a-search-hidden')) {
-        (searchContainer as HTMLElement).classList.remove('a-search-hidden');
-      } else {
-        (searchContainer as HTMLElement).classList.add('a-search-hidden');
-      }
+      searchContainer.classList.toggle('a-search-hidden');
     }
   }
 
   /**
-   * Zooms into the PDF by incrementing the scale.
+   * Zooms into the PDF by increasing the scale.
+   * The scale increases by 0.5 per zoom-in action, with a maximum limit of 4.0.
    */
-  async zoomIn() {
+  public async zoomIn(): Promise<void> {
     const currentScale = this.__pdfState.scale;
     const currentPage = this.currentPageNumber;
 
@@ -220,9 +216,10 @@ class WebViewer {
   }
 
   /**
-   * Zooms out of the PDF by decrementing the scale.
+   * Zooms out of the PDF by decreasing the scale.
+   * The scale decreases by 0.5 per zoom-out action, with a minimum limit of 0.5.
    */
-  async zoomOut() {
+  public async zoomOut(): Promise<void> {
     const currentScale = this.__pdfState.scale;
     const currentPage = this.currentPageNumber;
 
@@ -242,9 +239,10 @@ class WebViewer {
   }
 
   /**
-   * Gets the scroll offset relative to the top of a page.
-   * @param targetPage - The target page number.
-   * @returns The scroll offset from the top of the page.
+   * Gets the scroll offset relative to the top of a specified page.
+   *
+   * @param {number} targetPage - The target page number.
+   * @returns {number} The scroll offset from the top of the page.
    */
   private getScrollOffsetRelativeToPage(targetPage: number): number {
     const pageTop = this.__pageVirtualization.cachedPagePosition.get(targetPage) || 0;
@@ -254,11 +252,12 @@ class WebViewer {
   }
 
   /**
-   * Adjusts the scroll position based on scale changes.
-   * @param targetPage - The target page number.
-   * @param relativeScrollOffset - The relative scroll offset.
-   * @param previousScale - The previous scale factor.
-   * @param newScale - The new scale factor.
+   * Adjusts the scroll position after a zoom-in or zoom-out operation.
+   *
+   * @param {number} targetPage - The target page number.
+   * @param {number} relativeScrollOffset - The relative scroll offset before zooming.
+   * @param {number} previousScale - The scale before zooming.
+   * @param {number} newScale - The new scale after zooming.
    */
   private adjustScrollPosition(targetPage: number, relativeScrollOffset: number, previousScale: number, newScale: number): void {
     const pageTop = this.__pageVirtualization.cachedPagePosition.get(targetPage) || 0;
@@ -269,7 +268,28 @@ class WebViewer {
   }
 
   /**
-   * Updates the current page number input field.
+   * Navigates to a specific page in the PDF viewer.
+   *
+   * @param {number} pageNumber - The target page number.
+   */
+  public goToPage(pageNumber: number) {
+    if (pageNumber >= 1 && pageNumber <= this.totalPages!) {
+      const pagePosition = this.__pageVirtualization.cachedPagePosition.get(pageNumber);
+      if (pagePosition != undefined) {
+        const scrollElement = document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds['_MAIN_VIEWER_CONTAINER']}`);
+        if (scrollElement) {
+          scrollElement.scrollTop = pagePosition;
+          this.__pdfState.currentPage = pageNumber;
+          this.updateCurrentPageInput();
+        }
+      }
+    } else {
+      console.error(`Invalid page number: ${pageNumber}`);
+    }
+  }
+
+  /**
+   * Updates the current page number input field in the toolbar.
    */
   private updateCurrentPageInput() {
     const currentPageInputField = document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds._CURRENT_PAGE_INPUT}`);
@@ -279,36 +299,18 @@ class WebViewer {
   }
 
   /**
-   * Navigates to a specific page by number.
-   * @param pageNumber - The target page number.
-   */
-  public goToPage(pageNumber: number) {
-    if (this.totalPages == undefined) {
-      console.error(`goToPage: ${this.totalPages} is not a valid total page count.`);
-    }
-
-    if (pageNumber >= 1 && pageNumber <= this.totalPages!) {
-      const pagePosition = this.__pageVirtualization.cachedPagePosition;
-      const position = pagePosition?.get(pageNumber);
-      if (position != undefined && position >= 0) {
-        const scrollElement = document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds['_MAIN_VIEWER_CONTAINER']}`);
-        if (scrollElement) {
-          scrollElement.scrollTop = position;
-          this.__pdfState.currentPage = pageNumber;
-          this.updateCurrentPageInput();
-        }
-      }
-    } else {
-      console.error(`Invalid ${pageNumber} page number.`);
-    }
-  }
-
-  /**
-   * Applies CSS scaling to the viewer.
-   * @param scaleFactor - The scale factor to apply.
+   * Applies a CSS-based scaling transformation to the PDF viewer container.
+   *
+   * This method updates a CSS variable (`--scale-factor`) on the main page viewer container,
+   * which allows CSS styles to dynamically adjust based on the applied scale.
+   *
+   * @param {number} scaleFactor - The scale factor to apply to the viewer.
    */
   private applyCssScale(scaleFactor: number): void {
+    // Select the main page viewer container
     const pageViewerContainer = document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds._MAIN_PAGE_VIEWER_CONTAINER}`) as HTMLElement;
+
+    // Apply the scale factor if the container exists
     if (pageViewerContainer) {
       pageViewerContainer.style.setProperty('--scale-factor', String(scaleFactor));
     }
@@ -316,22 +318,23 @@ class WebViewer {
 
   /**
    * Handles toolbar button clicks and executes corresponding actions.
-   * @param buttonName - The name of the button clicked.
-   * @param event - The event object associated with the click.
+   *
+   * @param {string} buttonName - The name of the toolbar button clicked.
+   * @param {MouseEvent | Event} event - The event object associated with the action.
    */
   async toolbarButtonClick(buttonName: string, event: MouseEvent | Event) {
     switch (buttonName) {
       case 'firstPage':
-        this.firstPage();
+        this.goToPage(1);
         break;
       case 'lastPage':
-        this.lastPage();
+        this.goToPage(this.totalPages!);
         break;
       case 'previousPage':
-        this.previousPage();
+        this.goToPage(this.currentPageNumber - 1);
         break;
       case 'nextPage':
-        this.nextPage();
+        this.goToPage(this.currentPageNumber + 1);
         break;
       case 'zoomIn':
         await this.zoomIn();
@@ -341,13 +344,11 @@ class WebViewer {
         break;
       case 'currentPageNumber':
         this.__pdfState.currentPage = parseInt((event.target as HTMLInputElement).value);
-        if (event && (event as KeyboardEvent).key === 'Enter') {
+        if ((event as KeyboardEvent).key === 'Enter') {
           (event.target as HTMLInputElement).blur();
           this.goToPage(this.currentPageNumber);
           this.syncThumbnailScrollWithMainPageContainer();
         }
-        break;
-      case 'rotate':
         break;
     }
   }
