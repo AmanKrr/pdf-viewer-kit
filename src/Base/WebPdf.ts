@@ -36,30 +36,26 @@ import '../style/thumbnail.css';
  */
 class WebPdf {
   /**
-   * Default options used when loading a PDF document.
-   * These settings can be overridden by passing custom options.
-   */
-  private static loadOptions: LoadOptions = {
-    containerId: '', // ID of the container where the PDF will be displayed
-    document: '', // URL or file source of the PDF document
-    disableTextSelection: false, // Option to enable/disable text selection
-    maxDefaultZoomLevel: 5, // Maximum zoom level allowed
-    password: '', // Password for encrypted PDFs
-    printMode: false, // Enable or disable print mode
-    toolbarItems: {}, // Custom toolbar items
-    styleSheets: '', // External stylesheets for customization
-    preventTextCopy: false, // Disable text copying in PDF
-    renderSpecificPageOnly: null, // Load only a specific page
-    customToolbarItems: [], // Additional toolbar buttons
-  };
-
-  /**
    * Loads a PDF document into the web viewer.
    *
    * @param {LoadOptions} options - Configuration options for loading the document.
    * @returns {Promise<WebViewer | undefined>} Resolves to a `WebViewer` instance upon successful load or `undefined` on failure.
    */
-  static async load(options: LoadOptions): Promise<WebViewer | undefined> {
+  static async load(options: LoadOptions) {
+    // Default options for configuring the PDF viewer during the load process.
+    let loadOptions: LoadOptions = {
+      containerId: '', // ID of the container where the PDF will be displayed
+      document: '', // URL or file source of the PDF document
+      disableTextSelection: false, // Option to enable/disable text selection
+      maxDefaultZoomLevel: 5, // Maximum zoom level allowed
+      password: '', // Password for encrypted PDFs
+      printMode: false, // Enable or disable print mode
+      toolbarItems: {}, // Custom toolbar items
+      styleSheets: '', // External stylesheets for customization
+      preventTextCopy: false, // Disable text copying in PDF
+      renderSpecificPageOnly: null, // Load only a specific page
+      customToolbarItems: [], // Additional toolbar buttons
+    };
     const pdfStates = PdfState.getInstance(options.containerId);
     pdfStates.containerId = options.containerId;
 
@@ -75,7 +71,7 @@ class WebPdf {
     try {
       // Merge user-specified options with default options.
       const { password, ...rest } = options;
-      this.loadOptions = {
+      loadOptions = {
         ...rest,
         ...options,
       };
@@ -131,7 +127,7 @@ class WebPdf {
       }
 
       // Initialize the WebViewer instance with the loaded PDF.
-      const viewer = new WebViewer(pdf, this.loadOptions, internalContainers['parent'], container);
+      const viewer = new WebViewer(pdf, loadOptions, internalContainers['parent'], container);
       return viewer;
     } catch (err) {
       // Handle errors during the document loading process.
