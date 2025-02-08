@@ -61,12 +61,10 @@ export class RectangleAnnotation extends Annotation {
 
   public startDrawing(x: number, y: number): void {
     super.startDrawing(x, y);
-    console.log('here i am');
     this.svg.style.left = `${x}px`;
     this.svg.style.top = `${y}px`;
     this.element = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     this.element.id = this.svg.getAttribute('annotation-id')!;
-    this.element.onclick = (event: MouseEvent) => this.onAnnotationClick(event, this, 'rectangle');
     this.element.setAttribute('x', '0');
     this.element.setAttribute('y', '0');
     this.element.setAttribute('width', '0');
@@ -77,10 +75,25 @@ export class RectangleAnnotation extends Annotation {
     this.element.setAttribute('stroke-dasharray', this.getStrokeDashArray());
 
     this.svg.appendChild(this.element);
+
+    // The invisible (hit test) rect
+    this.hitElementRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    this.hitElementRect.setAttribute('x', '0');
+    this.hitElementRect.setAttribute('y', '0');
+    this.hitElementRect.setAttribute('width', '0');
+    this.hitElementRect.setAttribute('height', '0');
+    this.hitElementRect.setAttribute('fill', 'none');
+    this.hitElementRect.setAttribute('stroke', 'transparent');
+    this.hitElementRect.style.strokeWidth = (this.strokeWidth + 10).toString(); // increase if needed
+    // Make sure it receives pointer events even if the container is not interactive
+    this.hitElementRect.style.pointerEvents = 'auto';
+    this.hitElementRect.onclick = (event: MouseEvent) => this.onAnnotationClick(event, this, 'rectangle');
+    // Append the hit test rect above or after the visible rect
+    this.svg.appendChild(this.hitElementRect);
   }
 
   public updateDrawing(x: number, y: number): void {
-    if (!this.isDrawing || !this.element) return;
+    if (!this.isDrawing || !this.element || !this.hitElementRect) return;
 
     const width = x - this.startX;
     const height = y - this.startY;
@@ -93,6 +106,10 @@ export class RectangleAnnotation extends Annotation {
     this.element.setAttribute('y', padding.toString());
     this.element.setAttribute('width', Math.abs(width).toString());
     this.element.setAttribute('height', Math.abs(height).toString());
+    this.hitElementRect.setAttribute('x', padding.toString());
+    this.hitElementRect.setAttribute('y', padding.toString());
+    this.hitElementRect.setAttribute('width', Math.abs(width).toString());
+    this.hitElementRect.setAttribute('height', Math.abs(height).toString());
 
     if (width < 0) this.svg.style.left = `${x - padding}px`;
     if (height < 0) this.svg.style.top = `${y - padding}px`;
@@ -101,11 +118,7 @@ export class RectangleAnnotation extends Annotation {
   public stopDrawing(): void {
     super.stopDrawing();
 
-    if (!this.resizer) {
-      this.resizer = new Resizer(this.svg, this.element! as any);
-      this.svg.focus();
-      this.addDeleteEvent();
-    }
+    this.select();
 
     this.__pdfState?.emit('ANNOTATION_CREATED', this);
   }

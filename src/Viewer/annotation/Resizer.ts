@@ -80,7 +80,7 @@ export class Resizer {
     this.overlayRect.setAttribute('stroke', 'red');
     this.overlayRect.setAttribute('stroke-dasharray', '4');
     // Enable pointer events on the outline so the user can drag the entire annotation.
-    this.overlayRect.style.pointerEvents = 'all';
+    this.overlayRect.style.pointerEvents = 'fill';
     // Clicking on the outline (but not on a handle) starts a drag.
     this.overlayRect.addEventListener('mousedown', (e) => this.onDragStart(e));
     this.overlaySvg.appendChild(this.overlayRect);
@@ -342,6 +342,10 @@ export class Resizer {
     this.element.setAttribute('y', rectY.toString());
     this.element.setAttribute('width', rectWidth.toString());
     this.element.setAttribute('height', rectHeight.toString());
+    this.element.nextElementSibling?.setAttribute('x', rectX.toString());
+    this.element.nextElementSibling?.setAttribute('y', rectY.toString());
+    this.element.nextElementSibling?.setAttribute('width', rectWidth.toString());
+    this.element.nextElementSibling?.setAttribute('height', rectHeight.toString());
   }
 
   /**

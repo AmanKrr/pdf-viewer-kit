@@ -40,6 +40,10 @@ export class AnnotationManager {
     this.__pdfState = pdfState;
   }
 
+  public setPointerEvent(pointerEvent: 'all' | 'none') {
+    this.container.style.pointerEvents = pointerEvent;
+  }
+
   private addListeners() {
     this.container.addEventListener('mousedown', this.boundMouseDown);
     this.container.addEventListener('mousemove', this.boundMouseMove);
@@ -60,8 +64,8 @@ export class AnnotationManager {
   }
 
   private onMouseDown(event: MouseEvent) {
-    console.log('mouse down');
     if (!this.activeAnnotation) return;
+    event.preventDefault();
 
     const rect = this.container.getBoundingClientRect();
     const x = event.clientX - rect.left;
@@ -72,6 +76,7 @@ export class AnnotationManager {
 
   private onMouseMove(event: MouseEvent) {
     if (!this.activeAnnotation || !this.activeAnnotation.isDrawing) return;
+    event.preventDefault();
 
     const rect = this.container.getBoundingClientRect();
     const x = event.clientX - rect.left;
@@ -86,6 +91,7 @@ export class AnnotationManager {
     this.activeAnnotation.stopDrawing();
     this.activeAnnotation = null; // Reset so another shape can be drawn next time
     this.removeListeners();
+    this.setPointerEvent('none');
   }
 
   get getAnnotations(): RectangleAnnotation[] {

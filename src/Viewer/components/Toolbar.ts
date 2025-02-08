@@ -129,29 +129,74 @@ class Toolbar {
         id: 'thumbnailBtn',
         label: 'View thumbnail',
         icon: 'view-thumbnail',
-        onClick: () => this._viewer.toogleThumbnailViewer(),
+        onClick: (viewer: WebViewer) => this._viewer.toogleThumbnailViewer(),
         hide: false,
-        class: `${this.toolbarClass['thumbnail']}-icon`,
+        class: this.toolbarClass['thumbnail'] + '-icon',
         group: 1,
       },
       {
         id: 'firstPage',
         label: 'First Page',
         icon: 'first-page-icon',
-        onClick: () => this._viewer.firstPage(),
+        onClick: (viewer: WebViewer) => this._viewer.firstPage(),
         hide: false,
         isSeparatorBefore: true,
-        class: `${this.toolbarClass['firstPage']}-icon`,
+        class: this.toolbarClass['firstPage'] + '-icon',
+        group: 1,
+      },
+      {
+        id: 'previousPage',
+        label: 'Previous Page',
+        icon: 'previous-page-icon',
+        onClick: (viewer: WebViewer) => this._viewer.previousPage(),
+        hide: false,
+        class: this.toolbarClass['previousPage'] + '-icon',
+        group: 1,
+      },
+      {
+        id: 'nextPage',
+        label: 'Next Page',
+        icon: 'next-page-icon',
+        onClick: (viewer: WebViewer) => this._viewer.nextPage(),
+        hide: false,
+        class: this.toolbarClass['nextPage'] + '-icon',
+        group: 1,
+      },
+      {
+        id: 'lastPage',
+        label: 'Last Page',
+        icon: 'last-page-icon',
+        onClick: (viewer: WebViewer) => this._viewer.lastPage(),
+        hide: false,
+        class: this.toolbarClass['lastPage'] + '-icon',
+        group: 1,
+      },
+      {
+        id: 'pageNumber',
+        label: 'Page Number',
+        type: 'custom', // Indicates a special rendering type
+        render: () => Toolbar.renderPageNumberControls(this._viewer),
+        onClick: (p) => console.log('clicked'),
+        hide: false,
         group: 1,
       },
       {
         id: 'zoomIn',
         label: 'Zoom In',
         icon: 'zoom-in-icon',
-        onClick: () => this._viewer.zoomIn(),
+        onClick: (viewer: WebViewer) => this._viewer.zoomIn(),
         isSeparatorBefore: true,
         hide: false,
-        class: `${this.toolbarClass['zoomIn']}-icon`,
+        class: this.toolbarClass['zoomIn'] + '-icon',
+        group: 1,
+      },
+      {
+        id: 'zoomOut',
+        label: 'Zoom Out',
+        icon: 'zoom-out-icon',
+        onClick: (viewer: WebViewer) => this._viewer.zoomOut(),
+        class: this.toolbarClass['zoomOut'] + '-icon',
+        hide: false,
         group: 1,
       },
       {
@@ -161,18 +206,21 @@ class Toolbar {
         onClick: () => {
           // this._viewer.search();
           const container = document.querySelector(`#${this.__pdfState.containerId} #pageContainer-${this.__pdfState.currentPage} #a-annotate-layer`);
-          console.log('container', container);
           if (container) {
+            (container as HTMLElement).style.pointerEvents = 'all';
             const annotationManager = this.__pdfState.getAnnotationManager(this.__pdfState.currentPage); // Assuming page 1 for now
             if (!annotationManager) {
               this.__pdfState.createAnnotationLayer(this.__pdfState.currentPage, container as HTMLElement);
-              this.__pdfState.getAnnotationManager(this.__pdfState.currentPage)?.createRectangle('transparent', 'red', 2, 'solid');
+              const currentPageManager = this.__pdfState.getAnnotationManager(this.__pdfState.currentPage);
+              currentPageManager?.setPointerEvent('all');
+              currentPageManager?.createRectangle('transparent', 'red', 2, 'solid');
             } else {
+              annotationManager?.setPointerEvent('all');
               annotationManager?.createRectangle('transparent', 'red', 2, 'solid');
             }
           }
         },
-        class: this.toolbarClass['annotation']['rectangle'],
+        class: 'a-annotation-container-icon',
         hide: false,
         group: 2,
       },
@@ -180,20 +228,22 @@ class Toolbar {
         id: 'search',
         label: 'Search',
         icon: 'search-icon',
-        onClick: () => this._viewer.search(),
-        class: `${this.toolbarClass['search']}-icon`,
+        onClick: () => {
+          this._viewer.search();
+        },
+        class: this.toolbarClass['search'] + '-icon',
         hide: false,
         group: 2,
       },
-      // {
-      //   id: 'download',
-      //   label: 'Download',
-      //   icon: 'download-icon',
-      //   onClick: () => this._viewer.download(),
-      //   class: `${this.toolbarClass['download']}-icon`,
-      //   hide: false,
-      //   group: 2,
-      // },
+      {
+        id: 'download',
+        label: 'Download',
+        icon: 'download-icon',
+        onClick: (viewer: WebViewer) => this._viewer.zoomOut(),
+        class: this.toolbarClass['download'] + '-icon',
+        hide: true,
+        group: 2,
+      },
     ];
   }
 

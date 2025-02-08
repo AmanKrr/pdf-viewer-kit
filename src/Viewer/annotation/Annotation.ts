@@ -20,6 +20,7 @@ export class Annotation {
   protected container: HTMLElement;
   protected svg: SVGSVGElement;
   protected element: SVGElement | null = null;
+  protected hitElementRect: SVGElement | null = null;
   public isDrawing: boolean = false;
   protected startX: number = 0;
   protected startY: number = 0;
@@ -52,7 +53,6 @@ export class Annotation {
 
   protected stopDrawing(): void {
     this.isDrawing = false;
-    this.svg.style.pointerEvents = 'all';
   }
 
   protected getCoordinates(): { x0: number; x1: number; y0: number; y1: number } | null {
