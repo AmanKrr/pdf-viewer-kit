@@ -186,7 +186,7 @@ class WebViewer {
    * Toggles the visibility of the search box in the viewer.
    */
   public search(): void {
-    const searchContainer = document.querySelector('.a-search-container');
+    const searchContainer = document.querySelector(`#${this.__viewerOptions.containerId} .a-search-container`);
     if (searchContainer) {
       searchContainer.classList.toggle('a-search-hidden');
     }
