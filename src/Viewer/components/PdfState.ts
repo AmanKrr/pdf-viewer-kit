@@ -16,6 +16,7 @@
 
 import EventEmitter from '../event/EventUtils';
 import { PDFDocumentProxy } from 'pdfjs-dist';
+import { AnnotationManager } from '../manager/AnnotationManager';
 
 /**
  * Manages the state of the PDF viewer, including scale, loading status, and page navigation.
@@ -25,6 +26,7 @@ class PdfState extends EventEmitter {
   /** Stores instances of PdfState mapped by container ID */
   private static pdfStates: Map<string, PdfState> = new Map();
 
+  private annotationManagers: Map<number, AnnotationManager> = new Map();
   private _scale: number = 1.0;
   private _pdfInstance!: PDFDocumentProxy;
   private _isLoading: boolean = true;
@@ -203,6 +205,16 @@ class PdfState extends EventEmitter {
     if (this._uiLoading !== element) {
       this._uiLoading = element;
     }
+  }
+
+  public createAnnotationLayer(pageNum: number, parent: HTMLElement): void {
+    if (!this.annotationManagers.has(pageNum)) {
+      this.annotationManagers.set(pageNum, new AnnotationManager(parent, this));
+    }
+  }
+
+  public getAnnotationManager(pageNum: number): AnnotationManager | undefined {
+    return this.annotationManagers.get(pageNum);
   }
 }
 

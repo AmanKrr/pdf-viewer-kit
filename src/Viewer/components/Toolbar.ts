@@ -59,7 +59,7 @@ class Toolbar {
         drawing: false,
         stamp: false,
         circle: false,
-        rectangle: false,
+        rectangle: true,
         line: false,
       },
     };
@@ -83,7 +83,7 @@ class Toolbar {
         drawing: '',
         stamp: '',
         circle: '',
-        rectangle: '',
+        rectangle: 'a-rectangle-container',
         line: '',
       },
     };
@@ -153,6 +153,28 @@ class Toolbar {
         hide: false,
         class: `${this.toolbarClass['zoomIn']}-icon`,
         group: 1,
+      },
+      {
+        id: 'annotation',
+        label: 'Annotate',
+        icon: 'annotate-icon',
+        onClick: () => {
+          // this._viewer.search();
+          const container = document.querySelector(`#${this.__pdfState.containerId} #pageContainer-${this.__pdfState.currentPage} #a-annotate-layer`);
+          console.log('container', container);
+          if (container) {
+            const annotationManager = this.__pdfState.getAnnotationManager(this.__pdfState.currentPage); // Assuming page 1 for now
+            if (!annotationManager) {
+              this.__pdfState.createAnnotationLayer(this.__pdfState.currentPage, container as HTMLElement);
+              this.__pdfState.getAnnotationManager(this.__pdfState.currentPage)?.createRectangle('transparent', 'red', 2, 'solid');
+            } else {
+              annotationManager?.createRectangle('transparent', 'red', 2, 'solid');
+            }
+          }
+        },
+        class: this.toolbarClass['annotation']['rectangle'],
+        hide: false,
+        group: 2,
       },
       {
         id: 'search',

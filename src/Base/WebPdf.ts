@@ -27,8 +27,8 @@ import PasswordManager from '../Viewer/manager/Password';
 import '../style/toolbar.css';
 import '../style/root.css';
 import '../style/textlayer.css';
-import '../style/annotationlayer.css';
 import '../style/thumbnail.css';
+import '../style/annotationDrawerLayer.css';
 
 /**
  * Class responsible for loading and managing PDF documents within a web viewer.

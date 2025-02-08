@@ -245,6 +245,15 @@
 }
 
 /* ========================== */
+/* Annotation Button */
+/* ========================== */
+
+.a-toolbar-button .a-annotation-container-icon::before {
+  content: '\e9f8';
+  font-size: 1.4rem !important;
+}
+
+/* ========================== */
 /* Search Bar */
 /* ========================== */
 

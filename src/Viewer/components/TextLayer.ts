@@ -60,6 +60,9 @@ class TextLayer extends PageElement {
     const textLayerDiv = PageElement.createLayers(aPdfViewerClassNames._A_TEXT_LAYER, aPdfViewerIds._TEXT_LAYER, this.viewport);
     this.pageWrapper.appendChild(textLayerDiv);
 
+    const annotaionLayerDiv = PageElement.createLayers('a-annotation-layer', 'a-annotate-layer', this.viewport);
+    this.pageWrapper.appendChild(annotaionLayerDiv);
+
     // Retrieve the text content of the current page.
     const textContent = await this.page.getTextContent();
 

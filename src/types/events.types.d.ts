@@ -6,4 +6,8 @@ export type Events =
   | 'ScaleUp' /** Triggered when the PDF is zoomed in */
   | 'ScaleDown' /** Triggered when the PDF is zoomed out */
   | 'pdfInstanceChange' /** Triggered when the PDF document instance changes */
-  | 'loadingChange'; /** Triggered when the loading state of the PDF viewer changes */
+  | 'loadingChange' /** Triggered when the loading state of the PDF viewer changes */
+  | 'ANNOTATION_SELECTED'
+  | 'ANNOTATION_CREATED'
+  | 'ANNOTATION_DELETED'
+  | 'ANNOTATION_UPDATED';
