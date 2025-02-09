@@ -39,9 +39,6 @@ class PageVirtualization {
   private pagePosition: Map<number, number> = new Map();
   private pdfState!: PdfState;
   private pdfViewer!: WebViewer;
-  public pageRenderComplete: Promise<boolean> = new Promise((resolve) => {
-    resolve(false);
-  });
 
   /**
    * Constructor initializes the PageVirtualization with required parameters.
@@ -340,7 +337,21 @@ class PageVirtualization {
 
     // Create and append a canvas for rendering
     const [canvas, context] = PageElement.createCanvas(viewport);
-    pageWrapper.appendChild(canvas);
+    const div = document.createElement('div');
+    div.setAttribute('id', 'canva-presentation');
+    div.appendChild(canvas);
+    pageWrapper.appendChild(div);
+
+    // zoom content warapper
+    const imageContainer = document.createElement('div');
+    imageContainer.setAttribute('id', 'a-zoomed-page-image-container');
+    imageContainer.style.position = 'absolute';
+    imageContainer.style.left = '0';
+    imageContainer.style.top = '0';
+    imageContainer.style.width = `${viewport.width}px`;
+    imageContainer.style.height = `${viewport.height}px`;
+    imageContainer.style.overflow = 'hidden';
+    div.appendChild(imageContainer);
 
     // Render the page on the canvas
     const renderContext: RenderParameters = {
@@ -404,13 +415,7 @@ class PageVirtualization {
    * @returns {Promise<void>} A promise that resolves when all visible pages are rendered.
    */
   async redrawVisiblePages(targetPage: number): Promise<void> {
-    const visiblePages = this.getPagesInBuffer(targetPage);
-
-    // Remove all currently rendered pages
-    for (const pageNumber of this.renderedPages) {
-      this.removePage(pageNumber);
-    }
-    this.renderedPages.clear();
+    const visiblePages = this.renderedPages;
 
     // Re-render visible pages at the updated scale
     if (this.isThereSpecificPageToRender) {
@@ -418,10 +423,116 @@ class PageVirtualization {
       this.renderedPages.add(this.isThereSpecificPageToRender);
     } else {
       for (const pageNumber of visiblePages) {
-        await this.renderPage(pageNumber);
-        this.renderedPages.add(pageNumber);
+        await this.appendHighResImageToPageContainer(pageNumber);
+        // this.renderedPages.add(pageNumber);
       }
     }
+  }
+
+  /**
+   * Updates the style and dimensions of all page buffers in the container.
+   * Iterates over every element with the class 'a-page-view' and adjusts its position,
+   * width, and height based on the corresponding PDF page's viewport.
+   *
+   * @returns A promise that resolves once all page buffers have been updated.
+   */
+  public async updatePageBuffers(): Promise<void> {
+    if (!this.container) return;
+
+    const domPages = document.querySelectorAll(`#${this.options?.containerId} .a-page-view`);
+    if (!domPages) return;
+
+    for (let i = 0; i < domPages.length; i++) {
+      const pageNumber = parseInt(domPages[i].id.split('-')[1]);
+      // Retrieve the PDF page and its viewport.
+      const page: PDFPageProxy = await this.pdf.getPage(pageNumber);
+      const scale: number = this.pdfState.scale;
+      const viewport = page.getViewport({ scale });
+      const pageTop = this.pagePosition.get(pageNumber) || 0;
+
+      (domPages[i] as HTMLElement).style.top = `${pageTop}px`;
+      // Set the page container dimensions.
+      (domPages[i] as HTMLElement).style.height = `${viewport.height}px`;
+      (domPages[i] as HTMLElement).style.width = `${viewport.width}px`;
+
+      const canvas = domPages[i].querySelector('canvas');
+      if (canvas) {
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
+      }
+
+      const annotationLayer = domPages[i].querySelector('#a-annotate-layer');
+      if (annotationLayer) {
+        (annotationLayer as HTMLElement).style.width = `${viewport.width}px`;
+        (annotationLayer as HTMLElement).style.height = `${viewport.height}px`;
+      }
+
+      const zoomContainer = domPages[i].querySelector('#a-zoomed-page-image-container');
+      if (zoomContainer) {
+        (zoomContainer as HTMLElement).style.width = `${viewport.width}px`;
+        (zoomContainer as HTMLElement).style.height = `${viewport.height}px`;
+      }
+    }
+  }
+
+  /**
+   * Renders a high-resolution version of the specified PDF page as an image and appends it
+   * to the page container. The rendered image is wrapped inside a container div which is then
+   * appended to the element with the ID 'canva-presentation' within the corresponding page container.
+   *
+   * @param pageNumber - The number of the page to process.
+   * @returns A promise that resolves once the high-resolution image container has been appended.
+   */
+  public async appendHighResImageToPageContainer(pageNumber: number): Promise<void> {
+    // Get the PDF page and its viewport using the current scale.
+    const page: PDFPageProxy = await this.pdf.getPage(pageNumber);
+    const scale: number = this.pdfState.scale;
+    const viewport = page.getViewport({ scale });
+
+    // Render the high-resolution image and obtain its data URL.
+    const [dataUrl, _] = await this.renderHighResImage(viewport, page);
+
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.style.width = `${viewport.width}px`;
+    img.style.height = `${viewport.height}px`;
+
+    // Append the image container into the appropriate page container.
+    const pageContainer = document.querySelector(`#${this.pdfState.containerId} #pageContainer-${pageNumber}`);
+    if (pageContainer) {
+      const canvasPresentation = pageContainer.querySelector('#canva-presentation');
+      if (canvasPresentation) {
+        const imgContainer = canvasPresentation.querySelector('#a-zoomed-page-image-container');
+        if (imgContainer) {
+          imgContainer.innerHTML = '';
+          imgContainer.appendChild(img);
+        }
+      }
+    }
+  }
+
+  /**
+   * Renders a high-resolution image of a PDF page onto a canvas and returns the image as a data URL.
+   * The rendered image is generated using the provided viewport and PDF page. The method returns a tuple
+   * containing the data URL of the rendered image (in PNG format) along with the canvas element used for rendering.
+   *
+   * @param viewport - The PageViewport representing the dimensions and scale of the PDF page.
+   * @param page - The PDFPageProxy object representing the PDF page to render.
+   * @returns A promise that resolves with a tuple: [dataUrl: string, canvas: HTMLCanvasElement].
+   */
+  private async renderHighResImage(viewport: PageViewport, page: PDFPageProxy): Promise<[string, HTMLCanvasElement]> {
+    // Create a canvas with dimensions based on the viewport.
+    const [canvas, context] = PageElement.createCanvas(viewport);
+
+    // Render the PDF page onto the canvas.
+    const renderContext: RenderParameters = {
+      canvasContext: context,
+      viewport,
+      annotationMode: 2,
+    };
+    await page.render(renderContext).promise;
+
+    return [canvas.toDataURL('image/png'), canvas];
   }
 }
 

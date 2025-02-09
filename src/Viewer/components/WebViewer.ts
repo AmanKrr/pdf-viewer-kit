@@ -20,9 +20,11 @@ import { aPdfViewerClassNames, aPdfViewerIds } from '../../constant/ElementIdCla
 import throttle from 'lodash/throttle';
 import PdfState from './PdfState';
 import Toolbar from './Toolbar';
-import PageVirtualization from './PageVirtualization';
+// import PageVirtualization from './PageVirtualization';
 import { debounce } from 'lodash';
 import PdfSearch from '../manager/PdfSearch';
+import PageVirtualization from './PageVirtualization';
+import ZoomHandler from './ZoomHandler';
 
 /**
  * Manages the PDF viewer instance and provides various functionalities, including:
@@ -38,6 +40,7 @@ class WebViewer {
   private __pdfInstance!: PDFDocumentProxy;
   private __pdfState!: PdfState;
   private __cachedSideBarElement: HTMLElement | undefined;
+  private __zoomHandler: ZoomHandler;
 
   /**
    * Initializes the WebViewer instance.
@@ -59,6 +62,7 @@ class WebViewer {
     new PdfSearch(this.__pdfState);
     new Toolbar(this.__viewerOptions.containerId, this.__viewerOptions.customToolbarItems ?? [], this);
     this.addEvents();
+    this.__zoomHandler = new ZoomHandler(this.__pdfState, this.__pageVirtualization);
   }
 
   /**
@@ -197,22 +201,7 @@ class WebViewer {
    * The scale increases by 0.5 per zoom-in action, with a maximum limit of 4.0.
    */
   public async zoomIn(): Promise<void> {
-    const currentScale = this.__pdfState.scale;
-    const currentPage = this.currentPageNumber;
-
-    if (currentScale < 4.0) {
-      const newScale = currentScale + 0.5;
-      const scrollOffset = this.getScrollOffsetRelativeToPage(currentPage);
-
-      this.__pdfState.scale = newScale;
-      this.applyCssScale(newScale);
-
-      requestAnimationFrame(async () => {
-        await this.__pageVirtualization.calculatePagePositioning();
-        this.adjustScrollPosition(currentPage, scrollOffset, currentScale, newScale);
-        await this.__pageVirtualization.redrawVisiblePages(currentPage);
-      });
-    }
+    await this.__zoomHandler.zoomIn();
   }
 
   /**
@@ -220,51 +209,7 @@ class WebViewer {
    * The scale decreases by 0.5 per zoom-out action, with a minimum limit of 0.5.
    */
   public async zoomOut(): Promise<void> {
-    const currentScale = this.__pdfState.scale;
-    const currentPage = this.currentPageNumber;
-
-    if (currentScale > 0.5) {
-      const newScale = currentScale - 0.5;
-      const scrollOffset = this.getScrollOffsetRelativeToPage(currentPage);
-
-      this.__pdfState.scale = newScale;
-      this.applyCssScale(newScale);
-
-      requestAnimationFrame(async () => {
-        await this.__pageVirtualization.calculatePagePositioning();
-        this.adjustScrollPosition(currentPage, scrollOffset, currentScale, newScale);
-        await this.__pageVirtualization.redrawVisiblePages(currentPage);
-      });
-    }
-  }
-
-  /**
-   * Gets the scroll offset relative to the top of a specified page.
-   *
-   * @param {number} targetPage - The target page number.
-   * @returns {number} The scroll offset from the top of the page.
-   */
-  private getScrollOffsetRelativeToPage(targetPage: number): number {
-    const pageTop = this.__pageVirtualization.cachedPagePosition.get(targetPage) || 0;
-    const scrollTop = document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds['_MAIN_VIEWER_CONTAINER']}`)!.scrollTop;
-
-    return scrollTop - pageTop;
-  }
-
-  /**
-   * Adjusts the scroll position after a zoom-in or zoom-out operation.
-   *
-   * @param {number} targetPage - The target page number.
-   * @param {number} relativeScrollOffset - The relative scroll offset before zooming.
-   * @param {number} previousScale - The scale before zooming.
-   * @param {number} newScale - The new scale after zooming.
-   */
-  private adjustScrollPosition(targetPage: number, relativeScrollOffset: number, previousScale: number, newScale: number): void {
-    const pageTop = this.__pageVirtualization.cachedPagePosition.get(targetPage) || 0;
-    const scaledOffset = relativeScrollOffset * (newScale / previousScale);
-    const newScrollTop = pageTop + scaledOffset;
-
-    document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds['_MAIN_VIEWER_CONTAINER']}`)!.scrollTop = newScrollTop;
+    await this.__zoomHandler.zoomOut();
   }
 
   /**
@@ -295,24 +240,6 @@ class WebViewer {
     const currentPageInputField = document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds._CURRENT_PAGE_INPUT}`);
     if (currentPageInputField) {
       (currentPageInputField as HTMLInputElement).value = String(this.currentPageNumber);
-    }
-  }
-
-  /**
-   * Applies a CSS-based scaling transformation to the PDF viewer container.
-   *
-   * This method updates a CSS variable (`--scale-factor`) on the main page viewer container,
-   * which allows CSS styles to dynamically adjust based on the applied scale.
-   *
-   * @param {number} scaleFactor - The scale factor to apply to the viewer.
-   */
-  private applyCssScale(scaleFactor: number): void {
-    // Select the main page viewer container
-    const pageViewerContainer = document.querySelector(`#${this.__viewerOptions.containerId} #${aPdfViewerIds._MAIN_PAGE_VIEWER_CONTAINER}`) as HTMLElement;
-
-    // Apply the scale factor if the container exists
-    if (pageViewerContainer) {
-      pageViewerContainer.style.setProperty('--scale-factor', String(scaleFactor));
     }
   }
 
