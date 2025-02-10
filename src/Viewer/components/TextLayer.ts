@@ -16,7 +16,8 @@
 
 import PageElement from './PageElement';
 import { aPdfViewerClassNames, aPdfViewerIds } from '../../constant/ElementIdClass';
-import { PageViewport, PDFPageProxy, TextLayer as pdfjsTextLayer } from 'pdfjs-dist';
+import { PageViewport, PDFPageProxy, TextLayer as pdfjsTextLayer, AnnotationLayer } from 'pdfjs-dist';
+import { PDFLinkService } from '../service/LS';
 
 /**
  * Manages the creation and rendering of a text layer for a specific page in the PDF viewer.
@@ -60,7 +61,7 @@ class TextLayer extends PageElement {
     const textLayerDiv = PageElement.createLayers(aPdfViewerClassNames._A_TEXT_LAYER, aPdfViewerIds._TEXT_LAYER, this.viewport);
     this.pageWrapper.appendChild(textLayerDiv);
 
-    const annotaionLayerDiv = PageElement.createLayers('a-annotation-layer', 'a-annotate-layer', this.viewport);
+    const annotaionLayerDiv = PageElement.createLayers(aPdfViewerClassNames._A_ANNOTATION_DRAWING_LAYER, aPdfViewerIds._ANNOTATION_DRAWING_LAYER, this.viewport);
     this.pageWrapper.appendChild(annotaionLayerDiv);
 
     // Retrieve the text content of the current page.

@@ -23,12 +23,15 @@ import { debounce, throttle } from 'lodash';
 import ThumbnailViewer from './ThumbnailViewer';
 import WebViewer from './WebViewer';
 import { PDFLinkService } from '../service/LinkService';
+import { ViewerLoadOptions } from '../../types/webpdf.types';
+import AnnotationLayer from './AnnotationLayer';
+import { aPdfViewerIds } from '../../constant/ElementIdClass';
 
 /**
  * Handles virtualization of PDF pages, rendering only those visible within the viewport.
  */
 class PageVirtualization {
-  private options: LoadOptions | null = null;
+  private options: ViewerLoadOptions | null = null;
   private parentContainer: HTMLElement | null = null;
   private container: HTMLElement | null = null;
   private pageBuffer: number = 3; // Number of pages to keep in the buffer around the viewport.
@@ -50,7 +53,7 @@ class PageVirtualization {
    * @param {WebViewer} pdfViewer - Instance of the WebViewer.
    * @param {number} [pageBuffer=3] - Number of extra pages to render around the viewport.
    */
-  constructor(options: LoadOptions, parentContainer: HTMLElement, container: HTMLElement, totalPages: number, pdfViewer: WebViewer, pageBuffer = 3) {
+  constructor(options: ViewerLoadOptions, parentContainer: HTMLElement, container: HTMLElement, totalPages: number, pdfViewer: WebViewer, pageBuffer = 3) {
     this.options = options;
     this.totalPages = totalPages;
     this.parentContainer = parentContainer;
@@ -365,6 +368,7 @@ class PageVirtualization {
     if (this.options && !this.options.disableTextSelection) {
       const debounceTextRender = debounce(async (pageWrapper: HTMLElement, container: HTMLElement, page: PDFPageProxy, viewport: PageViewport) => {
         await new TextLayer(pageWrapper, container.firstChild as HTMLElement, page, viewport).createTextLayer();
+        await new AnnotationLayer(pageWrapper, container.firstChild as HTMLElement, page, viewport).createAnnotationLayer(this.pdfViewer, this.pdf);
       }, 200);
       await debounceTextRender(pageWrapper, this.container.firstChild as HTMLElement, page, viewport);
     }
@@ -461,7 +465,7 @@ class PageVirtualization {
         canvas.style.height = `${viewport.height}px`;
       }
 
-      const annotationLayer = domPages[i].querySelector('#a-annotate-layer');
+      const annotationLayer = domPages[i].querySelector(`#${aPdfViewerIds._ANNOTATION_DRAWING_LAYER}`);
       if (annotationLayer) {
         (annotationLayer as HTMLElement).style.width = `${viewport.width}px`;
         (annotationLayer as HTMLElement).style.height = `${viewport.height}px`;

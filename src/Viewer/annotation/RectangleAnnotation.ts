@@ -64,16 +64,13 @@ export class RectangleAnnotation extends Annotation {
     }
   }
 
-  public startDrawing(x: number, y: number): void {
-    super.startDrawing(x, y);
-    this.svg.style.left = `${x}px`;
-    this.svg.style.top = `${y}px`;
+  private createSvgRect(padding: string = '0', height: number = 0, width: number = 0) {
     this.element = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     this.element.id = this.svg.getAttribute('annotation-id')!;
-    this.element.setAttribute('x', '0');
-    this.element.setAttribute('y', '0');
-    this.element.setAttribute('width', '0');
-    this.element.setAttribute('height', '0');
+    this.element.setAttribute('x', padding);
+    this.element.setAttribute('y', padding);
+    this.element.setAttribute('width', Math.abs(width).toString());
+    this.element.setAttribute('height', Math.abs(height).toString());
     this.element.setAttribute('fill', this.fillColor);
     this.element.setAttribute('stroke', this.strokeColor);
     this.element.setAttribute('stroke-width', this.strokeWidth.toString());
@@ -83,10 +80,10 @@ export class RectangleAnnotation extends Annotation {
 
     // The invisible (hit test) rect
     this.hitElementRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    this.hitElementRect.setAttribute('x', '0');
-    this.hitElementRect.setAttribute('y', '0');
-    this.hitElementRect.setAttribute('width', '0');
-    this.hitElementRect.setAttribute('height', '0');
+    this.hitElementRect.setAttribute('x', padding);
+    this.hitElementRect.setAttribute('y', padding);
+    this.hitElementRect.setAttribute('width', Math.abs(width).toString());
+    this.hitElementRect.setAttribute('height', Math.abs(width).toString());
     this.hitElementRect.setAttribute('fill', 'none');
     this.hitElementRect.setAttribute('stroke', 'transparent');
     this.hitElementRect.style.strokeWidth = (this.strokeWidth + 10).toString(); // increase if needed
@@ -95,6 +92,13 @@ export class RectangleAnnotation extends Annotation {
     this.hitElementRect.onclick = (event: MouseEvent) => this.onAnnotationClick(event, this, 'rectangle');
     // Append the hit test rect above or after the visible rect
     this.svg.appendChild(this.hitElementRect);
+  }
+
+  public startDrawing(x: number, y: number): void {
+    super.startDrawing(x, y);
+    this.svg.style.left = `${x}px`;
+    this.svg.style.top = `${y}px`;
+    this.createSvgRect();
   }
 
   public updateDrawing(x: number, y: number): void {
@@ -171,7 +175,7 @@ export class RectangleAnnotation extends Annotation {
     }
   }
 
-  public updateZoom(zoomFactor: number): void {
+  private updateZoom(zoomFactor: number): void {
     // Calculate new values based on the stored original values.
     const newLeft = this.originalLeft * zoomFactor;
     const newTop = this.originalTop * zoomFactor;
@@ -206,5 +210,23 @@ export class RectangleAnnotation extends Annotation {
     if (this.resizer) {
       this.resizer.syncOverlayToSvg();
     }
+  }
+
+  public draw(x0: number, x1: number, y0: number, y1: number) {
+    // If you want some padding (e.g. for resizer handles), define it here.
+    const padding = 10;
+
+    this.startX = x0;
+    this.startY = y0;
+    this.isDrawing = false;
+
+    // Set the annotation's SVG container position and size.
+    // We add padding on all sides so the drawn rectangle sits inside the container.
+    this.svg.style.left = x0 + 'px';
+    this.svg.style.top = y0 + 'px';
+    this.svg.setAttribute('width', (x1 + padding * 2).toString());
+    this.svg.setAttribute('height', (y1 + padding * 2).toString());
+
+    this.createSvgRect('10', y1, x1);
   }
 }

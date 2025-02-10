@@ -16,7 +16,6 @@
 
 // If using Webpack to create the build, use the Webpack-referenced file instead of /pdf.js.
 import { PDFDocumentProxy } from 'pdfjs-dist';
-import * as pdfjsLib from 'pdfjs-dist/webpack.mjs';
 import WebViewer from '../Viewer/components/WebViewer';
 import WebUiUtils from '../utils/WebUiUtils';
 import PdfState from '../Viewer/components/PdfState';
@@ -28,7 +27,12 @@ import '../style/toolbar.css';
 import '../style/root.css';
 import '../style/textlayer.css';
 import '../style/thumbnail.css';
+import '../style/annotationlayer.css';
 import '../style/annotationDrawerLayer.css';
+
+import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist';
+import { LoadOptions } from '../types/webpdf.types';
+GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href;
 
 /**
  * Class responsible for loading and managing PDF documents within a web viewer.
@@ -48,10 +52,8 @@ class WebPdf {
       document: '', // URL or file source of the PDF document
       disableTextSelection: false, // Option to enable/disable text selection
       maxDefaultZoomLevel: 5, // Maximum zoom level allowed
-      password: '', // Password for encrypted PDFs
-      printMode: false, // Enable or disable print mode
+      password: undefined, // Password for encrypted PDFs
       toolbarItems: {}, // Custom toolbar items
-      styleSheets: '', // External stylesheets for customization
       preventTextCopy: false, // Disable text copying in PDF
       renderSpecificPageOnly: null, // Load only a specific page
       customToolbarItems: [], // Additional toolbar buttons
@@ -80,13 +82,13 @@ class WebPdf {
        * Initiates loading of the PDF document.
        * Supports fetching from URLs, local files, and encrypted PDFs.
        */
-      const initiateLoadPdf = pdfjsLib.getDocument({
+      const initiateLoadPdf = getDocument({
         url: options.document, // PDF source URL
         password: password, // Password (if required)
         withCredentials: options.withCredentials, // Send credentials if needed
         data: options.data, // Raw binary PDF data
         httpHeaders: options.httpHeaders, // Custom HTTP headers
-      } as GetDocumentOptions);
+      });
 
       // Track progress while fetching the PDF (Commented out but can be enabled for debugging)
       /*

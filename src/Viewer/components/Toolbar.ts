@@ -205,7 +205,7 @@ class Toolbar {
         icon: 'annotate-icon',
         onClick: () => {
           // this._viewer.search();
-          const container = document.querySelector(`#${this.__pdfState.containerId} #pageContainer-${this.__pdfState.currentPage} #a-annotate-layer`);
+          const container = document.querySelector(`#${this.__pdfState.containerId} #pageContainer-${this.__pdfState.currentPage} #${aPdfViewerIds._ANNOTATION_DRAWING_LAYER}`);
           if (container) {
             (container as HTMLElement).style.pointerEvents = 'all';
             const annotationManager = this.__pdfState.getAnnotationManager(this.__pdfState.currentPage); // Assuming page 1 for now

@@ -16,16 +16,41 @@
 
 import PdfState from '../components/PdfState';
 
+/**
+ * Base class for handling annotations in a PDF viewer.
+ * Responsible for managing annotation elements, interactions, and coordinates.
+ */
 export class Annotation {
+  /** The container element where the annotation SVG is placed */
   protected container: HTMLElement;
+
+  /** The SVG element that represents the annotation */
   protected svg: SVGSVGElement;
+
+  /** The actual annotation element inside the SVG (e.g., rectangle, line) */
   protected element: SVGElement | null = null;
+
+  /** An invisible hit-area rectangle for interaction */
   protected hitElementRect: SVGElement | null = null;
+
+  /** Flag to indicate if the annotation is being drawn */
   public isDrawing: boolean = false;
+
+  /** Starting X-coordinate of the annotation */
   protected startX: number = 0;
+
+  /** Starting Y-coordinate of the annotation */
   protected startY: number = 0;
+
+  /** Reference to the PdfState instance for event handling */
   protected __pdfState: PdfState | null = null;
 
+  /**
+   * Creates a new annotation instance.
+   *
+   * @param {HTMLElement} container - The container where the annotation is placed.
+   * @param {PdfState} pdfState - The PdfState instance to manage annotation state.
+   */
   constructor(container: HTMLElement, pdfState: PdfState) {
     this.container = container;
     this.__pdfState = pdfState;
@@ -33,37 +58,66 @@ export class Annotation {
     // Create a new SVG instance for this annotation
     this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     this.svg.style.position = 'absolute';
-    this.svg.setAttribute('tabindex', '0');
+    this.svg.setAttribute('tabindex', '0'); // Enables keyboard focus
     this.svg.style.outline = 'none';
     this.svg.setAttribute('annotation-id', Date.now().toString());
-    this.svg.style.pointerEvents = 'none';
+    this.svg.style.pointerEvents = 'none'; // Prevents unwanted interactions
     this.container.appendChild(this.svg);
   }
 
+  /**
+   * Handles click events on an annotation.
+   * Emits an event when an annotation is selected.
+   *
+   * @param {MouseEvent} event - The mouse event triggering the click.
+   * @param {any} context - The context object associated with the annotation.
+   * @param {'rectangle'} type - The type of annotation clicked.
+   */
   protected onAnnotationClick(event: MouseEvent, context: any, type: 'rectangle') {
     event.stopPropagation();
     this.__pdfState?.emit('ANNOTATION_SELECTED', context, type);
   }
 
+  /**
+   * Starts drawing the annotation.
+   *
+   * @param {number} x - The X-coordinate where drawing starts.
+   * @param {number} y - The Y-coordinate where drawing starts.
+   */
   protected startDrawing(x: number, y: number): void {
     this.isDrawing = true;
     this.startX = x;
     this.startY = y;
   }
 
+  /**
+   * Stops drawing the annotation and logs its coordinates.
+   */
   protected stopDrawing(): void {
     this.isDrawing = false;
+    console.log(this.getCoordinates());
   }
 
+  /**
+   * Retrieves the coordinates of the annotation.
+   *
+   * @returns {{ x0: number; x1: number; y0: number; y1: number } | null}
+   * An object containing the annotation's top-left (x0, y0)
+   * and its width (x1) and height (y1), or `null` if the SVG is not available.
+   */
   protected getCoordinates(): { x0: number; x1: number; y0: number; y1: number } | null {
     if (!this.svg) return null;
 
     const bbox = (this.svg as any).getBBox();
+
+    const top = parseInt(this.svg.style.top);
+    const left = parseInt(this.svg.style.left);
+
     return {
-      x0: bbox.x,
-      x1: bbox.x + bbox.width,
-      y0: bbox.y,
-      y1: bbox.y + bbox.height,
+      x0: left, // X-coordinate of the annotation
+      x1: bbox.width, // Width of the annotation
+      y0: top, // Y-coordinate of the annotation
+      y1: bbox.height, // Height of the annotation
     };
   }
 }

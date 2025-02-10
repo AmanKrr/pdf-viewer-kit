@@ -31,7 +31,6 @@ export class AnnotationManager {
 
   constructor(container: HTMLElement, pdfState: PdfState) {
     this.container = container;
-
     this.__pdfState = pdfState;
     pdfState.on('ANNOTATION_SELECTED', this.onAnnotationSelection.bind(this));
   }
@@ -61,6 +60,38 @@ export class AnnotationManager {
     this.addListeners();
     this.activeAnnotation = new RectangleAnnotation(this.container, this.__pdfState!, fillColor, strokeColor, strokeWidth, strokeStyle);
     this.annotations.push(this.activeAnnotation);
+  }
+
+  public drawRectangle({
+    x0,
+    y0,
+    x1,
+    y1,
+    fillColor,
+    strokeColor,
+    strokeWidth,
+    strokeStyle,
+  }: {
+    x0: number;
+    y0: number;
+    x1: number;
+    y1: number;
+    fillColor?: string;
+    strokeColor?: string;
+    strokeWidth?: number;
+    strokeStyle?: string;
+  }) {
+    const fillCol = fillColor ?? 'transparent';
+    const strokeCol = strokeColor ?? 'red';
+    const strokeWid = strokeWidth ?? 2;
+    const strokeSty = strokeStyle ?? 'solid';
+
+    this.deselectAll();
+    this.addListeners();
+    this.activeAnnotation = new RectangleAnnotation(this.container, this.__pdfState!, fillCol, strokeCol, strokeWid, strokeSty);
+    this.activeAnnotation.draw(x0, x1, y0, y1);
+    this.annotations.push(this.activeAnnotation);
+    this.activeAnnotation.select();
   }
 
   private onMouseDown(event: MouseEvent) {

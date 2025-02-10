@@ -20,11 +20,11 @@ import { aPdfViewerClassNames, aPdfViewerIds } from '../../constant/ElementIdCla
 import throttle from 'lodash/throttle';
 import PdfState from './PdfState';
 import Toolbar from './Toolbar';
-// import PageVirtualization from './PageVirtualization';
 import { debounce } from 'lodash';
 import PdfSearch from '../manager/PdfSearch';
 import PageVirtualization from './PageVirtualization';
 import ZoomHandler from './ZoomHandler';
+import { ViewerLoadOptions } from '../../types/webpdf.types';
 
 /**
  * Manages the PDF viewer instance and provides various functionalities, including:
@@ -109,6 +109,24 @@ class WebViewer {
   /** @returns {number} The total number of pages in the PDF document. */
   get totalPages() {
     return this.__pdfState.pdfInstance?.numPages;
+  }
+
+  public getAnnotationManager(pageNumber: number) {
+    const container = document.querySelector(`#${this.__pdfState.containerId} #pageContainer-${pageNumber} #${aPdfViewerIds._ANNOTATION_DRAWING_LAYER}`);
+    if (container) {
+      const annotationManager = this.__pdfState.getAnnotationManager(pageNumber); // Assuming page 1 for now
+      if (!annotationManager) {
+        this.__pdfState.createAnnotationLayer(pageNumber, container as HTMLElement);
+        const currentPageManager = this.__pdfState.getAnnotationManager(pageNumber);
+        console.log('current', currentPageManager);
+        currentPageManager?.setPointerEvent('all');
+        return currentPageManager;
+      } else {
+        annotationManager?.setPointerEvent('all');
+      }
+
+      return annotationManager;
+    }
   }
 
   /**

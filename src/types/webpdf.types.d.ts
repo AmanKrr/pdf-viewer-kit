@@ -1,7 +1,7 @@
 /**
  * Represents the options for loading a PDF document in the web viewer.
  */
-interface LoadOptions {
+export interface LoadOptions extends DocumentInitParameters {
   /** The ID of the container element where the PDF viewer will be inserted. */
   containerId: string;
 
@@ -9,7 +9,7 @@ interface LoadOptions {
   document?: string | URL;
 
   /** Raw PDF data provided as an `ArrayBuffer` or `Blob`. */
-  data?: ArrayBuffer | Blob;
+  data?: string | ArrayBuffer | TypedArray | number[] | undefined;
 
   /** If `true`, text selection will be disabled in the viewer. */
   disableTextSelection?: boolean;
