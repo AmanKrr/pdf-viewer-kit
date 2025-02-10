@@ -28,6 +28,10 @@ export class RectangleAnnotation extends Annotation {
   private isDragging: boolean = false;
   private offsetX: number = 0;
   private offsetY: number = 0;
+  private originalLeft: number = 0;
+  private originalTop: number = 0;
+  private originalWidth: number = 0;
+  private originalHeight: number = 0;
 
   constructor(container: HTMLElement, pdfState: PdfState, fillColor: string, strokeColor: string, strokeWidth: number, strokeStyle: string) {
     super(container, pdfState);
@@ -35,6 +39,7 @@ export class RectangleAnnotation extends Annotation {
     this.strokeColor = strokeColor;
     this.strokeWidth = strokeWidth;
     this.strokeStyle = strokeStyle;
+    this.__pdfState?.on('scaleChange', () => this.updateZoom(this.__pdfState?.scale!));
   }
 
   get getId() {
@@ -118,6 +123,17 @@ export class RectangleAnnotation extends Annotation {
   public stopDrawing(): void {
     super.stopDrawing();
 
+    // Get the current zoom factor (defaulting to 1 if not set)
+    const currentZoom = this.__pdfState?.scale || 1;
+
+    // Capture the current values—but convert them back to base coordinates.
+    this.originalLeft = (parseFloat(this.svg.style.left) || 0) / currentZoom;
+    this.originalTop = (parseFloat(this.svg.style.top) || 0) / currentZoom;
+    this.originalWidth = parseFloat(this.svg.getAttribute('width') || '0') / currentZoom;
+    this.originalHeight = parseFloat(this.svg.getAttribute('height') || '0') / currentZoom;
+
+    // Now select the annotation (which creates the resizer overlay)
+
     this.select();
 
     this.__pdfState?.emit('ANNOTATION_CREATED', this);
@@ -152,6 +168,43 @@ export class RectangleAnnotation extends Annotation {
         this.resizer = null;
       }
       this.svg.remove();
+    }
+  }
+
+  public updateZoom(zoomFactor: number): void {
+    // Calculate new values based on the stored original values.
+    const newLeft = this.originalLeft * zoomFactor;
+    const newTop = this.originalTop * zoomFactor;
+    const newWidth = this.originalWidth * zoomFactor;
+    const newHeight = this.originalHeight * zoomFactor;
+
+    // Update the annotation's SVG container.
+    this.svg.style.left = newLeft + 'px';
+    this.svg.style.top = newTop + 'px';
+    this.svg.setAttribute('width', newWidth.toString());
+    this.svg.setAttribute('height', newHeight.toString());
+
+    // If you update internal elements (like the inner rect or hit test rect),
+    // you may need to adjust those as well.
+    if (this.element) {
+      // Assuming a fixed padding of 10 was used during drawing:
+      const padding = 10 * zoomFactor;
+      this.element.setAttribute('x', padding.toString());
+      this.element.setAttribute('y', padding.toString());
+      this.element.setAttribute('width', (newWidth - padding * 2).toString());
+      this.element.setAttribute('height', (newHeight - padding * 2).toString());
+    }
+    if (this.hitElementRect) {
+      const padding = 10 * zoomFactor;
+      this.hitElementRect.setAttribute('x', padding.toString());
+      this.hitElementRect.setAttribute('y', padding.toString());
+      this.hitElementRect.setAttribute('width', (newWidth - padding * 2).toString());
+      this.hitElementRect.setAttribute('height', (newHeight - padding * 2).toString());
+    }
+
+    // Tell the resizer to re-sync its overlay and handles.
+    if (this.resizer) {
+      this.resizer.syncOverlayToSvg();
     }
   }
 }

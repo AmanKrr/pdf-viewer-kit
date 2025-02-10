@@ -135,7 +135,7 @@ export class Resizer {
   /**
    * Syncs the overlay’s position and size to the annotation svg’s current absolute position and dimensions.
    */
-  private syncOverlayToSvg(): void {
+  public syncOverlayToSvg(): void {
     // The annotation svg is absolutely positioned using its CSS style.
     const left = parseFloat(this.svg.style.left) || 0;
     const top = parseFloat(this.svg.style.top) || 0;
