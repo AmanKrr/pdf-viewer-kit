@@ -14,6 +14,7 @@
   limitations under the License.
 */
 
+import { RectConfig } from '../../types/geometry';
 import PdfState from '../components/PdfState';
 
 /**
@@ -60,7 +61,7 @@ export class Annotation {
     this.svg.style.position = 'absolute';
     this.svg.setAttribute('tabindex', '0'); // Enables keyboard focus
     this.svg.style.outline = 'none';
-    this.svg.setAttribute('annotation-id', Date.now().toString());
+    this.svg.setAttribute('annotation-id', this.generateUniqueId());
     this.svg.style.pointerEvents = 'none'; // Prevents unwanted interactions
     this.container.appendChild(this.svg);
   }
@@ -73,9 +74,11 @@ export class Annotation {
    * @param {any} context - The context object associated with the annotation.
    * @param {'rectangle'} type - The type of annotation clicked.
    */
-  protected onAnnotationClick(event: MouseEvent, context: any, type: 'rectangle') {
-    event.stopPropagation();
-    this.__pdfState?.emit('ANNOTATION_SELECTED', context, type);
+  protected onAnnotationClick(event: MouseEvent | null, annotationData: Partial<RectConfig>) {
+    if (event) {
+      event.stopPropagation();
+    }
+    this.__pdfState?.emit('ANNOTATION_SELECTED', annotationData);
   }
 
   /**
@@ -95,7 +98,13 @@ export class Annotation {
    */
   protected stopDrawing(): void {
     this.isDrawing = false;
-    console.log(this.getCoordinates());
+    if (this.__pdfState) {
+      const button = document.querySelector(`#${this.__pdfState.containerId} .a-annotation-container-icon`) as HTMLElement;
+      if (button) {
+        button.parentElement!.style.backgroundColor = '';
+      }
+      (this.container as HTMLElement).style.cursor = 'default';
+    }
   }
 
   /**
@@ -108,16 +117,25 @@ export class Annotation {
   protected getCoordinates(): { x0: number; x1: number; y0: number; y1: number } | null {
     if (!this.svg) return null;
 
-    const bbox = (this.svg as any).getBBox();
+    const bbox = (this.svg as any).getBBox(); // Get bounding box of SVG
 
     const top = parseInt(this.svg.style.top);
     const left = parseInt(this.svg.style.left);
 
-    return {
+    const rectInfo = JSON.stringify({
       x0: left, // X-coordinate of the annotation
       x1: bbox.width, // Width of the annotation
       y0: top, // Y-coordinate of the annotation
       y1: bbox.height, // Height of the annotation
-    };
+    });
+
+    return JSON.parse(rectInfo);
+  }
+
+  /**
+   * Generates a unique id string.
+   */
+  private generateUniqueId(): string {
+    return 'anno-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now().toString();
   }
 }

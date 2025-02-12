@@ -25,6 +25,8 @@ import PdfSearch from '../manager/PdfSearch';
 import PageVirtualization from './PageVirtualization';
 import ZoomHandler from './ZoomHandler';
 import { ViewerLoadOptions } from '../../types/webpdf.types';
+import { AnnotationService } from '../service/AnnotationService';
+import { SelectionManager } from '../manager/SelectionManager';
 
 /**
  * Manages the PDF viewer instance and provides various functionalities, including:
@@ -41,6 +43,7 @@ class WebViewer {
   private __pdfState!: PdfState;
   private __cachedSideBarElement: HTMLElement | undefined;
   private __zoomHandler: ZoomHandler;
+  private __annotationService: AnnotationService;
 
   /**
    * Initializes the WebViewer instance.
@@ -58,11 +61,13 @@ class WebViewer {
     this.__pdfState = PdfState.getInstance(viewerOptions.containerId);
 
     // Initialize page virtualization, search, and toolbar components
-    this.__pageVirtualization = new PageVirtualization(this.__viewerOptions, parentContainer, pageParentContainer, this.__pdfInstance.numPages, this);
+    const selectionManager = new SelectionManager();
+    this.__pageVirtualization = new PageVirtualization(this.__viewerOptions, parentContainer, pageParentContainer, this.__pdfInstance.numPages, this, selectionManager);
     new PdfSearch(this.__pdfState);
-    new Toolbar(this.__viewerOptions.containerId, this.__viewerOptions.customToolbarItems ?? [], this);
+    new Toolbar(this.__viewerOptions.containerId, this.__viewerOptions.customToolbarItems ?? [], this, selectionManager);
     this.addEvents();
     this.__zoomHandler = new ZoomHandler(this.__pdfState, this.__pageVirtualization);
+    this.__annotationService = new AnnotationService(this.__pdfState, this);
   }
 
   /**
@@ -111,22 +116,8 @@ class WebViewer {
     return this.__pdfState.pdfInstance?.numPages;
   }
 
-  public getAnnotationManager(pageNumber: number) {
-    const container = document.querySelector(`#${this.__pdfState.containerId} #pageContainer-${pageNumber} #${aPdfViewerIds._ANNOTATION_DRAWING_LAYER}`);
-    if (container) {
-      const annotationManager = this.__pdfState.getAnnotationManager(pageNumber); // Assuming page 1 for now
-      if (!annotationManager) {
-        this.__pdfState.createAnnotationLayer(pageNumber, container as HTMLElement);
-        const currentPageManager = this.__pdfState.getAnnotationManager(pageNumber);
-        console.log('current', currentPageManager);
-        currentPageManager?.setPointerEvent('all');
-        return currentPageManager;
-      } else {
-        annotationManager?.setPointerEvent('all');
-      }
-
-      return annotationManager;
-    }
+  get annotation() {
+    return this.__annotationService;
   }
 
   /**

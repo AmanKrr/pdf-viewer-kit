@@ -32,6 +32,20 @@ export class RectangleAnnotation extends Annotation {
   private originalTop: number = 0;
   private originalWidth: number = 0;
   private originalHeight: number = 0;
+  private shapeInfo: {
+    id: string;
+    fillColor: string;
+    strokeColor: string;
+    strokeWidth: number;
+    strokeStyle: string;
+    x0?: number | undefined;
+    x1?: number | undefined;
+    y0?: number | undefined;
+    y1?: number | undefined;
+    type: 'rectangle';
+    pageNumber: number | undefined;
+  } | null = null;
+  private pageNumber: number | undefined;
 
   constructor(container: HTMLElement, pdfState: PdfState, fillColor: string, strokeColor: string, strokeWidth: number, strokeStyle: string) {
     super(container, pdfState);
@@ -44,6 +58,10 @@ export class RectangleAnnotation extends Annotation {
 
   get getId() {
     return this.element?.id;
+  }
+
+  get rectInfo() {
+    return this.shapeInfo;
   }
 
   private addDeleteEvent(): void {
@@ -83,13 +101,14 @@ export class RectangleAnnotation extends Annotation {
     this.hitElementRect.setAttribute('x', padding);
     this.hitElementRect.setAttribute('y', padding);
     this.hitElementRect.setAttribute('width', Math.abs(width).toString());
-    this.hitElementRect.setAttribute('height', Math.abs(width).toString());
+    this.hitElementRect.setAttribute('height', Math.abs(height).toString());
     this.hitElementRect.setAttribute('fill', 'none');
     this.hitElementRect.setAttribute('stroke', 'transparent');
     this.hitElementRect.style.strokeWidth = (this.strokeWidth + 10).toString(); // increase if needed
+    this.hitElementRect.style.cursor = 'pointer';
     // Make sure it receives pointer events even if the container is not interactive
     this.hitElementRect.style.pointerEvents = 'auto';
-    this.hitElementRect.onclick = (event: MouseEvent) => this.onAnnotationClick(event, this, 'rectangle');
+    this.hitElementRect.onclick = (event: MouseEvent) => this.onAnnotationClick(event, this.rectInfo!);
     // Append the hit test rect above or after the visible rect
     this.svg.appendChild(this.hitElementRect);
   }
@@ -99,6 +118,7 @@ export class RectangleAnnotation extends Annotation {
     this.svg.style.left = `${x}px`;
     this.svg.style.top = `${y}px`;
     this.createSvgRect();
+    this.pageNumber = this.__pdfState?.currentPage;
   }
 
   public updateDrawing(x: number, y: number): void {
@@ -124,29 +144,36 @@ export class RectangleAnnotation extends Annotation {
     if (height < 0) this.svg.style.top = `${y - padding}px`;
   }
 
-  public stopDrawing(): void {
-    super.stopDrawing();
+  private onShapeUpdate() {
+    this.__pdfState?.emit('ANNOTATION_CREATED', this.rectInfo);
+  }
 
+  public stopDrawing(select = true): void {
+    super.stopDrawing();
+    this.maintainOriginalBounding();
+    this.setRectInfo();
+    if (select) {
+      this.select();
+      this.onAnnotationClick(null, this.rectInfo!);
+    }
+    this.onShapeUpdate();
+  }
+
+  private maintainOriginalBounding(zoomLevel = 0) {
     // Get the current zoom factor (defaulting to 1 if not set)
-    const currentZoom = this.__pdfState?.scale || 1;
+    const currentZoom = zoomLevel || this.__pdfState?.scale || 1;
 
     // Capture the current values—but convert them back to base coordinates.
     this.originalLeft = (parseFloat(this.svg.style.left) || 0) / currentZoom;
     this.originalTop = (parseFloat(this.svg.style.top) || 0) / currentZoom;
     this.originalWidth = parseFloat(this.svg.getAttribute('width') || '0') / currentZoom;
     this.originalHeight = parseFloat(this.svg.getAttribute('height') || '0') / currentZoom;
-
-    // Now select the annotation (which creates the resizer overlay)
-
-    this.select();
-
-    this.__pdfState?.emit('ANNOTATION_CREATED', this);
   }
 
   public select(): void {
     // ✅ Show resizers when the rectangle is selected
     if (!this.resizer) {
-      this.resizer = new Resizer(this.svg, this.element! as any);
+      this.resizer = new Resizer(this.svg, this.element! as any, this.onShapeUpdate.bind(this));
       this.svg.focus();
       this.addDeleteEvent();
     }
@@ -212,21 +239,48 @@ export class RectangleAnnotation extends Annotation {
     }
   }
 
-  public draw(x0: number, x1: number, y0: number, y1: number) {
-    // If you want some padding (e.g. for resizer handles), define it here.
+  public draw(x0: number, x1: number, y0: number, y1: number, pageNumber: number) {
     const padding = 10;
 
     this.startX = x0;
     this.startY = y0;
     this.isDrawing = false;
 
-    // Set the annotation's SVG container position and size.
-    // We add padding on all sides so the drawn rectangle sits inside the container.
     this.svg.style.left = x0 + 'px';
     this.svg.style.top = y0 + 'px';
     this.svg.setAttribute('width', (x1 + padding * 2).toString());
     this.svg.setAttribute('height', (y1 + padding * 2).toString());
+    this.pageNumber = pageNumber;
 
     this.createSvgRect('10', y1, x1);
+    this.maintainOriginalBounding(1);
+    this.updateZoom(this.__pdfState?.scale!);
+  }
+
+  private setRectInfo() {
+    const info = {
+      ...this.getCoordinates(),
+      id: this.element!.id,
+      pageNumber: this.pageNumber,
+      fillColor: this.fillColor,
+      strokeColor: this.strokeColor,
+      strokeWidth: this.strokeWidth,
+      strokeStyle: this.strokeStyle,
+      type: 'rectangle',
+    };
+    this.shapeInfo = info as any;
+  }
+
+  public revokeSelection() {
+    if (this.hitElementRect) {
+      this.hitElementRect.style.cursor = 'default';
+      this.hitElementRect.onclick = null;
+    }
+  }
+
+  public scrollToView() {
+    if (this.svg) {
+      this.svg.scrollIntoView({ block: 'center' });
+    }
   }
 }

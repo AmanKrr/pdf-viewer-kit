@@ -26,6 +26,8 @@ import { PDFLinkService } from '../service/LinkService';
 import { ViewerLoadOptions } from '../../types/webpdf.types';
 import AnnotationLayer from './AnnotationLayer';
 import { aPdfViewerIds } from '../../constant/ElementIdClass';
+import { AnnotationManager } from '../manager/AnnotationManager';
+import { SelectionManager } from '../manager/SelectionManager';
 
 /**
  * Handles virtualization of PDF pages, rendering only those visible within the viewport.
@@ -42,6 +44,7 @@ class PageVirtualization {
   private pagePosition: Map<number, number> = new Map();
   private pdfState!: PdfState;
   private pdfViewer!: WebViewer;
+  private selectionManager: SelectionManager;
 
   /**
    * Constructor initializes the PageVirtualization with required parameters.
@@ -53,7 +56,15 @@ class PageVirtualization {
    * @param {WebViewer} pdfViewer - Instance of the WebViewer.
    * @param {number} [pageBuffer=3] - Number of extra pages to render around the viewport.
    */
-  constructor(options: ViewerLoadOptions, parentContainer: HTMLElement, container: HTMLElement, totalPages: number, pdfViewer: WebViewer, pageBuffer = 3) {
+  constructor(
+    options: ViewerLoadOptions,
+    parentContainer: HTMLElement,
+    container: HTMLElement,
+    totalPages: number,
+    pdfViewer: WebViewer,
+    selectionManager: SelectionManager,
+    pageBuffer = 3,
+  ) {
     this.options = options;
     this.totalPages = totalPages;
     this.parentContainer = parentContainer;
@@ -62,6 +73,7 @@ class PageVirtualization {
     this.pdfState = PdfState.getInstance(options.containerId);
     this.pdf = this.pdfState.pdfInstance;
     this.pdfViewer = pdfViewer;
+    this.selectionManager = selectionManager;
 
     this.calculatePagePositioning().then(async () => {
       if (this.isThereSpecificPageToRender == null || this.isThereSpecificPageToRender == undefined) {
@@ -367,8 +379,9 @@ class PageVirtualization {
     // Render the text layer if text selection is enabled
     if (this.options && !this.options.disableTextSelection) {
       const debounceTextRender = debounce(async (pageWrapper: HTMLElement, container: HTMLElement, page: PDFPageProxy, viewport: PageViewport) => {
-        await new TextLayer(pageWrapper, container.firstChild as HTMLElement, page, viewport).createTextLayer();
+        const [_, annotationDrawLayer] = await new TextLayer(pageWrapper, container.firstChild as HTMLElement, page, viewport).createTextLayer();
         await new AnnotationLayer(pageWrapper, container.firstChild as HTMLElement, page, viewport).createAnnotationLayer(this.pdfViewer, this.pdf);
+        this.pdfViewer.annotation.registerAnnotationManager(pageNumber, new AnnotationManager(annotationDrawLayer, this.pdfState, this.selectionManager));
       }, 200);
       await debounceTextRender(pageWrapper, this.container.firstChild as HTMLElement, page, viewport);
     }
@@ -385,6 +398,7 @@ class PageVirtualization {
 
     for (const pageNumber of this.renderedPages) {
       if (pageNumber < minPage || pageNumber > maxPage) {
+        this.pdfViewer.annotation.unregisterAnnotationManager(pageNumber);
         this.removePage(pageNumber);
         this.renderedPages.delete(pageNumber);
       }

@@ -29,10 +29,12 @@ export class Resizer {
   private marginTop: number;
   private marginRight: number;
   private marginBottom: number;
+  private onShapeUpdateCallback: () => void;
 
-  constructor(svg: SVGSVGElement, element: SVGRectElement) {
+  constructor(svg: SVGSVGElement, element: SVGRectElement, onShapeUpdate: () => void) {
     this.svg = svg;
     this.element = element;
+    this.onShapeUpdateCallback = onShapeUpdate;
 
     // Compute the margins from the inner rect relative to the svg.
     const svgWidth = parseFloat(this.svg.getAttribute('width') || '0');
@@ -276,6 +278,9 @@ export class Resizer {
       this.isResizing = false;
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
+      if (this.onShapeUpdateCallback) {
+        this.onShapeUpdateCallback();
+      }
     };
 
     document.addEventListener('mousemove', onMouseMove);

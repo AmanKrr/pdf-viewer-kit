@@ -16,6 +16,8 @@
 
 import { aPdfViewerClassNames, aPdfViewerIds } from '../../constant/ElementIdClass';
 import WebUiUtils from '../../utils/WebUiUtils';
+import { AnnotationManager } from '../manager/AnnotationManager';
+import { SelectionManager } from '../manager/SelectionManager';
 import PdfState from './PdfState';
 import WebViewer from './WebViewer';
 
@@ -28,6 +30,7 @@ class Toolbar {
   private toolbarConfig: ToolbarButtonConfig[];
   private _viewer!: WebViewer;
   private __pdfState!: PdfState;
+  private selectionManager: SelectionManager;
 
   /**
    * Constructs the toolbar for the PDF viewer.
@@ -36,9 +39,10 @@ class Toolbar {
    * @param {ToolbarButtonConfig[]} customToolbarItems - An array of custom toolbar items.
    * @param {WebViewer} webViewer - The WebViewer instance to control the PDF viewer.
    */
-  constructor(containerId: string, customToolbarItems: ToolbarButtonConfig[] | [], webViewer: WebViewer) {
+  constructor(containerId: string, customToolbarItems: ToolbarButtonConfig[] | [], webViewer: WebViewer, selectionManager: SelectionManager) {
     this._viewer = webViewer;
     this.__pdfState = PdfState.getInstance(containerId);
+    this.selectionManager = selectionManager;
 
     // Initialize default toolbar options
     this.toolbar = {
@@ -204,19 +208,21 @@ class Toolbar {
         label: 'Annotate',
         icon: 'annotate-icon',
         onClick: () => {
-          // this._viewer.search();
           const container = document.querySelector(`#${this.__pdfState.containerId} #pageContainer-${this.__pdfState.currentPage} #${aPdfViewerIds._ANNOTATION_DRAWING_LAYER}`);
           if (container) {
+            const button = document.querySelector(`#${this.__pdfState.containerId} .a-annotation-container-icon`) as HTMLElement;
+            if (button) {
+              button.parentElement!.style.backgroundColor = '#4b4b4b';
+            }
+            (container as HTMLElement).style.cursor = 'crosshair';
             (container as HTMLElement).style.pointerEvents = 'all';
-            const annotationManager = this.__pdfState.getAnnotationManager(this.__pdfState.currentPage); // Assuming page 1 for now
-            if (!annotationManager) {
-              this.__pdfState.createAnnotationLayer(this.__pdfState.currentPage, container as HTMLElement);
-              const currentPageManager = this.__pdfState.getAnnotationManager(this.__pdfState.currentPage);
-              currentPageManager?.setPointerEvent('all');
-              currentPageManager?.createRectangle('transparent', 'red', 2, 'solid');
+            const manager = this._viewer.annotation.isAnnotationManagerRegistered(this.__pdfState.currentPage);
+            if (manager) {
+              manager.createRectangle('transparent', 'red', 2, 'solid');
             } else {
-              annotationManager?.setPointerEvent('all');
-              annotationManager?.createRectangle('transparent', 'red', 2, 'solid');
+              const manager = new AnnotationManager(container as HTMLElement, this.__pdfState, this.selectionManager);
+              this._viewer.annotation.registerAnnotationManager(this.__pdfState.currentPage, manager);
+              manager.createRectangle('transparent', 'red', 2, 'solid');
             }
           }
         },
@@ -376,6 +382,117 @@ class Toolbar {
     wrapper.appendChild(totalPageContainer);
 
     return wrapper;
+  }
+
+  private static shapeTool() {
+    // Parent wrapper
+    // const shapeToolbarWrapper = document.createElement('div');
+    // shapeToolbarWrapper.classList.add('a-shape-toolbar-wrapper');
+    // // Selected tool button
+    // const div = document.createElement('div');
+    // div.classList.add('a-toolbar-item');
+    // div.classList.add('a-toolbar-tooltip');
+    // const selectedToolButton = document.createElement('button');
+    // selectedToolButton.classList.add('a-toolbar-button');
+    // const icon = document.createElement('span');
+    // icon.setAttribute('class', `a-toolbar-icon a-shape-selection-dropdown`);
+    // selectedToolButton.appendChild(icon);
+    // selectedToolButton.addEventListener('click', () => {});
+    // div.appendChild(selectedToolButton);
+    // // arrow
+    // const dropdownArrow = document.createElement('div');
+    // dropdownArrow.classList.add('a-toolbar-button');
+    // const icon2 = document.createElement('span');
+    // icon2.setAttribute('class', `a-toolbar-icon`);
+    // dropdownArrow.appendChild(icon2);
+    // dropdownArrow.addEventListener('click', () => {});
+    // shapeToolbarWrapper.appendChild(div);
+    // shapeToolbarWrapper.appendChild(dropdownArrow);
+    // return shapeToolbarWrapper;
+    // const dropIconElement = document.createElement('span');
+    // dropIconElement.classList.add('a-shape-selection-dropdown');
+    // // Create Main Shape Button (last selected shape)
+    // const mainShapeButton = document.createElement('button');
+    // mainShapeButton.classList.add('a-toolbar-item');
+    // mainShapeButton.classList.add('a-toolbar-tooltip');
+    // mainShapeButton.id = 'mainShapeButton';
+    // const btn = document.createElement('button');
+    // btn.classList.add('a-toolbar-item');
+    // btn.classList.add('a-toolbar-tooltip');
+    // btn.classList.add('a-toolbar-button');
+    // btn.appendChild(dropIconElement);
+    // const selectedShapeIcon = document.createElement('img');
+    // selectedShapeIcon.id = 'selectedShapeIcon';
+    // selectedShapeIcon.src = 'icons/line.svg'; // Default icon
+    // // selectedShapeIcon.alt = 'Line';
+    // mainShapeButton.appendChild(selectedShapeIcon);
+    // // Create Dropdown Container
+    // const dropdown = document.createElement('div');
+    // dropdown.classList.add('dropdown');
+    // const dropdownButton = document.createElement('button');
+    // dropdownButton.classList.add('toolbar-button');
+    // dropdownButton.id = 'dropdownButton';
+    // const dropdownIcon = document.createElement('img');
+    // dropdownIcon.src = 'icons/arrow-down.svg';
+    // dropdownIcon.alt = 'Dropdown';
+    // dropdownButton.appendChild(dropdownIcon);
+    // // Create Dropdown Menu
+    // const dropdownMenu = document.createElement('div');
+    // dropdownMenu.classList.add('dropdown-menu');
+    // // Shape options (icon path should be adjusted)
+    // const shapes = [
+    //   { shape: 'line', label: 'Line', icon: 'icons/line.svg' },
+    //   { shape: 'arrow', label: 'Arrow', icon: 'icons/arrow.svg' },
+    //   { shape: 'rectangle', label: 'Rectangle', icon: 'icons/rectangle.svg' },
+    //   { shape: 'ellipse', label: 'Ellipse', icon: 'icons/ellipse.svg' },
+    //   { shape: 'polygon', label: 'Polygon', icon: 'icons/polygon.svg' },
+    //   { shape: 'cloudy-polygon', label: 'Cloudy Polygon', icon: 'icons/cloudy-polygon.svg' },
+    //   { shape: 'polyline', label: 'Polyline', icon: 'icons/polyline.svg' },
+    //   { shape: 'cloudy-rectangle', label: 'Cloudy Rectangle', icon: 'icons/cloudy-rectangle.svg' },
+    //   { shape: 'dashed-rectangle', label: 'Dashed Rectangle', icon: 'icons/dashed-rectangle.svg' },
+    // ];
+    // let lastSelectedShape = 'line'; // Default shape
+    // // Populate dropdown menu
+    // shapes.forEach(({ shape, label, icon }) => {
+    //   const item = document.createElement('div');
+    //   item.classList.add('dropdown-item');
+    //   item.dataset.shape = shape;
+    //   const img = document.createElement('img');
+    //   img.src = icon;
+    //   img.alt = label;
+    //   item.appendChild(img);
+    //   item.append(label);
+    //   item.addEventListener('click', () => {
+    //     lastSelectedShape = shape;
+    //     selectedShapeIcon.src = icon; // Update main button icon
+    //     dropdownMenu.classList.remove('show');
+    //     console.log('Selected Shape:', lastSelectedShape);
+    //   });
+    //   dropdownMenu.appendChild(item);
+    // });
+    // // Append elements
+    // dropdown.appendChild(dropdownButton);
+    // dropdown.appendChild(dropdownMenu);
+    // // toolbar.appendChild(mainShapeButton);
+    // // toolbar.appendChild(dropdown);
+    // // document.body.appendChild(toolbar);
+    // // Event Listeners
+    // dropdownButton.addEventListener('click', (event) => {
+    //   event.stopPropagation();
+    //   dropdownMenu.classList.toggle('show');
+    // });
+    // document.addEventListener('click', () => {
+    //   dropdownMenu.classList.remove('show');
+    // });
+    // mainShapeButton.addEventListener('click', () => {
+    //   console.log('Using tool:', lastSelectedShape);
+    // });
+    // const div = document.createElement('div');
+    // div.classList.add('a-shape-selection-toolbar');
+    // div.appendChild(mainShapeButton);
+    // div.appendChild(btn);
+    // // div.appendChild(dropdown);
+    // return div;
   }
 }
 
