@@ -24,7 +24,6 @@ import { PageViewport, PDFPageProxy, TextLayer as pdfjsTextLayer } from 'pdfjs-d
  */
 class TextLayer extends PageElement {
   private pageWrapper!: HTMLElement;
-  private container!: HTMLElement;
   private page!: PDFPageProxy;
   private viewport!: PageViewport;
 
@@ -36,10 +35,9 @@ class TextLayer extends PageElement {
    * @param {PDFPageProxy} page - The PDF.js page proxy object representing the current page.
    * @param {PageViewport} viewport - The viewport defining the dimensions and scale of the text layer.
    */
-  constructor(pageWrapper: HTMLElement, container: HTMLElement, page: PDFPageProxy, viewport: PageViewport) {
+  constructor(pageWrapper: HTMLElement, page: PDFPageProxy, viewport: PageViewport) {
     super();
     this.pageWrapper = pageWrapper;
-    this.container = container;
     this.page = page;
     this.viewport = viewport;
   }

@@ -20,7 +20,7 @@ import PdfState from '../components/PdfState';
 import { ISelectable, SelectionManager } from './SelectionManager';
 
 export class AnnotationManager {
-  private container: HTMLElement;
+  private container: HTMLElement | null;
   private activeAnnotation: RectangleAnnotation | null = null;
   private selectedAnnotation: RectangleAnnotation | null = null;
   private annotations: RectangleAnnotation[] = [];
@@ -51,6 +51,7 @@ export class AnnotationManager {
   }
 
   public setPointerEvent(pointerEvent: 'all' | 'none') {
+    if (!this.container) return;
     this.container.style.pointerEvents = pointerEvent;
   }
 
@@ -68,18 +69,21 @@ export class AnnotationManager {
   }
 
   private addListeners() {
+    if (!this.container) return;
     this.container.addEventListener('mousedown', this.boundMouseDown);
     this.container.addEventListener('mousemove', this.boundMouseMove);
     this.container.addEventListener('mouseup', this.boundMouseUp);
   }
 
   private removeListeners() {
+    if (!this.container) return;
     this.container.removeEventListener('mousedown', this.boundMouseDown);
     this.container.removeEventListener('mousemove', this.boundMouseMove);
     this.container.removeEventListener('mouseup', this.boundMouseUp);
   }
 
   public createRectangle(fillColor: string, strokeColor: string, strokeWidth: number, strokeStyle: string) {
+    if (!this.container) return;
     this.deselectAll();
     this.addListeners();
     this.activeAnnotation = new RectangleAnnotation(this.container, this.__pdfState!, fillColor, strokeColor, strokeWidth, strokeStyle);
@@ -107,6 +111,7 @@ export class AnnotationManager {
     strokeWidth?: number;
     strokeStyle?: string;
   }) {
+    if (!this.container) return;
     const fillCol = fillColor ?? 'transparent';
     const strokeCol = strokeColor ?? 'red';
     const strokeWid = strokeWidth ?? 2;
@@ -125,6 +130,7 @@ export class AnnotationManager {
   }
 
   private onMouseDown(event: MouseEvent) {
+    if (!this.container) return;
     if (!this.activeAnnotation) return;
     event.preventDefault();
 
@@ -136,6 +142,7 @@ export class AnnotationManager {
   }
 
   private onMouseMove(event: MouseEvent) {
+    if (!this.container) return;
     if (!this.activeAnnotation || !this.activeAnnotation.isDrawing) return;
     event.preventDefault();
 
@@ -246,5 +253,8 @@ export class AnnotationManager {
     if (this.selectionUnsubscribe) {
       this.selectionUnsubscribe();
     }
+    this.container = null;
+    this.activeAnnotation = null;
+    this.selectedAnnotation = null;
   }
 }

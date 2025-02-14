@@ -118,19 +118,19 @@ class PageVirtualization {
       setTimeout(() => (isScaleChangeActive = false), 300);
     });
 
-    const debouncedScrollHandler = throttle(async () => {
-      if (!isScaleChangeActive) {
-        const scrollTop = this.container!.scrollTop;
-        const isScrollingDown = scrollTop > this.lastScrollTop;
-        this.lastScrollTop = scrollTop;
-
-        const targetPage = this.calculatePageFromScroll(scrollTop);
-        await this.updateVisiblePages(isScrollingDown, targetPage);
-      }
-    }, 160);
-
-    this.container.addEventListener('scroll', debouncedScrollHandler);
+    this.container.addEventListener('scroll', () => this.debouncedScrollHandler(isScaleChangeActive));
   }
+
+  private debouncedScrollHandler = throttle(async (isScaleChangeActive: boolean) => {
+    if (!isScaleChangeActive) {
+      const scrollTop = this.container!.scrollTop;
+      const isScrollingDown = scrollTop > this.lastScrollTop;
+      this.lastScrollTop = scrollTop;
+
+      const targetPage = this.calculatePageFromScroll(scrollTop);
+      await this.updateVisiblePages(isScrollingDown, targetPage);
+    }
+  }, 160);
 
   /**
    * Calculate the number of pages required to fill the viewport.
@@ -348,6 +348,7 @@ class PageVirtualization {
 
     // Create and append a page container
     const pageWrapper = PageElement.createPageContainerDiv(pageNumber, viewport, this.pagePosition);
+    pageWrapper.style.backgroundColor = 'white'; // Ensure a white placeholder is shown
     this.container.firstChild?.appendChild(pageWrapper);
 
     // Create and append a canvas for rendering
@@ -374,17 +375,15 @@ class PageVirtualization {
       viewport,
       annotationMode: 2,
     };
-    await page.render(renderContext).promise;
-
-    // Render the text layer if text selection is enabled
-    if (this.options && !this.options.disableTextSelection) {
-      const debounceTextRender = debounce(async (pageWrapper: HTMLElement, container: HTMLElement, page: PDFPageProxy, viewport: PageViewport) => {
-        const [_, annotationDrawLayer] = await new TextLayer(pageWrapper, container.firstChild as HTMLElement, page, viewport).createTextLayer();
-        await new AnnotationLayer(pageWrapper, container.firstChild as HTMLElement, page, viewport).createAnnotationLayer(this.pdfViewer, this.pdf);
-        this.pdfViewer.annotation.registerAnnotationManager(pageNumber, new AnnotationManager(annotationDrawLayer, this.pdfState, this.selectionManager));
-      }, 200);
-      await debounceTextRender(pageWrapper, this.container.firstChild as HTMLElement, page, viewport);
-    }
+    page.render(renderContext).promise.then(async () => {
+      if (this.options && !this.options.disableTextSelection) {
+        const [_, annotationDrawLayer] = await new TextLayer(pageWrapper, page, viewport).createTextLayer();
+        await new AnnotationLayer(pageWrapper, page, viewport).createAnnotationLayer(this.pdfViewer, this.pdf);
+        if (!this.pdfViewer.annotation.isAnnotationManagerRegistered(pageNumber)) {
+          this.pdfViewer.annotation.registerAnnotationManager(pageNumber, new AnnotationManager(annotationDrawLayer, this.pdfState, this.selectionManager));
+        }
+      }
+    });
   }
 
   /**
@@ -485,10 +484,11 @@ class PageVirtualization {
         (annotationLayer as HTMLElement).style.height = `${viewport.height}px`;
       }
 
-      const zoomContainer = domPages[i].querySelector('#a-zoomed-page-image-container');
+      const zoomContainer = canvas?.nextElementSibling;
       if (zoomContainer) {
         (zoomContainer as HTMLElement).style.width = `${viewport.width}px`;
         (zoomContainer as HTMLElement).style.height = `${viewport.height}px`;
+        zoomContainer.innerHTML = '';
       }
     }
   }
@@ -507,13 +507,13 @@ class PageVirtualization {
     const scale: number = this.pdfState.scale;
     const viewport = page.getViewport({ scale });
 
-    // Render the high-resolution image and obtain its data URL.
-    const [dataUrl, _] = await this.renderHighResImage(viewport, page);
-
     const img = document.createElement('img');
-    img.src = dataUrl;
     img.style.width = `${viewport.width}px`;
     img.style.height = `${viewport.height}px`;
+
+    // Render the high-resolution image and obtain its data URL.
+    const [dataUrl, _] = await this.renderHighResImage(viewport, page);
+    img.src = dataUrl;
 
     // Append the image container into the appropriate page container.
     const pageContainer = document.querySelector(`#${this.pdfState.containerId} #pageContainer-${pageNumber}`);
@@ -522,7 +522,6 @@ class PageVirtualization {
       if (canvasPresentation) {
         const imgContainer = canvasPresentation.querySelector('#a-zoomed-page-image-container');
         if (imgContainer) {
-          imgContainer.innerHTML = '';
           imgContainer.appendChild(img);
         }
       }

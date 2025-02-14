@@ -71,6 +71,7 @@
   border-width: 1px;
   box-shadow: none;
   box-sizing: border-box;
+  background-color: white;
 }
 
 /* Wrapper for the viewer to align PDF with sidebar */

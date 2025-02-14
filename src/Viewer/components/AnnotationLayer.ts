@@ -8,14 +8,12 @@ import { PDFLinkService } from '../service/LS';
 
 class AnnotationLayer extends PageElement {
   private pageWrapper!: HTMLElement;
-  private container!: HTMLElement;
   private page!: PDFPageProxy;
   private viewport!: PageViewport;
 
-  constructor(pageWrapper: HTMLElement, container: HTMLElement, page: PDFPageProxy, viewport: PageViewport) {
+  constructor(pageWrapper: HTMLElement, page: PDFPageProxy, viewport: PageViewport) {
     super();
     this.pageWrapper = pageWrapper;
-    this.container = container;
     this.page = page;
     this.viewport = viewport;
   }
