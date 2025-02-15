@@ -89,14 +89,41 @@ class TextLayer extends PageElement {
     });
 
     // Render the text layer into the container.
-    pdfJsInternalTextLayer.render();
+    await pdfJsInternalTextLayer.render();
+    this.wrapTextLayerIntoPTag();
+    // this.copyAndPateText();
 
     // Attach a click event handler to each text div for future interactivity.
-    pdfJsInternalTextLayer.textDivs.forEach((ele) => {
-      ele.onclick = (e) => console.log('Coming soon'); // Placeholder for future interaction
-    });
+    // pdfJsInternalTextLayer.textDivs.forEach((ele) => {
+    //   ele.onclick = (e) => console.log('Coming soon'); // Placeholder for future interaction
+    // });
 
     return [textLayerDiv, annotaionLayerDiv];
+  }
+
+  private wrapTextLayerIntoPTag() {
+    if (!this.pageWrapper) return;
+
+    const textLayer = this.pageWrapper.querySelector(`.${aPdfViewerClassNames._A_TEXT_LAYER}`);
+
+    if (!textLayer) return;
+    const innerHtml = textLayer.innerHTML;
+    textLayer.innerHTML = '';
+    textLayer.innerHTML = `<p>${innerHtml}</p>`.replaceAll(`<br role="presentation">`, '');
+  }
+
+  private copyAndPateText() {
+    if (!this.pageWrapper) return;
+
+    const textLayer = this.pageWrapper.querySelector(`.${aPdfViewerClassNames._A_TEXT_LAYER}`) as HTMLElement;
+
+    if (!textLayer) return;
+
+    textLayer.onkeydown = this.keyDown;
+  }
+
+  private keyDown(event: KeyboardEvent) {
+    console.log(event);
   }
 }
 

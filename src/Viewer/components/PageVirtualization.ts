@@ -343,7 +343,7 @@ class PageVirtualization {
     if (!this.container) return;
 
     const page = await this.pdf.getPage(pageNumber);
-    const scale = this.pdfState.scale;
+    const scale = this.pdfState.scale > 1 ? 1 : this.pdfState.scale;
     const viewport = page.getViewport({ scale });
 
     // Create and append a page container
@@ -375,12 +375,18 @@ class PageVirtualization {
       viewport,
       annotationMode: 2,
     };
+    if (this.pdfState.scale > 1) {
+      this.updatePageBuffers(pageNumber);
+    }
     page.render(renderContext).promise.then(async () => {
       if (this.options && !this.options.disableTextSelection) {
         const [_, annotationDrawLayer] = await new TextLayer(pageWrapper, page, viewport).createTextLayer();
         await new AnnotationLayer(pageWrapper, page, viewport).createAnnotationLayer(this.pdfViewer, this.pdf);
         if (!this.pdfViewer.annotation.isAnnotationManagerRegistered(pageNumber)) {
           this.pdfViewer.annotation.registerAnnotationManager(pageNumber, new AnnotationManager(annotationDrawLayer, this.pdfState, this.selectionManager));
+        }
+        if (this.pdfState.scale > 1) {
+          await this.appendHighResImageToPageContainer(pageNumber);
         }
       }
     });
@@ -437,11 +443,10 @@ class PageVirtualization {
     // Re-render visible pages at the updated scale
     if (this.isThereSpecificPageToRender) {
       await this.renderPage(this.isThereSpecificPageToRender);
-      this.renderedPages.add(this.isThereSpecificPageToRender);
+      await this.appendHighResImageToPageContainer(this.isThereSpecificPageToRender);
     } else {
       for (const pageNumber of visiblePages) {
         await this.appendHighResImageToPageContainer(pageNumber);
-        // this.renderedPages.add(pageNumber);
       }
     }
   }
@@ -453,42 +458,76 @@ class PageVirtualization {
    *
    * @returns A promise that resolves once all page buffers have been updated.
    */
-  public async updatePageBuffers(): Promise<void> {
+  public async updatePageBuffers(pageNumber: number | null = null): Promise<void> {
     if (!this.container) return;
 
-    const domPages = document.querySelectorAll(`#${this.options?.containerId} .a-page-view`);
-    if (!domPages) return;
+    if (pageNumber !== null) {
+      const domPages = document.querySelector(`#${this.options?.containerId} #pageContainer-${pageNumber}`) as HTMLElement;
+      if (domPages) {
+        const page: PDFPageProxy = await this.pdf.getPage(pageNumber);
+        const scale: number = this.pdfState.scale;
+        const viewport = page.getViewport({ scale });
+        const pageTop = this.pagePosition.get(pageNumber) || 0;
 
-    for (let i = 0; i < domPages.length; i++) {
-      const pageNumber = parseInt(domPages[i].id.split('-')[1]);
-      // Retrieve the PDF page and its viewport.
-      const page: PDFPageProxy = await this.pdf.getPage(pageNumber);
-      const scale: number = this.pdfState.scale;
-      const viewport = page.getViewport({ scale });
-      const pageTop = this.pagePosition.get(pageNumber) || 0;
+        domPages.style.top = `${pageTop}px`;
+        // Set the page container dimensions.
+        domPages.style.height = `${viewport.height}px`;
+        domPages.style.width = `${viewport.width}px`;
 
-      (domPages[i] as HTMLElement).style.top = `${pageTop}px`;
-      // Set the page container dimensions.
-      (domPages[i] as HTMLElement).style.height = `${viewport.height}px`;
-      (domPages[i] as HTMLElement).style.width = `${viewport.width}px`;
+        const canvas = domPages.querySelector('canvas');
+        if (canvas) {
+          canvas.style.width = `${viewport.width}px`;
+          canvas.style.height = `${viewport.height}px`;
+        }
 
-      const canvas = domPages[i].querySelector('canvas');
-      if (canvas) {
-        canvas.style.width = `${viewport.width}px`;
-        canvas.style.height = `${viewport.height}px`;
+        const annotationLayer = domPages.querySelector(`#${aPdfViewerIds._ANNOTATION_DRAWING_LAYER}`);
+        if (annotationLayer) {
+          (annotationLayer as HTMLElement).style.width = `${viewport.width}px`;
+          (annotationLayer as HTMLElement).style.height = `${viewport.height}px`;
+        }
+
+        const zoomContainer = canvas?.nextElementSibling;
+        if (zoomContainer) {
+          (zoomContainer as HTMLElement).style.width = `${viewport.width}px`;
+          (zoomContainer as HTMLElement).style.height = `${viewport.height}px`;
+          zoomContainer.innerHTML = '';
+        }
       }
+    } else {
+      const domPages = document.querySelectorAll(`#${this.options?.containerId} .a-page-view`);
+      if (!domPages) return;
 
-      const annotationLayer = domPages[i].querySelector(`#${aPdfViewerIds._ANNOTATION_DRAWING_LAYER}`);
-      if (annotationLayer) {
-        (annotationLayer as HTMLElement).style.width = `${viewport.width}px`;
-        (annotationLayer as HTMLElement).style.height = `${viewport.height}px`;
-      }
+      for (let i = 0; i < domPages.length; i++) {
+        const pageNumber = parseInt(domPages[i].id.split('-')[1]);
+        // Retrieve the PDF page and its viewport.
+        const page: PDFPageProxy = await this.pdf.getPage(pageNumber);
+        const scale: number = this.pdfState.scale;
+        const viewport = page.getViewport({ scale });
+        const pageTop = this.pagePosition.get(pageNumber) || 0;
 
-      const zoomContainer = canvas?.nextElementSibling;
-      if (zoomContainer) {
-        (zoomContainer as HTMLElement).style.width = `${viewport.width}px`;
-        (zoomContainer as HTMLElement).style.height = `${viewport.height}px`;
-        zoomContainer.innerHTML = '';
+        (domPages[i] as HTMLElement).style.top = `${pageTop}px`;
+        // Set the page container dimensions.
+        (domPages[i] as HTMLElement).style.height = `${viewport.height}px`;
+        (domPages[i] as HTMLElement).style.width = `${viewport.width}px`;
+
+        const canvas = domPages[i].querySelector('canvas');
+        if (canvas) {
+          canvas.style.width = `${viewport.width}px`;
+          canvas.style.height = `${viewport.height}px`;
+        }
+
+        const annotationLayer = domPages[i].querySelector(`#${aPdfViewerIds._ANNOTATION_DRAWING_LAYER}`);
+        if (annotationLayer) {
+          (annotationLayer as HTMLElement).style.width = `${viewport.width}px`;
+          (annotationLayer as HTMLElement).style.height = `${viewport.height}px`;
+        }
+
+        const zoomContainer = canvas?.nextElementSibling;
+        if (zoomContainer) {
+          (zoomContainer as HTMLElement).style.width = `${viewport.width}px`;
+          (zoomContainer as HTMLElement).style.height = `${viewport.height}px`;
+          zoomContainer.innerHTML = '';
+        }
       }
     }
   }

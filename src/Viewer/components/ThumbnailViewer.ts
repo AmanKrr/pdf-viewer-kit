@@ -122,11 +122,11 @@ class ThumbnailViewer {
     const page: PDFPageProxy = await this.pdfDocument.getPage(this.pageNumber);
 
     // Set thumbnail scale
-    const scale = 0.3; // Render at a higher scale for better quality
+    const scale = 0.2; // Render at a higher scale for better quality
     const viewport = page.getViewport({ scale });
 
     // Create and configure canvas
-    const upscaleFactor = 2; // Render at 2x resolution
+    const upscaleFactor = 1.9; // Render at 2x resolution
     const canvasWidth = viewport.width * upscaleFactor;
     const canvasHeight = viewport.height * upscaleFactor;
 

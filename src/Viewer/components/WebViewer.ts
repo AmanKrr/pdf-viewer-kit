@@ -63,7 +63,7 @@ class WebViewer {
     // Initialize page virtualization, search, and toolbar components
     const selectionManager = new SelectionManager();
     this.__pageVirtualization = new PageVirtualization(this.__viewerOptions, parentContainer, pageParentContainer, this.__pdfInstance.numPages, this, selectionManager);
-    new PdfSearch(this.__pdfState, this);
+    // new PdfSearch(this.__pdfState, this);
     new Toolbar(this.__viewerOptions.containerId, this.__viewerOptions.customToolbarItems ?? [], this, selectionManager);
     this.addEvents();
     this.__zoomHandler = new ZoomHandler(this.__pdfState, this.__pageVirtualization);
