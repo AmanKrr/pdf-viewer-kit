@@ -59,6 +59,10 @@
   height: 0;
 }
 
+.a-text-layer :is(span) {
+  display: block;
+}
+
 /* ========================== */
 /* Highlighting Styles */
 /* ========================== */
