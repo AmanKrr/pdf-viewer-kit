@@ -1,9 +1,12 @@
 export declare const aPdfViewerIds: {
     _TOOLBAR_CONTAINER: string;
+    _TOOLBAR_GROUP_1: string;
+    _TOOLBAR_GROUP_2: string;
     _MAIN_VIEWER_CONTAINER: string;
     _MAIN_PAGE_VIEWER_CONTAINER: string;
     _TEXT_LAYER: string;
     _ANNOTATION_LAYER: string;
+    _ANNOTATION_DRAWING_LAYER: string;
     _LOADING_CONTAINER: string;
     _INPUT_PAGE_NUMBER: string;
     _CURRENT_PAGE_INPUT: string;
@@ -12,12 +15,15 @@ export declare const aPdfViewerClassNames: {
     _PDF_LOADING: string;
     _A_PDF_VIEWER: string;
     _A_TOOLBAR_ITEMS: string;
+    _A_VIEWER_WRAPPER: string;
     _A_VIEWER_CONTAINER: string;
     _A_PAGE_CONTAINER: string;
     _A_PAGE_VIEW: string;
     _A_TEXT_LAYER: string;
     _A_ANNOTATION_LAYER: string;
+    _A_ANNOTATION_DRAWING_LAYER: string;
     _A_TOOLBAR_ITEM: string;
+    _TOOLBAR_GROUP: string;
     _A_TOOLBAR_TOOLTIP: string;
     _A_TOOLBAR_BUTTON: string;
     _A_TOOLBAR_ICON: string;
@@ -33,4 +39,6 @@ export declare const aPdfViewerClassNames: {
     _A_PAGE_NUMBER_CONTAINER: string;
     _A_PAGE_INPUT_CONTAINER: string;
     _A_CURRENT_PAGE_NUMBER_INPUT_FIELD: string;
+    _A_SIDEBAR_CONTAINER: string;
+    _A_INNER_SIDEBAR_CONTAINER_CONTENT: string;
 };

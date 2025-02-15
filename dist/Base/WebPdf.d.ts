@@ -1,34 +1,21 @@
-import WebViewer from "../Viewer/components/WebViewer";
-import "../style/toolbar.css";
-import "../style/root.css";
-import "../style/textlayer.css";
-import "../style/annotationlayer.css";
+import WebViewer from '../Viewer/components/WebViewer';
+import '../style/toolbar.css';
+import '../style/root.css';
+import '../style/textlayer.css';
+import '../style/thumbnail.css';
+import '../style/annotationlayer.css';
+import '../style/annotationDrawerLayer.css';
+import { LoadOptions } from '../types/webpdf.types';
 /**
- * Represents the options for loading a PDF document in the web viewer.
+ * Class responsible for loading and managing PDF documents within a web viewer.
+ * Extends functionalities from `WebViewer` and integrates PDF.js for rendering.
  */
-interface LoadOptions {
-    containerId: string;
-    document: string | Blob | ArrayBuffer;
-    disableTextSelection?: boolean;
-    maxDefaultZoomLevel?: number;
-    password?: string;
-    printMode?: boolean;
-    toolbarItems?: string[];
-    styleSheets?: string;
-    preventTextCopy?: boolean;
-    renderSpecificPageOnly?: number | null;
-}
-/**
- * A class for loading and displaying PDF documents in a web viewer.
- */
-declare class WebPdf extends WebViewer {
-    private static loadOptions;
-    isloading: boolean;
-    private static scale;
+declare class WebPdf {
     /**
      * Loads a PDF document into the web viewer.
-     * @param options - The options for loading the document.
-     * @returns A Promise that resolves to a WebViewer instance if successful, otherwise undefined.
+     *
+     * @param {LoadOptions} options - Configuration options for loading the document.
+     * @returns {Promise<WebViewer | undefined>} Resolves to a `WebViewer` instance upon successful load or `undefined` on failure.
      */
     static load(options: LoadOptions): Promise<WebViewer | undefined>;
 }
