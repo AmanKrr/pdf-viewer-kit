@@ -46,14 +46,19 @@ export class RectangleAnnotation extends Annotation {
     pageNumber: number | undefined;
   } | null = null;
   private pageNumber: number | undefined;
+  private constraints;
 
   constructor(container: HTMLElement, pdfState: PdfState, fillColor: string, strokeColor: string, strokeWidth: number, strokeStyle: string) {
     super(container, pdfState);
+    this.constraints = container?.getBoundingClientRect();
     this.fillColor = fillColor;
     this.strokeColor = strokeColor;
     this.strokeWidth = strokeWidth;
     this.strokeStyle = strokeStyle;
-    this.__pdfState?.on('scaleChange', () => this.updateZoom(this.__pdfState?.scale!));
+    this.__pdfState?.on('scaleChange', () => {
+      this.constraints = this.container?.getBoundingClientRect();
+      this.updateZoom(this.__pdfState?.scale!);
+    });
   }
 
   get getId() {
@@ -123,11 +128,18 @@ export class RectangleAnnotation extends Annotation {
 
   public updateDrawing(x: number, y: number): void {
     if (!this.isDrawing || !this.element || !this.hitElementRect) return;
-
-    const width = x - this.startX;
-    const height = y - this.startY;
-
     const padding = 10;
+
+    // Clamp x and y inside page (container) bounds
+    const maxX = this.constraints.width - padding;
+    const maxY = this.constraints.height - padding;
+
+    const clampedX = Math.min(Math.max(x, 0), maxX);
+    const clampedY = Math.min(Math.max(y, 0), maxY);
+
+    const width = clampedX - this.startX;
+    const height = clampedY - this.startY;
+
     this.svg.setAttribute('width', (Math.abs(width) + padding * 2).toString());
     this.svg.setAttribute('height', (Math.abs(height) + padding * 2).toString());
 
@@ -140,8 +152,8 @@ export class RectangleAnnotation extends Annotation {
     this.hitElementRect.setAttribute('width', Math.abs(width).toString());
     this.hitElementRect.setAttribute('height', Math.abs(height).toString());
 
-    if (width < 0) this.svg.style.left = `${x - padding}px`;
-    if (height < 0) this.svg.style.top = `${y - padding}px`;
+    if (width < 0) this.svg.style.left = `${clampedX - padding}px`;
+    if (height < 0) this.svg.style.top = `${clampedY - padding}px`;
   }
 
   private onShapeUpdate() {
@@ -173,7 +185,7 @@ export class RectangleAnnotation extends Annotation {
   public select(): void {
     // ✅ Show resizers when the rectangle is selected
     if (!this.resizer) {
-      this.resizer = new Resizer(this.svg, this.element! as any, this.onShapeUpdate.bind(this));
+      this.resizer = new Resizer(this.svg, this.element! as any, this.onShapeUpdate.bind(this), this.constraints);
       this.svg.focus();
       this.addDeleteEvent();
     }
@@ -235,6 +247,7 @@ export class RectangleAnnotation extends Annotation {
 
     // Tell the resizer to re-sync its overlay and handles.
     if (this.resizer) {
+      this.resizer.constraintsValue = this.constraints;
       this.resizer.syncOverlayToSvg();
     }
   }

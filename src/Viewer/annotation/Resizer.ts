@@ -30,8 +30,10 @@ export class Resizer {
   private marginRight: number;
   private marginBottom: number;
   private onShapeUpdateCallback: () => void;
+  private constraints;
 
-  constructor(svg: SVGSVGElement, element: SVGRectElement, onShapeUpdate: () => void) {
+  constructor(svg: SVGSVGElement, element: SVGRectElement, onShapeUpdate: () => void, constraints: any) {
+    this.constraints = constraints;
     this.svg = svg;
     this.element = element;
     this.onShapeUpdateCallback = onShapeUpdate;
@@ -56,6 +58,10 @@ export class Resizer {
     this.createResizerHandles();
     // Sync the overlay to the svg’s current absolute position and dimensions.
     this.syncOverlayToSvg();
+  }
+
+  set constraintsValue(constraints: DOMRect) {
+    this.constraints = constraints;
   }
 
   /**
@@ -138,19 +144,32 @@ export class Resizer {
    * Syncs the overlay’s position and size to the annotation svg’s current absolute position and dimensions.
    */
   public syncOverlayToSvg(): void {
-    // The annotation svg is absolutely positioned using its CSS style.
+    // Recalculate margins using current SVG and inner rect attributes.
+    const svgWidth = parseFloat(this.svg.getAttribute('width') || '0');
+    const svgHeight = parseFloat(this.svg.getAttribute('height') || '0');
+    const rectX = parseFloat(this.element.getAttribute('x') || '0');
+    const rectY = parseFloat(this.element.getAttribute('y') || '0');
+    const rectWidth = parseFloat(this.element.getAttribute('width') || '0');
+    const rectHeight = parseFloat(this.element.getAttribute('height') || '0');
+
+    // Update margins so that they match the current zoomed values.
+    this.marginLeft = rectX;
+    this.marginTop = rectY;
+    this.marginRight = svgWidth - (rectX + rectWidth);
+    this.marginBottom = svgHeight - (rectY + rectHeight);
+
+    // Now continue syncing the overlay to the SVG.
     const left = parseFloat(this.svg.style.left) || 0;
     const top = parseFloat(this.svg.style.top) || 0;
-    const width = parseFloat(this.svg.getAttribute('width') || '0');
-    const height = parseFloat(this.svg.getAttribute('height') || '0');
+    const width = svgWidth;
+    const height = svgHeight;
 
-    // Update the overlay container to exactly cover the svg.
     this.overlaySvg.style.left = left + 'px';
     this.overlaySvg.style.top = top + 'px';
     this.overlaySvg.setAttribute('width', width.toString());
     this.overlaySvg.setAttribute('height', height.toString());
 
-    // Update the overlay’s outline and handle positions.
+    // Update the overlay outline and handle positions.
     this.updateOverlayDimensions(left, top, width, height);
   }
 
@@ -268,6 +287,40 @@ export class Resizer {
         }
       }
 
+      // --- Constrain the inner rectangle (not the full svg) ---
+      // Inner rect left/top:
+      //   innerX = newLeft + marginLeft
+      //   innerY = newTop + marginTop
+      // Inner rect right/bottom:
+      //   innerRight = newLeft + newWidth - marginRight
+      //   innerBottom = newTop + newHeight - marginBottom
+
+      // Constrain left edge:
+      if (newLeft + this.marginLeft < 0) {
+        const offset = -(newLeft + this.marginLeft);
+        newLeft += offset;
+        newWidth -= offset;
+      }
+
+      // Constrain top edge:
+      if (newTop + this.marginTop < 0) {
+        const offset = -(newTop + this.marginTop);
+        newTop += offset;
+        newHeight -= offset;
+      }
+
+      if (this.constraints) {
+        // Constrain right edge: inner rect's right must be within container width.
+        if (newLeft + newWidth - this.marginRight > this.constraints.width) {
+          newWidth = this.constraints.width - newLeft + this.marginRight;
+        }
+        // Constrain bottom edge: inner rect's bottom must be within container height.
+        if (newTop + newHeight - this.marginBottom > this.constraints.height) {
+          newHeight = this.constraints.height - newTop + this.marginBottom;
+        }
+      }
+      // --- End constraints ---
+
       // Update the svg (and inner rect) with the new position/dimensions.
       this.updateSvgAndRect(newLeft, newTop, newWidth, newHeight);
       // Keep the overlay in sync.
@@ -306,8 +359,29 @@ export class Resizer {
     const onMouseMove = (moveEvent: MouseEvent) => {
       const dx = moveEvent.clientX - startX;
       const dy = moveEvent.clientY - startY;
-      const newLeft = initialLeft + dx;
-      const newTop = initialTop + dy;
+      let newLeft = initialLeft + dx;
+      let newTop = initialTop + dy;
+
+      if (this.constraints) {
+        // Constrain the inner rectangle.
+        // The inner rect is offset from the outer SVG by marginLeft and marginTop,
+        // and its bottom/right are determined by the outer SVG's size minus marginRight/marginBottom.
+        if (newLeft + this.marginLeft < 0) {
+          newLeft = -this.marginLeft;
+        }
+        if (newTop + this.marginTop < 0) {
+          newTop = -this.marginTop;
+        }
+        // Ensure the inner rect's right edge stays within the container.
+        if (newLeft + currentWidth - this.marginRight > this.constraints.width) {
+          newLeft = this.constraints.width - (currentWidth - this.marginRight);
+        }
+        // Ensure the inner rect's bottom edge stays within the container.
+        if (newTop + currentHeight - this.marginBottom > this.constraints.height) {
+          newTop = this.constraints.height - (currentHeight - this.marginBottom);
+        }
+      }
+
       this.updateSvgAndRect(newLeft, newTop, currentWidth, currentHeight);
       this.syncOverlayToSvg();
     };

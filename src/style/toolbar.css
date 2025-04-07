@@ -249,7 +249,7 @@
 /* ========================== */
 
 .a-toolbar-button .a-annotation-container-icon::before {
-  content: '\e9f8';
+  content: '\f51e';
   font-size: 1.4rem !important;
 }
 

@@ -69,17 +69,15 @@ export class AnnotationManager {
   }
 
   private addListeners() {
-    if (!this.container) return;
-    this.container.addEventListener('mousedown', this.boundMouseDown);
-    this.container.addEventListener('mousemove', this.boundMouseMove);
-    this.container.addEventListener('mouseup', this.boundMouseUp);
+    window.addEventListener('mousedown', this.boundMouseDown);
+    window.addEventListener('mousemove', this.boundMouseMove);
+    window.addEventListener('mouseup', this.boundMouseUp);
   }
 
   private removeListeners() {
-    if (!this.container) return;
-    this.container.removeEventListener('mousedown', this.boundMouseDown);
-    this.container.removeEventListener('mousemove', this.boundMouseMove);
-    this.container.removeEventListener('mouseup', this.boundMouseUp);
+    window.removeEventListener('mousedown', this.boundMouseDown);
+    window.removeEventListener('mousemove', this.boundMouseMove);
+    window.removeEventListener('mouseup', this.boundMouseUp);
   }
 
   public createRectangle(fillColor: string, strokeColor: string, strokeWidth: number, strokeStyle: string) {

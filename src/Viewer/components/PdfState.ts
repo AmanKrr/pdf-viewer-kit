@@ -96,7 +96,6 @@ class PdfState extends EventEmitter {
   set scale(newScale: number) {
     if (this._scale !== newScale) {
       this._scale = newScale;
-      this.emit('scaleChange', newScale);
     }
   }
 

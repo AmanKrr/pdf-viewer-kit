@@ -80,9 +80,8 @@ export default class ZoomHandler {
     });
 
     await this.pageVirtualization.updatePageBuffers();
-    await this.pageVirtualization.redrawVisiblePages(currentPage);
-
     this.pdfState.emit('scaleChange');
+    await this.pageVirtualization.redrawVisiblePages(currentPage);
   }
 
   /**
