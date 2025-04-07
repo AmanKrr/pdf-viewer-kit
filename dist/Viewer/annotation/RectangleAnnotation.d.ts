@@ -16,6 +16,7 @@ export declare class RectangleAnnotation extends Annotation {
     private originalHeight;
     private shapeInfo;
     private pageNumber;
+    private constraints;
     constructor(container: HTMLElement, pdfState: PdfState, fillColor: string, strokeColor: string, strokeWidth: number, strokeStyle: string);
     get getId(): string | undefined;
     get rectInfo(): {

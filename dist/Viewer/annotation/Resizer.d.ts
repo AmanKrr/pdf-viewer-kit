@@ -12,7 +12,9 @@ export declare class Resizer {
     private marginRight;
     private marginBottom;
     private onShapeUpdateCallback;
-    constructor(svg: SVGSVGElement, element: SVGRectElement, onShapeUpdate: () => void);
+    private constraints;
+    constructor(svg: SVGSVGElement, element: SVGRectElement, onShapeUpdate: () => void, constraints: any);
+    set constraintsValue(constraints: DOMRect);
     /**
      * Creates an overlay SVG element that sits on top of the annotation svg.
      * (It’s appended as a sibling so that its coordinates are in the document space.)

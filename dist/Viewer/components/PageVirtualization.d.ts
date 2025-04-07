@@ -1,6 +1,7 @@
 import WebViewer from './WebViewer';
 import { ViewerLoadOptions } from '../../types/webpdf.types';
 import { SelectionManager } from '../manager/SelectionManager';
+import SearchHighlighter from '../manager/SearchHighlighter';
 /**
  * Handles virtualization of PDF pages, rendering only those visible within the viewport.
  */
@@ -17,6 +18,7 @@ declare class PageVirtualization {
     private pdfState;
     private pdfViewer;
     private selectionManager;
+    private searchHighlighter;
     /**
      * Constructor initializes the PageVirtualization with required parameters.
      *
@@ -27,7 +29,7 @@ declare class PageVirtualization {
      * @param {WebViewer} pdfViewer - Instance of the WebViewer.
      * @param {number} [pageBuffer=3] - Number of extra pages to render around the viewport.
      */
-    constructor(options: ViewerLoadOptions, parentContainer: HTMLElement, container: HTMLElement, totalPages: number, pdfViewer: WebViewer, selectionManager: SelectionManager, pageBuffer?: number);
+    constructor(options: ViewerLoadOptions, parentContainer: HTMLElement, container: HTMLElement, totalPages: number, pdfViewer: WebViewer, selectionManager: SelectionManager, searchHighlighter: typeof SearchHighlighter, pageBuffer?: number);
     /**
      * Checks if a specific page has been designated for rendering.
      *
