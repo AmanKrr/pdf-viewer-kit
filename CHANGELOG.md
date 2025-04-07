@@ -1,3 +1,24 @@
+# [1.5.0](https://github.com/AmanKrr/pdf-kit/compare/v1.4.0...v1.5.0) (2025-04-07)
+
+
+### Bug Fixes
+
+* Multiple pdf indpendent search field ([feda6be](https://github.com/AmanKrr/pdf-kit/commit/feda6bee3b56f0ff1fc097d6c26153de22ca17dc))
+* Multiple pdf load ([a2b71a9](https://github.com/AmanKrr/pdf-kit/commit/a2b71a982212e0af2840f81d012dd93cd83feb50))
+* Text layer selection improvement ([0c64b5e](https://github.com/AmanKrr/pdf-kit/commit/0c64b5e7da85b67839c49f7fc46765a6d420ba8d))
+
+
+### Features
+
+* **annotation:** Add constraints to rectangle resizing and update event listeners ([573322b](https://github.com/AmanKrr/pdf-kit/commit/573322bf3c6aec39ff0580f5c41ce954780c3163))
+* **search:** Implement search functionality with highlighting and indexing ([04d4c93](https://github.com/AmanKrr/pdf-kit/commit/04d4c9395b62e0cc337ed6ead23b697df506e00e))
+* **toolbar:** Enhance toolbar button functionality and styling ([bd6021b](https://github.com/AmanKrr/pdf-kit/commit/bd6021b16434ae3a66b2e14457f70fdcb6004115))
+
+
+### Performance Improvements
+
+* Improve zoom in/out perforamnce and memory utilization. ([5788b11](https://github.com/AmanKrr/pdf-kit/commit/5788b11db14a3a0f1d698008369d9860de198fc5))
+
 # [1.4.0](https://github.com/AmanKrr/pdf-kit/compare/v1.3.0...v1.4.0) (2025-01-24)
 
 
