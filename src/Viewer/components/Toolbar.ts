@@ -133,7 +133,7 @@ class Toolbar {
         id: 'thumbnailBtn',
         label: 'View thumbnail',
         icon: 'view-thumbnail',
-        onClick: (viewer: WebViewer) => this._viewer.toogleThumbnailViewer(),
+        onClick: (e: any, viewer: WebViewer) => this._viewer.toogleThumbnailViewer(),
         hide: false,
         class: this.toolbarClass['thumbnail'] + '-icon',
         group: 1,
@@ -142,7 +142,7 @@ class Toolbar {
         id: 'firstPage',
         label: 'First Page',
         icon: 'first-page-icon',
-        onClick: (viewer: WebViewer) => this._viewer.firstPage(),
+        onClick: (e: any, viewer: WebViewer) => this._viewer.firstPage(),
         hide: false,
         isSeparatorBefore: true,
         class: this.toolbarClass['firstPage'] + '-icon',
@@ -152,7 +152,7 @@ class Toolbar {
         id: 'previousPage',
         label: 'Previous Page',
         icon: 'previous-page-icon',
-        onClick: (viewer: WebViewer) => this._viewer.previousPage(),
+        onClick: (e: any, viewer: WebViewer) => this._viewer.previousPage(),
         hide: false,
         class: this.toolbarClass['previousPage'] + '-icon',
         group: 1,
@@ -161,7 +161,7 @@ class Toolbar {
         id: 'nextPage',
         label: 'Next Page',
         icon: 'next-page-icon',
-        onClick: (viewer: WebViewer) => this._viewer.nextPage(),
+        onClick: (e: any, viewer: WebViewer) => this._viewer.nextPage(),
         hide: false,
         class: this.toolbarClass['nextPage'] + '-icon',
         group: 1,
@@ -170,7 +170,7 @@ class Toolbar {
         id: 'lastPage',
         label: 'Last Page',
         icon: 'last-page-icon',
-        onClick: (viewer: WebViewer) => this._viewer.lastPage(),
+        onClick: (e: any, viewer: WebViewer) => this._viewer.lastPage(),
         hide: false,
         class: this.toolbarClass['lastPage'] + '-icon',
         group: 1,
@@ -188,7 +188,7 @@ class Toolbar {
         id: 'zoomIn',
         label: 'Zoom In',
         icon: 'zoom-in-icon',
-        onClick: (viewer: WebViewer) => this._viewer.zoomIn(),
+        onClick: (e: any, viewer: WebViewer) => this._viewer.zoomIn(),
         isSeparatorBefore: true,
         hide: false,
         class: this.toolbarClass['zoomIn'] + '-icon',
@@ -198,7 +198,7 @@ class Toolbar {
         id: 'zoomOut',
         label: 'Zoom Out',
         icon: 'zoom-out-icon',
-        onClick: (viewer: WebViewer) => this._viewer.zoomOut(),
+        onClick: (e: any, viewer: WebViewer) => this._viewer.zoomOut(),
         class: this.toolbarClass['zoomOut'] + '-icon',
         hide: false,
         group: 1,
@@ -207,13 +207,13 @@ class Toolbar {
         id: 'annotation',
         label: 'Annotate',
         icon: 'annotate-icon',
-        onClick: () => {
+        onClick: (e: any) => {
+          const target = e?.target as HTMLInputElement;
+          if (target?.parentElement) {
+            target?.parentElement.classList.toggle('active');
+          }
           const container = document.querySelector(`#${this.__pdfState.containerId} #pageContainer-${this.__pdfState.currentPage} #${aPdfViewerIds._ANNOTATION_DRAWING_LAYER}`);
           if (container) {
-            const button = document.querySelector(`#${this.__pdfState.containerId} .a-annotation-container-icon`) as HTMLElement;
-            if (button) {
-              button.parentElement!.style.backgroundColor = '#4b4b4b';
-            }
             (container as HTMLElement).style.cursor = 'crosshair';
             (container as HTMLElement).style.pointerEvents = 'all';
             const manager = this._viewer.annotation.isAnnotationManagerRegistered(this.__pdfState.currentPage);
@@ -234,7 +234,11 @@ class Toolbar {
         id: 'search',
         label: 'Search',
         icon: 'search-icon',
-        onClick: () => {
+        onClick: (e: any) => {
+          const target = e?.target as HTMLInputElement;
+          if (target?.parentElement) {
+            target?.parentElement.classList.toggle('active');
+          }
           this._viewer.search();
         },
         class: this.toolbarClass['search'] + '-icon',
@@ -299,7 +303,7 @@ class Toolbar {
     icon.setAttribute('class', `a-toolbar-icon ${config.class}`);
     button.appendChild(icon);
 
-    button.addEventListener('click', () => config.onClick(this._viewer));
+    button.addEventListener('click', (e: any) => config.onClick(e, this._viewer));
     return button;
   }
 

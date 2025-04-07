@@ -121,18 +121,33 @@ class SearchBar {
 
       const options = ['Match Case', 'Whole Word', 'Regex'];
       options.forEach((option) => {
-        const label = document.createElement('label');
-        label.classList.add('a-option-label');
+        if (option == 'Regex') return;
+        // create button for each option
+        const button = document.createElement('button');
+        button.classList.add('a-option-button');
+        button.textContent = option == 'Match Case' ? 'Aa' : option == 'Whole Word' ? 'ab' : option;
+        button.addEventListener('click', () => {
+          // Toggle the button's active state.
+          button.classList.toggle('active');
+          // Perform the search with the updated options.
+          const searchTerm = this.searchInputElement?.value || '';
+          const matchCase = document.querySelector('.a-option-button.active')?.textContent === 'Aa';
+          const wholeWord = document.querySelector('.a-option-button.active')?.textContent === 'ab';
+          const regex = document.querySelector('.a-option-button.active')?.textContent === 'Regex';
+          this.debounceSearch(searchCallback, searchTerm, { matchCase, regex, wholeWord }, getMatchStatus);
+        });
+        // const label = document.createElement('label');
+        // label.classList.add('a-option-label');
 
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.classList.add('a-search-option');
-        // Set a dataset attribute to later determine which option this is.
-        checkbox.dataset.option = option.toLowerCase().replace(' ', '-');
+        // const checkbox = document.createElement('input');
+        // checkbox.type = 'checkbox';
+        // checkbox.classList.add('a-search-option');
+        // // Set a dataset attribute to later determine which option this is.
+        // checkbox.dataset.option = option.toLowerCase().replace(' ', '-');
 
-        label.appendChild(checkbox);
-        label.appendChild(document.createTextNode(option));
-        optionsContainer.appendChild(label);
+        // label.appendChild(checkbox);
+        // label.appendChild(document.createTextNode(option));
+        optionsContainer.appendChild(button);
       });
 
       container.appendChild(searchBar);

@@ -101,7 +101,7 @@ export class Annotation {
     if (this.__pdfState) {
       const button = document.querySelector(`#${this.__pdfState.containerId} .a-annotation-container-icon`) as HTMLElement;
       if (button) {
-        button.parentElement!.style.backgroundColor = '';
+        button.parentElement?.classList?.toggle('active');
       }
       (this.container as HTMLElement).style.cursor = 'default';
     }

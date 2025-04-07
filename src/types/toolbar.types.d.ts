@@ -21,7 +21,7 @@ interface ToolbarButtonConfig {
   type?: 'custom';
 
   /** Function executed when the button is clicked. */
-  onClick: (params: any) => void;
+  onClick: (e: any, params: any) => void;
 
   /** Custom rendering function for the button (if applicable). */
   render?: (params: any | null) => HTMLElement;

@@ -270,7 +270,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  width: 300px;
+  width: 345px;
   height: max-content;
   z-index: 999;
 }
@@ -351,9 +351,9 @@
 
 /* Container for search options (Match Case, Whole Word, Regex) */
 .a-options-container {
-  display: none;
+  /* display: none; */
   /* Initially hidden, can be toggled via JavaScript */
-  /* display: flex; */
+  display: flex;
   /* Uncomment to make options visible by default */
   align-items: center;
   gap: 5px;
@@ -361,22 +361,40 @@
 }
 
 /* ========================== */
-/* Option Label Styling */
+/* Option button Styling */
 /* ========================== */
 
-/* Styling for each search option label */
-.a-option-label {
+/* Styling for each search option button */
+.a-option-button {
   display: flex;
   align-items: center;
   gap: 2px;
   font-size: 12px;
   cursor: pointer;
+  background-color: transparent;
+  border: 1px solid #dcdcdc;
+  border-radius: 2px;
+  padding: 3px 4px;
 }
 
-/* Styling for checkboxes inside search options */
-.a-option-label input {
-  margin: 0;
-  cursor: pointer;
+.a-option-button:nth-child(2) {
+  text-decoration: underline;
+}
+
+.a-option-button:hover {
+  background-color: #f0f0f0;
+  border-color: #bbb;
+}
+
+.a-option-button:active {
+  transform: scale(0.9);
+  transition: transform 0.3s linear;
+}
+
+.a-option-button.active {
+  background-color: #4b4b4b;
+  color: white;
+  border-color: #4b4b4b;
 }
 
 /* ========================== */
@@ -398,4 +416,14 @@
 /* Hover effect for the search icon */
 .a-search-icon:hover {
   color: black;
+}
+
+/* active toolbar button */
+.a-toolbar-button.active {
+  background-color: #4b4b4b !important;
+  border-color: #4b4b4b !important;
+}
+
+.a-toolbar-items .a-toolbar-item .a-toolbar-button.active .a-toolbar-icon::before {
+  color: #d5d5d5;
 }
