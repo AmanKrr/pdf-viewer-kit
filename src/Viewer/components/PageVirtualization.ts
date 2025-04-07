@@ -28,6 +28,7 @@ import AnnotationLayer from './AnnotationLayer';
 import { aPdfViewerIds } from '../../constant/ElementIdClass';
 import { AnnotationManager } from '../manager/AnnotationManager';
 import { SelectionManager } from '../manager/SelectionManager';
+import SearchHighlighter from '../manager/SearchHighlighter';
 
 /**
  * Handles virtualization of PDF pages, rendering only those visible within the viewport.
@@ -45,6 +46,7 @@ class PageVirtualization {
   private pdfState!: PdfState;
   private pdfViewer!: WebViewer;
   private selectionManager: SelectionManager;
+  private searchHighlighter: typeof SearchHighlighter;
 
   /**
    * Constructor initializes the PageVirtualization with required parameters.
@@ -63,6 +65,7 @@ class PageVirtualization {
     totalPages: number,
     pdfViewer: WebViewer,
     selectionManager: SelectionManager,
+    searchHighlighter: typeof SearchHighlighter,
     pageBuffer = 3,
   ) {
     this.options = options;
@@ -74,6 +77,7 @@ class PageVirtualization {
     this.pdf = this.pdfState.pdfInstance;
     this.pdfViewer = pdfViewer;
     this.selectionManager = selectionManager;
+    this.searchHighlighter = searchHighlighter;
 
     this.calculatePagePositioning().then(async () => {
       if (this.isThereSpecificPageToRender == null || this.isThereSpecificPageToRender == undefined) {
@@ -382,6 +386,7 @@ class PageVirtualization {
       if (this.options && !this.options.disableTextSelection) {
         const [_, annotationDrawLayer] = await new TextLayer(pageWrapper, page, viewport).createTextLayer();
         await new AnnotationLayer(pageWrapper, page, viewport).createAnnotationLayer(this.pdfViewer, this.pdf);
+        this.searchHighlighter.registerPage(pageNumber);
         if (!this.pdfViewer.annotation.isAnnotationManagerRegistered(pageNumber)) {
           this.pdfViewer.annotation.registerAnnotationManager(pageNumber, new AnnotationManager(annotationDrawLayer, this.pdfState, this.selectionManager));
         }
@@ -404,6 +409,7 @@ class PageVirtualization {
     for (const pageNumber of this.renderedPages) {
       if (pageNumber < minPage || pageNumber > maxPage) {
         this.pdfViewer.annotation.unregisterAnnotationManager(pageNumber);
+        this.searchHighlighter.deregisterPage(pageNumber);
         this.removePage(pageNumber);
         this.renderedPages.delete(pageNumber);
       }

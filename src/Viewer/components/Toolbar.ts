@@ -230,17 +230,17 @@ class Toolbar {
         hide: false,
         group: 2,
       },
-      // {
-      //   id: 'search',
-      //   label: 'Search',
-      //   icon: 'search-icon',
-      //   onClick: () => {
-      //     this._viewer.search();
-      //   },
-      //   class: this.toolbarClass['search'] + '-icon',
-      //   hide: false,
-      //   group: 2,
-      // },
+      {
+        id: 'search',
+        label: 'Search',
+        icon: 'search-icon',
+        onClick: () => {
+          this._viewer.search();
+        },
+        class: this.toolbarClass['search'] + '-icon',
+        hide: false,
+        group: 2,
+      },
       {
         id: 'download',
         label: 'Download',

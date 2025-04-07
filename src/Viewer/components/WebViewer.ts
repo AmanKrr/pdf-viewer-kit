@@ -27,6 +27,8 @@ import ZoomHandler from './ZoomHandler';
 import { ViewerLoadOptions } from '../../types/webpdf.types';
 import { AnnotationService } from '../service/AnnotationService';
 import { SelectionManager } from '../manager/SelectionManager';
+import SearchBar from './SearchBar';
+import SearchHighlighter from '../manager/SearchHighlighter';
 
 /**
  * Manages the PDF viewer instance and provides various functionalities, including:
@@ -62,7 +64,25 @@ class WebViewer {
 
     // Initialize page virtualization, search, and toolbar components
     const selectionManager = new SelectionManager();
-    this.__pageVirtualization = new PageVirtualization(this.__viewerOptions, parentContainer, pageParentContainer, this.__pdfInstance.numPages, this, selectionManager);
+    SearchHighlighter.viewer = this;
+    new SearchBar(
+      this.__pdfState,
+      async (searchTerm, options) => {
+        await SearchHighlighter.search(searchTerm, options, this.__pdfState);
+      },
+      SearchHighlighter.prevMatch.bind(SearchHighlighter),
+      SearchHighlighter.nextMatch.bind(SearchHighlighter),
+      SearchHighlighter.getMatchStatus.bind(SearchHighlighter),
+    );
+    this.__pageVirtualization = new PageVirtualization(
+      this.__viewerOptions,
+      parentContainer,
+      pageParentContainer,
+      this.__pdfInstance.numPages,
+      this,
+      selectionManager,
+      SearchHighlighter,
+    );
     // new PdfSearch(this.__pdfState, this);
     new Toolbar(this.__viewerOptions.containerId, this.__viewerOptions.customToolbarItems ?? [], this, selectionManager);
     this.addEvents();
