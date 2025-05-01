@@ -1,6 +1,6 @@
 import { PDFDocumentProxy } from 'pdfjs-dist';
-import PdfState from '../components/PdfState';
-import WebViewer from '../components/WebViewer';
+import PdfState from '../ui/PDFState';
+import WebViewer from '../ui/WebViewer';
 export interface SearchOptions {
     matchCase: boolean;
     wholeWord: boolean;
@@ -26,13 +26,15 @@ export interface PageSearchResult {
  * have the attribute role="presentation".
  */
 declare class SearchHighlighter {
-    private currentSearchTerm;
-    private currentOptions;
-    private flatResults;
-    private allFlatResults;
-    private currentMatchIndex;
-    private pdfViewer;
-    set viewer(pdfViewer: WebViewer);
+    private _currentSearchTerm;
+    private _currentOptions;
+    private _flatResults;
+    private _allFlatResults;
+    private _currentMatchIndex;
+    private _pdfViewer;
+    private _pdfState;
+    private _searchIndexManager;
+    constructor(pdfState: PdfState, pdfViewer: WebViewer);
     /**
      * Performs a search over all indexed pages.
      * @param searchTerm The term to search for.
@@ -47,7 +49,7 @@ declare class SearchHighlighter {
     /**
      * Builds a RegExp based on the search term and options.
      */
-    private buildRegex;
+    private _buildRegex;
     /**
      * Applies inline highlighting to a specific page.
      * This method waits for the page container to exist (up to a timeout) and then processes its text layer.
@@ -57,7 +59,7 @@ declare class SearchHighlighter {
      * Waits until the page container (with ID "pageContainer-{pageNumber}") is available in the DOM.
      * Returns null after a timeout.
      */
-    private waitForPageContainer;
+    private _waitForPageContainer;
     /**
      * Removes all inline highlights from all text layers.
      */
@@ -89,5 +91,5 @@ declare class SearchHighlighter {
         total: number;
     };
 }
-declare const _default: SearchHighlighter;
-export default _default;
+export default SearchHighlighter;
+//# sourceMappingURL=SearchHighlighter.d.ts.map

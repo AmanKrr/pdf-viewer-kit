@@ -15,11 +15,8 @@
 */
 
 import { PDFDocumentProxy } from 'pdfjs-dist';
-import WebUiUtils from '../../utils/web-ui-utils';
 import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
-import throttle from 'lodash/throttle';
 import PdfState from './PDFState';
-// import Toolbar from './PDFToolbar';
 import { debounce } from 'lodash';
 import PageVirtualization from './PDFPageVirtualization';
 import ZoomHandler from './PDFZoomHandler';
@@ -93,7 +90,7 @@ class WebViewer {
       const pdfState = PdfState.getInstance(viewerOptions.containerId);
       const buttons = viewerOptions.customToolbarItems ?? [];
       const opts = viewerOptions.toolbarOptions ?? {};
-      this._toolbar = viewerOptions.customToolbar ? viewerOptions.customToolbar : new Toolbar(this, pdfState, buttons, opts);
+      this._toolbar = viewerOptions.customToolbar ? viewerOptions.customToolbar : (new Toolbar(this, pdfState, buttons, opts) as any);
       this._toolbar!.render(toolbarHost);
     }
 

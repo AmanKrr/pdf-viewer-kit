@@ -15,7 +15,7 @@
 */
 
 import { IAnnotation } from '../../interface/IAnnotation';
-import { EllipseConfig, RectangleConfig } from '../../types/geometry';
+import { EllipseConfig, RectangleConfig } from '../../types/geometry.types';
 import PdfState from '../ui/PDFState';
 
 /**

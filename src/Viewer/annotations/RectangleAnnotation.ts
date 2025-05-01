@@ -15,7 +15,7 @@
 */
 
 import { INNER_PADDING_PX } from '../../constants/geometry-constants';
-import { RectangleConfig } from '../../types/geometry';
+import { RectangleConfig } from '../../types/geometry.types';
 import PdfState from '../ui/PDFState';
 import { Annotation } from './Annotation';
 import { Resizer } from './Resizer';

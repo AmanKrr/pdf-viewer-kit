@@ -16,7 +16,7 @@
 
 import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
 import { IAnnotation } from '../../interface/IAnnotation';
-import { ShapeType } from '../../types/geometry';
+import { ShapeType } from '../../types/geometry.types';
 import { ToolbarButtonConfig } from '../../types/toolbar.types';
 import PdfState from './PDFState';
 import WebViewer from './WebViewer';
@@ -645,7 +645,7 @@ export class AnnotationToolbar {
     const icon = document.createElement('span');
     icon.className = `a-toolbar-icon ${config.iconClass}`;
     button.appendChild(icon);
-    button.addEventListener('click', () => config.onClick?.(null));
+    button.addEventListener('click', () => config.onClick?.(null as any));
     return button;
   }
 

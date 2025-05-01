@@ -4,7 +4,7 @@ import { PDFPageProxy } from 'pdfjs-dist';
  * This module can later be extended (for example, to build a Trie for auto-suggestions).
  */
 declare class SearchIndexManager {
-    private pageTexts;
+    private _pageTexts;
     /**
      * Extracts text from a PDF page and caches it.
      * @param pageNumber The page number.
@@ -21,5 +21,5 @@ declare class SearchIndexManager {
      */
     getAllPageNumbers(): number[];
 }
-declare const _default: SearchIndexManager;
-export default _default;
+export default SearchIndexManager;
+//# sourceMappingURL=SearchIndexManager.d.ts.map

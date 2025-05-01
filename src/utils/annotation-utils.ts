@@ -15,7 +15,7 @@
 */
 
 import { INNER_PADDING_PX } from '../constants/geometry-constants';
-import { EllipseConfig, LineConfig, RectangleConfig } from '../types/geometry';
+import { EllipseConfig, LineConfig, RectangleConfig } from '../types/geometry.types';
 import { ShapeAnno } from '../viewer/services/AnnotationExportService';
 
 /**

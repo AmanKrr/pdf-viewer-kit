@@ -15,7 +15,7 @@
 */
 
 import { INNER_PADDING_PX } from '../../constants/geometry-constants';
-import { LineConfig } from '../../types/geometry';
+import { LineConfig } from '../../types/geometry.types';
 import PdfState from '../ui/PDFState';
 import { Annotation } from './Annotation';
 import { Resizer } from './Resizer';

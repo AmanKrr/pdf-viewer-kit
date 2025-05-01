@@ -18,7 +18,7 @@
   },
   "scripts": {
     "clean": "rimraf dist/ ts-build/",
-    "copy-files": "copyfiles -u 1 src/**/*.css src/assets/**/* ts-build/",
+    "copy-files": "copyfiles -u 1 src/**/*.css src/assets/**/* src/**/*.d.ts ts-build/",
     "build": "npm run clean && tsc && npm run copy-files && node minifyBuild.js",
     "semantic-release": "semantic-release",
     "doc": "jsdoc -r -d docs src",

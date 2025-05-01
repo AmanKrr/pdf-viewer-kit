@@ -16,7 +16,7 @@
 
 import PdfState from '../ui/PDFState';
 import { IAnnotation } from '../../interface/IAnnotation';
-import { ShapeType } from '../../types/geometry';
+import { ShapeType } from '../../types/geometry.types';
 import { RectangleAnnotation } from './RectangleAnnotation';
 import { EllipseAnnotation } from './EllipseAnnotation';
 import { LineAnnotation } from './LineAnnotation';

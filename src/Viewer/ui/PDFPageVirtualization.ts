@@ -93,7 +93,7 @@ class PageVirtualization {
         await this._renderInitialPages();
       }
 
-      if ((this._options.toolbarOptions ?? {})?.showThumbnail) {
+      if ((this._options?.toolbarOptions ?? {})?.showThumbnail) {
         await this.generateThumbnail();
       }
       this._resolveReady();

@@ -14,7 +14,7 @@
   limitations under the License.
 */
 
-import { EllipseConfig, LineConfig, RectangleConfig, ShapeConfig } from '../../types/geometry';
+import { EllipseConfig, LineConfig, RectangleConfig, ShapeConfig } from '../../types/geometry.types';
 import PdfState from '../ui/PDFState';
 import WebViewer from '../ui/WebViewer';
 import { AnnotationManager } from '../manager/AnnotationManager';

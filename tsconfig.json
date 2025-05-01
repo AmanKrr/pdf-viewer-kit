@@ -14,6 +14,10 @@
     "sourceMap": true,
     "downlevelIteration": true,
     "forceConsistentCasingInFileNames": true,
+    "declarationMap": true,            // so editors can trace back to your TS source
+    "stripInternal": false,            // keep all declarations
+    // you could also set a separate declarationDir:
+    // "declarationDir": "ts-build/types",
   },
   "include": ["src/**/*.ts", "src/**/*tsx","src/**/*.css"],
   "exclude": ["node_modules"]

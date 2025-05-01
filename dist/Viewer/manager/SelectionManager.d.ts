@@ -23,5 +23,6 @@ export declare class SelectionManager {
     /**
      * Notifies all registered listeners of a selection change.
      */
-    private notifyListeners;
+    private _notifyListeners;
 }
+//# sourceMappingURL=SelectionManager.d.ts.map

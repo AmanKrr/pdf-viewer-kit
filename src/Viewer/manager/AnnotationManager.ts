@@ -15,7 +15,7 @@
 */
 
 import { IAnnotation } from '../../interface/IAnnotation';
-import { DrawConfig, ShapeConfig, ShapeType } from '../../types/geometry';
+import { DrawConfig, ShapeConfig, ShapeType } from '../../types/geometry.types';
 import { AnnotationFactory } from '../annotations/PDFAnnotationFactory';
 import PdfState from '../ui/PDFState';
 import { ISelectable, SelectionManager } from './SelectionManager';
