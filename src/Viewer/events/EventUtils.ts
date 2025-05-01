@@ -60,6 +60,19 @@ class EventEmitter {
       this.events[event] = this.events[event].filter((l) => l !== listener);
     }
   }
+
+  /**
+   * Removes **all** listeners.
+   * If you pass an event name, only that event’s handlers are cleared;
+   * otherwise **every** event is wiped out.
+   */
+  public removeAllListeners(event?: Events): void {
+    if (event) {
+      delete this.events[event];
+    } else {
+      this.events = {};
+    }
+  }
 }
 
 export default EventEmitter;

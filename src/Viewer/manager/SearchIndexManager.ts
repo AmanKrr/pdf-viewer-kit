@@ -22,7 +22,7 @@ import { PDFPageProxy } from 'pdfjs-dist';
  */
 class SearchIndexManager {
   // Cache mapping page numbers to extracted text.
-  private pageTexts: Map<number, string> = new Map();
+  private _pageTexts: Map<number, string> = new Map();
 
   /**
    * Extracts text from a PDF page and caches it.
@@ -30,7 +30,7 @@ class SearchIndexManager {
    * @param page The PDF.js page proxy.
    */
   async extractPageText(pageNumber: number, page: PDFPageProxy): Promise<void> {
-    if (this.pageTexts.has(pageNumber)) return;
+    if (this._pageTexts.has(pageNumber)) return;
 
     const textContent = await page.getTextContent();
     // Concatenate all non-empty text items.
@@ -38,7 +38,7 @@ class SearchIndexManager {
       .map((item: any) => item.str.trim())
       .filter((str: string) => str.length > 0)
       .join(' ');
-    this.pageTexts.set(pageNumber, extractedText);
+    this._pageTexts.set(pageNumber, extractedText);
   }
 
   /**
@@ -46,15 +46,15 @@ class SearchIndexManager {
    * @param pageNumber The page number.
    */
   getPageText(pageNumber: number): string | undefined {
-    return this.pageTexts.get(pageNumber);
+    return this._pageTexts.get(pageNumber);
   }
 
   /**
    * Returns an array of page numbers for which text has been extracted.
    */
   getAllPageNumbers(): number[] {
-    return Array.from(this.pageTexts.keys());
+    return Array.from(this._pageTexts.keys());
   }
 }
 
-export default new SearchIndexManager();
+export default SearchIndexManager;

@@ -14,10 +14,10 @@
   limitations under the License.
 */
 
-import PdfState from '../components/PdfState';
-import WebViewer from '../components/WebViewer';
+import PdfState from '../ui/PDFState';
+import WebViewer from '../ui/WebViewer';
 import { PDFDocumentProxy } from 'pdfjs-dist';
-import EventEmitter from '../event/EventUtils';
+import EventEmitter from '../events/EventUtils';
 
 /**
  * Default security attributes for external links to prevent security vulnerabilities.
@@ -53,9 +53,9 @@ class PDFLinkService {
   /** Indicates whether external links should be enabled. Defaults to `true`. */
   externalLinkEnabled: boolean = true;
 
-  private __pdfDocument: PDFDocumentProxy | undefined;
-  private __pdfViewer!: WebViewer;
-  private __pdfState: PdfState | null;
+  private _pdfDocument: PDFDocumentProxy | undefined;
+  private _pdfViewer!: WebViewer;
+  private _pdfState: PdfState | null;
 
   /**
    * Constructs the `PDFLinkService` instance.
@@ -63,9 +63,9 @@ class PDFLinkService {
    * @param {PDFLinkServiceOptions} options - Configuration options for the link service.
    */
   constructor({ pdfState, pdfViewer }: PDFLinkServiceOptions) {
-    this.__pdfState = pdfState ?? null;
-    this.__pdfViewer = pdfViewer;
-    this.__pdfDocument = this.__pdfState?.pdfInstance;
+    this._pdfState = pdfState ?? null;
+    this._pdfViewer = pdfViewer;
+    this._pdfDocument = this._pdfState?.pdfInstance;
   }
 
   /**
@@ -74,11 +74,11 @@ class PDFLinkService {
    * @returns {number} The currently active page number, or `-1` if the viewer is not initialized.
    */
   get currentPageNumber(): number {
-    if (!this.__pdfViewer) {
-      console.error(`this.__pdfViewer is ${this.__pdfViewer}`);
+    if (!this._pdfViewer) {
+      console.error(`this._pdfViewer is ${this._pdfViewer}`);
       return -1;
     }
-    return this.__pdfViewer.currentPageNumber;
+    return this._pdfViewer.currentPageNumber;
   }
 
   /**
@@ -87,14 +87,14 @@ class PDFLinkService {
    * @param {number} pageNumber - The target page number to navigate to.
    */
   goToPage(pageNumber: number): void {
-    if (!this.__pdfDocument) return;
+    if (!this._pdfDocument) return;
 
-    if (pageNumber < 0 || pageNumber > this.__pdfViewer.totalPages) {
+    if (pageNumber < 0 || pageNumber > this._pdfViewer.totalPages) {
       console.error(`PDFLinkService.goToPage: "${pageNumber}" is not a valid page.`);
       return;
     }
 
-    this.__pdfViewer.goToPage(pageNumber);
+    this._pdfViewer.goToPage(pageNumber);
   }
 }
 

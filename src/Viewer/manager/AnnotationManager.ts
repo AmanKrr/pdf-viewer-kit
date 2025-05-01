@@ -14,245 +14,371 @@
   limitations under the License.
 */
 
-import { RectConfig } from '../../types/geometry';
-import { RectangleAnnotation } from '../annotation/RectangleAnnotation';
-import PdfState from '../components/PdfState';
+import { IAnnotation } from '../../interface/IAnnotation';
+import { DrawConfig, ShapeConfig, ShapeType } from '../../types/geometry';
+import { AnnotationFactory } from '../annotations/PDFAnnotationFactory';
+import PdfState from '../ui/PDFState';
 import { ISelectable, SelectionManager } from './SelectionManager';
 
+/**
+ * Manages lifecycle of annotations: creation, interactive drawing,
+ * selection, deselection, serialization, and cleanup.
+ */
 export class AnnotationManager {
-  private container: HTMLElement | null;
-  private activeAnnotation: RectangleAnnotation | null = null;
-  private selectedAnnotation: RectangleAnnotation | null = null;
-  private annotations: RectangleAnnotation[] = [];
-  private __pdfState: PdfState | null = null;
-  private focusedShape: [number, string] | [] = [];
-  private selectionUnsubscribe: () => void;
-  private selectionManager: SelectionManager;
+  private _annotationDrawerContainer: HTMLElement | null;
+  private _pdfState: PdfState | null = null;
 
-  // Store references to event handlers
-  private boundMouseDown = this.onMouseDown.bind(this);
-  private boundMouseMove = this.onMouseMove.bind(this);
-  private boundMouseUp = this.onMouseUp.bind(this);
+  private _annotations: IAnnotation[] = [];
+  private _activeAnnotation: IAnnotation | null = null;
+  private _selectedAnnotation: IAnnotation | null = null;
 
-  constructor(container: HTMLElement, pdfState: PdfState, selectionManager: SelectionManager) {
-    this.container = container;
-    this.__pdfState = pdfState;
-    this.selectionManager = selectionManager;
-    this.selectionUnsubscribe = selectionManager.onSelectionChange((selectedShape: ISelectable | null) => {
-      if (this.selectedAnnotation && (!selectedShape || this.selectedAnnotation.getId !== selectedShape.id)) {
+  private _selectionUnsubscribe: () => void;
+  private _selectionManager: SelectionManager;
+
+  private _drawConfig: DrawConfig & { type: ShapeType } = {
+    fillColor: 'transparent',
+    strokeColor: 'red',
+    strokeWidth: 2,
+    strokeStyle: 'solid',
+    opacity: 1,
+    type: 'rectangle',
+  };
+
+  private _boundMouseDown = this._onMouseDown.bind(this);
+  private _boundMouseMove = this._onMouseMove.bind(this);
+  private _boundMouseUp = this._onMouseUp.bind(this);
+  private _boundInitMouseDown = this._initMouseDown.bind(this);
+  private _boundAnnotationSelection = this._onAnnotationSelection.bind(this);
+
+  /**
+   * @param annotationDrawerContainer The HTML container for drawing annotations
+   * @param pdfState                  Shared PdfState instance
+   * @param selectionManager          Handles selection events
+   */
+  constructor(annotationDrawerContainer: HTMLElement, pdfState: PdfState, selectionManager: SelectionManager) {
+    this._annotationDrawerContainer = annotationDrawerContainer;
+    this._pdfState = pdfState;
+    this._selectionManager = selectionManager;
+
+    // Listen for external selection changes
+    this._selectionUnsubscribe = selectionManager.onSelectionChange((selectedShape: ISelectable | null) => {
+      if (this._selectedAnnotation && (!selectedShape || this._selectedAnnotation.annotationId !== selectedShape.id)) {
         this.deselectAll();
       }
     });
-    pdfState.on('ANNOTATION_SELECTED', this.onAnnotationSelection.bind(this));
+
+    this._pdfState.on('ANNOTATION_SELECTED', this._boundAnnotationSelection);
   }
 
+  /**
+   * Update default drawing configuration.
+   */
+  set drawConfig(config: DrawConfig & { type: ShapeType }) {
+    this._drawConfig = {
+      ...config,
+    };
+  }
+
+  /**
+   * Update the PdfState instance used by this manager.
+   */
   set pdfState(pdfState: PdfState) {
-    this.__pdfState = pdfState;
+    this._pdfState = pdfState;
   }
 
+  /**
+   * Returns all shapes managed by this class
+   */
+  get getAnnotations(): IAnnotation[] {
+    return this._annotations;
+  }
+
+  /**
+   * Returns the currently active shape
+   */
+  get getActiveAnnotation(): IAnnotation | null {
+    return this._activeAnnotation;
+  }
+
+  /**
+   * Returns the currently selected shape
+   */
+  get getSelectedAnnoation(): IAnnotation | null {
+    return this._selectedAnnotation;
+  }
+
+  /**
+   * Begin listening for the initial mouse-down to start a new annotation.
+   */
+  public _initAnnotation() {
+    if (!this._annotationDrawerContainer) return;
+    this._annotationDrawerContainer.addEventListener('mousedown', this._boundInitMouseDown);
+  }
+
+  /**
+   * Stop listening for the initial mouse-down.
+   */
+  public _initAnnotationCleanup() {
+    if (!this._annotationDrawerContainer) return;
+    this._annotationDrawerContainer.removeEventListener('mousedown', this._boundInitMouseDown);
+  }
+
+  /**
+   * Add event listeners to track drawing
+   */
+  private _addListeners() {
+    if (!this._annotationDrawerContainer) return;
+    if (!this._annotationDrawerContainer.parentElement) return;
+    if (!this._annotationDrawerContainer.parentElement.parentElement) return;
+    this._annotationDrawerContainer.parentElement.parentElement.addEventListener('mousedown', this._boundMouseDown);
+    this._annotationDrawerContainer.parentElement.parentElement.addEventListener('mousemove', this._boundMouseMove);
+    this._annotationDrawerContainer.parentElement.parentElement.addEventListener('mouseup', this._boundMouseUp);
+  }
+
+  /**
+   * Remove event listeners to stop tracking drawing
+   */
+  private _removeListeners() {
+    if (!this._annotationDrawerContainer) return;
+    if (!this._annotationDrawerContainer.parentElement) return;
+    if (!this._annotationDrawerContainer.parentElement.parentElement) return;
+    this._annotationDrawerContainer.parentElement.parentElement.removeEventListener('mousedown', this._boundMouseDown);
+    this._annotationDrawerContainer.parentElement.parentElement.removeEventListener('mousemove', this._boundMouseMove);
+    this._annotationDrawerContainer.parentElement.parentElement.removeEventListener('mouseup', this._boundMouseUp);
+  }
+
+  /**
+   * Handler for initial mouse-down: creates the new shape instance.
+   */
+  private _initMouseDown() {
+    const { type, ...rest } = this._drawConfig;
+    this.createShape(type, rest);
+  }
+
+  /**
+   * Handler for mouse up (stop drawing).
+   */
+  private _onMouseDown(event: MouseEvent) {
+    if (!this._annotationDrawerContainer || !this._activeAnnotation || !this._pdfState) return;
+    if (!event.target) {
+      console.error('Failed to draw annotation. Target not found.');
+      return;
+    }
+    event.preventDefault();
+
+    const rect = this._annotationDrawerContainer.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    const pageNumber = (event?.target as HTMLElement | null)?.parentElement?.id?.split('-')?.[1];
+    this._activeAnnotation.startDrawing(x, y, pageNumber ? parseInt(pageNumber) : this._pdfState.currentPage);
+  }
+
+  /**
+   * Handler for mouse move (update drawing).
+   */
+  private _onMouseMove(event: MouseEvent) {
+    if (!this._annotationDrawerContainer || !this._activeAnnotation) return;
+    if (!this._activeAnnotation.isDrawing) return;
+    event.preventDefault();
+
+    const rect = this._annotationDrawerContainer.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    this._activeAnnotation.updateDrawing(x, y);
+  }
+
+  /**
+   * Handler for mouse up (stop drawing).
+   */
+  private _onMouseUp() {
+    if (!this._activeAnnotation) return;
+    this._activeAnnotation.stopDrawing();
+    this._removeListeners();
+    this._onAnnotationSelection(this._activeAnnotation.getConfig());
+    this._activeAnnotation = null; // Reset so another shape can be drawn next time
+    this.setPointerEvent('none');
+  }
+
+  /**
+   * Enable or disable pointer events on the drawing container.
+   */
   public setPointerEvent(pointerEvent: 'all' | 'none') {
-    if (!this.container) return;
-    this.container.style.pointerEvents = pointerEvent;
+    if (!this._annotationDrawerContainer) return;
+    this._annotationDrawerContainer.style.pointerEvents = pointerEvent;
   }
 
-  public selectAnnotation(annotation: RectangleAnnotation): void {
-    // First, deselect any annotation in this manager
+  /**
+   * Create a new annotation of the given type and config, then begin drawing.
+   *
+   * @param type   The shape type ('rectangle' | 'ellipse', etc.)
+   * @param config Optional override of drawConfig properties
+   */
+  public createShape(
+    type: ShapeType,
+    config: {
+      fillColor?: string;
+      strokeColor?: string;
+      strokeWidth?: number;
+      strokeStyle?: string;
+      opacity?: number;
+      id?: string;
+    } = {},
+  ): void {
+    if (!this._annotationDrawerContainer || !this._pdfState) return;
+
+    // Deselect all so we start fresh
     this.deselectAll();
-    // Select the new annotation
-    annotation.select();
-    this.selectedAnnotation = annotation;
-    // Notify the centralized selection manager about the new selection.
-    this.selectionManager.setSelected({
-      id: annotation.getId!,
-      type: 'rectangle', // Adjust if you support other shapes.
+    this._addListeners();
+
+    // Use the factory to create the shape
+    this._activeAnnotation = AnnotationFactory.createAnnotation({
+      type,
+      annotationDrawerContainer: this._annotationDrawerContainer,
+      pdfState: this._pdfState,
+      fillColor: config.fillColor ?? this._drawConfig.fillColor!,
+      strokeColor: config.strokeColor ?? this._drawConfig.strokeColor!,
+      strokeWidth: config.strokeWidth ?? this._drawConfig.strokeWidth!,
+      strokeStyle: config.strokeStyle ?? this._drawConfig.strokeStyle!,
+      opacity: config.opacity ?? this._drawConfig.opacity!,
+      id: config?.id,
     });
+
+    this._annotations.push(this._activeAnnotation);
   }
 
-  private addListeners() {
-    window.addEventListener('mousedown', this.boundMouseDown);
-    window.addEventListener('mousemove', this.boundMouseMove);
-    window.addEventListener('mouseup', this.boundMouseUp);
-  }
+  /**
+   * Internal helper to draw an existing ShapeConfig programmatically
+   * (e.g., loading saved annotations).
+   */
+  private _drawShape(shapeConfig: ShapeConfig, revokeSelection: boolean) {
+    if (!this._annotationDrawerContainer || !this._pdfState) return;
 
-  private removeListeners() {
-    window.removeEventListener('mousedown', this.boundMouseDown);
-    window.removeEventListener('mousemove', this.boundMouseMove);
-    window.removeEventListener('mouseup', this.boundMouseUp);
-  }
-
-  public createRectangle(fillColor: string, strokeColor: string, strokeWidth: number, strokeStyle: string) {
-    if (!this.container) return;
-    this.deselectAll();
-    this.addListeners();
-    this.activeAnnotation = new RectangleAnnotation(this.container, this.__pdfState!, fillColor, strokeColor, strokeWidth, strokeStyle);
-    this.annotations.push(this.activeAnnotation);
-  }
-
-  private drawRectangle({
-    pageNumber,
-    x0,
-    y0,
-    x1,
-    y1,
-    fillColor,
-    strokeColor,
-    strokeWidth,
-    strokeStyle,
-  }: {
-    pageNumber: number;
-    x0: number;
-    y0: number;
-    x1: number;
-    y1: number;
-    fillColor?: string;
-    strokeColor?: string;
-    strokeWidth?: number;
-    strokeStyle?: string;
-  }) {
-    if (!this.container) return;
-    const fillCol = fillColor ?? 'transparent';
-    const strokeCol = strokeColor ?? 'red';
-    const strokeWid = strokeWidth ?? 2;
-    const strokeSty = strokeStyle ?? 'solid';
-
-    this.deselectAll();
-    this.activeAnnotation = new RectangleAnnotation(this.container, this.__pdfState!, fillCol, strokeCol, strokeWid, strokeSty);
-    this.activeAnnotation.draw(x0, x1, y0, y1, pageNumber);
-    this.activeAnnotation.stopDrawing(false);
-    this.annotations.push(this.activeAnnotation);
-    this.setPointerEvent('none');
-  }
-
-  get registeredFocus() {
-    return this.focusedShape;
-  }
-
-  private onMouseDown(event: MouseEvent) {
-    if (!this.container) return;
-    if (!this.activeAnnotation) return;
-    event.preventDefault();
-
-    const rect = this.container.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-
-    this.activeAnnotation.startDrawing(x, y);
-  }
-
-  private onMouseMove(event: MouseEvent) {
-    if (!this.container) return;
-    if (!this.activeAnnotation || !this.activeAnnotation.isDrawing) return;
-    event.preventDefault();
-
-    const rect = this.container.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-
-    this.activeAnnotation.updateDrawing(x, y);
-  }
-
-  private onMouseUp() {
-    if (!this.activeAnnotation) return;
-
-    this.activeAnnotation.stopDrawing();
-    this.registerFocus();
-    this.activeAnnotation = null; // Reset so another shape can be drawn next time
-    this.removeListeners();
-    this.setPointerEvent('none');
-  }
-
-  private registerFocus(annotationData: RectConfig | undefined = undefined) {
-    const info = annotationData ?? this.activeAnnotation?.rectInfo;
-    if (info && info['pageNumber'] != undefined && info['id'] != undefined) {
-      this.focusedShape = [info['pageNumber'], info['id']];
-    }
-  }
-
-  get getAnnotations(): RectangleAnnotation[] {
-    return this.annotations;
-  }
-
-  public deselectAll(): void {
-    this.annotations.forEach((annotation) => annotation.deselect());
-    this.selectedAnnotation = null;
-  }
-
-  // public selectAnnotation(annotation: RectangleAnnotation): void {
-  //   this.deselectAll();
-  //   annotation.select();
-  //   this.selectedAnnotation = annotation;
-  // }
-
-  private onAnnotationSelection(annotationData: Partial<RectConfig>) {
-    if (annotationData['id'] == undefined) {
-      throw Error('annotation id missing!');
-    }
-    if (annotationData['type'] == 'rectangle') {
-      const annotationClicked = this.annotations.filter((annotation) => annotation.getId == annotationData['id']);
-      if (annotationClicked && annotationClicked.length == 1) {
-        this.selectAnnotation(annotationClicked[0]);
-      }
-    }
-  }
-
-  public deleteAnnotation(annotationId: string) {
-    const annotationClicked = this.annotations.filter((annotation) => annotation.getId == annotationId);
-    if (annotationClicked && annotationClicked.length == 1) {
-      annotationClicked[0].deletAnnotation();
-      const annotations = this.annotations.filter((annotation) => annotation.getId != annotationId);
-      this.annotations = annotations;
-    }
-  }
-
-  // public loadAnnotation(pageNumber: number) {
-  //   if (!this.__pdfState) {
-  //     console.error('Pdf State is not valid.');
-  //     return;
-  //   }
-
-  //   const annotations = this.__pdfState.annotationInfo(pageNumber);
-
-  //   annotations.forEach((annotation: RectConfig) => {
-  //     this.drawRectangle(annotation);
-  //   });
-
-  //   if (annotations.length == 0) {
-  //     this.setPointerEvent('none');
-  //   }
-  // }
-
-  public addAnnotation(annotation: RectConfig, scrollIntoView = false): void {
-    this.drawRectangle({
-      x0: annotation.x0,
-      y0: annotation.y0,
-      x1: annotation.x1,
-      y1: annotation.y1,
-      fillColor: annotation.fillColor,
-      strokeColor: annotation.strokeColor,
-      strokeWidth: annotation.strokeWidth,
-      strokeStyle: annotation.strokeStyle,
-      pageNumber: annotation.pageNumber,
+    // Create the shape
+    const shape = AnnotationFactory.createAnnotation({
+      type: shapeConfig.type,
+      annotationDrawerContainer: this._annotationDrawerContainer,
+      pdfState: this._pdfState,
+      fillColor: shapeConfig.fillColor ?? this._drawConfig.fillColor!,
+      strokeColor: shapeConfig.strokeColor ?? this._drawConfig.strokeColor!,
+      strokeWidth: shapeConfig.strokeWidth ?? this._drawConfig.strokeWidth!,
+      strokeStyle: shapeConfig.strokeStyle ?? this._drawConfig.strokeStyle!,
+      opacity: shapeConfig.opacity ?? this._drawConfig.opacity!,
+      id: shapeConfig.id,
     });
-    if (this.activeAnnotation && scrollIntoView) {
-      this.activeAnnotation.scrollToView();
-      this.activeAnnotation.revokeSelection();
+
+    if (shapeConfig.type === 'rectangle') {
+      (shape as any).draw(shapeConfig.x0 ?? 0, shapeConfig.x1 ?? 0, shapeConfig.y0 ?? 0, shapeConfig.y1 ?? 0, shapeConfig.pageNumber);
+    } else if (shapeConfig.type === 'ellipse') {
+      (shape as any).draw(shapeConfig.cx ?? 0, shapeConfig.cy ?? 0, shapeConfig.rx ?? 0, shapeConfig.ry ?? 0, shapeConfig.pageNumber);
+    } else if (shapeConfig.type === 'line') {
+      (shape as any).draw(shapeConfig.x1 ?? 0, shapeConfig.y1 ?? 0, shapeConfig.x2 ?? 0, shapeConfig.y2 ?? 0, shapeConfig.pageNumber);
     }
+
+    if (revokeSelection) {
+      (shape as any).revokeSelection();
+    }
+
+    this._annotations.push(shape);
+    this._activeAnnotation = null;
+    this.setPointerEvent('none');
+    return shape;
   }
 
-  public updateAnnotation(annotation: RectConfig): void {
+  /**
+   * Add an annotation to the viewer. This is a wrapper around drawShape.
+   * @param shapeConfig The configuration for the shape.
+   * @param scrollIntoView Whether to scroll the annotation into view.
+   */
+  public addAnnotation(shapeConfig: ShapeConfig, scrollIntoView = false, revokeSelection = false): void {
+    if (this._annotations.some((a) => a.annotationId === shapeConfig.id)) return;
+    const shape = this._drawShape(shapeConfig, revokeSelection);
+    if (!shape) {
+      console.error('Failed to create annotation');
+      return;
+    }
+
+    if (scrollIntoView && shape.scrollToView) {
+      shape.scrollToView();
+    }
+    shape.deselect();
+  }
+
+  /**
+   * Update an existing annotation. This is a placeholder and should be
+   * implemented in subclasses or specific managers.
+   * @param annotation The annotation to update.
+   */
+  public updateAnnotation(annotation: ShapeConfig): void {
     console.log('updateAnnotation not implemented in AnnotationManager');
   }
 
-  // When cleaning up the AnnotationManager (for example, when the page is removed):
-  public destroy(): void {
-    // Remove event listeners from the container, etc.
-    this.removeListeners();
-    // Unsubscribe from the selection manager.
-    if (this.selectionUnsubscribe) {
-      this.selectionUnsubscribe();
+  /**
+   * Delete an annotation by its ID.
+   * @param annotationId The ID of the annotation to delete.
+   */
+  public deleteAnnotation(annotationId: string) {
+    const idx = this._annotations.findIndex((a) => a.annotationId === annotationId);
+    if (idx > -1) {
+      this._annotations[idx].deleteAnnotation(true);
+      this._annotations.splice(idx, 1);
     }
-    this.container = null;
-    this.activeAnnotation = null;
-    this.selectedAnnotation = null;
+  }
+
+  /**
+   * Select an annotation and notify the selection manager.
+   * @param annotation The annotation to select.
+   */
+  public selectAnnotation(annotation: IAnnotation): void {
+    // Deselect all first
+    this.deselectAll();
+    // Select the new annotation
+    annotation.select();
+    this._selectedAnnotation = annotation;
+    // Notify selection manager
+    this._selectionManager.setSelected({
+      id: annotation.annotationId,
+      type: annotation.type,
+    });
+  }
+
+  /**
+   * Deselect all annotations.
+   */
+  public deselectAll(): void {
+    this._annotations.forEach((annotation) => annotation.deselect());
+    this._selectedAnnotation = null;
+  }
+
+  /**
+   * Handle annotation selection from external events.
+   * @param annotationData The data of the selected annotation.
+   */
+  private _onAnnotationSelection(annotationData: Partial<ShapeConfig>) {
+    if (annotationData['id'] == undefined) {
+      throw Error('annotation id missing!');
+    }
+    const found = this._annotations.find((a) => a.annotationId === annotationData.id);
+    if (found) {
+      this.selectAnnotation(found);
+    }
+  }
+
+  /**
+   * Cleanup resources, event handlers, subscriptions
+   */
+  public destroy(): void {
+    this._removeListeners();
+    if (this._selectionUnsubscribe) {
+      this._selectionUnsubscribe();
+    }
+    this._pdfState?.off('ANNOTATION_SELECTED', this._boundAnnotationSelection);
+    // Optionally remove all shapes from DOM:
+    // this._annotations.forEach(a => a.deleteAnnotation(true));
+    // this._annotations = [];
+    this._annotationDrawerContainer = null;
+    this._activeAnnotation = null;
+    this._selectedAnnotation = null;
   }
 }

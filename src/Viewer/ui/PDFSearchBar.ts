@@ -15,7 +15,7 @@
 */
 
 import { debounce } from 'lodash';
-import { aPdfViewerClassNames } from '../../constant/ElementIdClass';
+import { PDF_VIEWER_CLASSNAMES } from '../../constants/pdf-viewer-selectors';
 import { SearchOptions } from '../manager/SearchHighlighter';
 
 /**
@@ -31,12 +31,12 @@ import { SearchOptions } from '../manager/SearchHighlighter';
  * for further use (like updating the counter).
  */
 class SearchBar {
-  private pdfState: any; // Replace with the actual type for PdfState
-  private container: HTMLElement | null = null;
-  private searchInputElement: HTMLInputElement | null = null;
-  private matchCounterElement: HTMLElement | null = null;
-  private upButtonElement: HTMLButtonElement | null = null;
-  private downButtonElement: HTMLButtonElement | null = null;
+  private _pdfState: any; // Replace with the actual type for PdfState
+  private _container: HTMLElement | null = null;
+  private _searchInputElement: HTMLInputElement | null = null;
+  private _matchCounterElement: HTMLElement | null = null;
+  private _upButtonElement: HTMLButtonElement | null = null;
+  private _downButtonElement: HTMLButtonElement | null = null;
 
   /**
    * Creates and inserts the search bar into the viewer.
@@ -52,9 +52,9 @@ class SearchBar {
     nextMatchCallback: () => void,
     getMatchStatus: () => { current: number; total: number },
   ) {
-    this.pdfState = pdfState;
+    this._pdfState = pdfState;
     // Get the parent container based on the containerId and viewer class.
-    const parentContainer = document.querySelector(`#${this.pdfState.containerId} .${aPdfViewerClassNames._A_PDF_VIEWER}`);
+    const parentContainer = document.querySelector(`#${this._pdfState.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`);
     if (parentContainer) {
       // Create the main search container.
       const container = document.createElement('div');
@@ -72,16 +72,16 @@ class SearchBar {
       // When input changes, perform a search with default options.
       input.oninput = async (e: Event) => {
         const target = e.target as HTMLInputElement;
-        await this.debounceSearch(searchCallback, target.value, { matchCase: false, regex: false, wholeWord: false }, getMatchStatus);
+        await this._debounceSearch(searchCallback, target.value, { matchCase: false, regex: false, wholeWord: false }, getMatchStatus);
       };
       // Save a reference.
-      this.searchInputElement = input;
+      this._searchInputElement = input;
 
       // Create the match counter display.
       const matchCounter = document.createElement('span');
       matchCounter.classList.add('a-match-counter');
       matchCounter.textContent = '0/0';
-      this.matchCounterElement = matchCounter;
+      this._matchCounterElement = matchCounter;
 
       // Create a separator.
       const separator = document.createElement('div');
@@ -96,7 +96,7 @@ class SearchBar {
         const { current, total } = getMatchStatus();
         this.updateMatchCounter(current, total);
       });
-      this.upButtonElement = upButton;
+      this._upButtonElement = upButton;
 
       const downButton = document.createElement('button');
       downButton.classList.add('a-search-nav', 'down');
@@ -106,7 +106,7 @@ class SearchBar {
         const { current, total } = getMatchStatus();
         this.updateMatchCounter(current, total);
       });
-      this.downButtonElement = downButton;
+      this._downButtonElement = downButton;
 
       // Assemble the search bar.
       searchBar.appendChild(input);
@@ -130,11 +130,11 @@ class SearchBar {
           // Toggle the button's active state.
           button.classList.toggle('active');
           // Perform the search with the updated options.
-          const searchTerm = this.searchInputElement?.value || '';
-          const matchCase = document.querySelector('.a-option-button.active')?.textContent === 'Aa';
-          const wholeWord = document.querySelector('.a-option-button.active')?.textContent === 'ab';
-          const regex = document.querySelector('.a-option-button.active')?.textContent === 'Regex';
-          this.debounceSearch(searchCallback, searchTerm, { matchCase, regex, wholeWord }, getMatchStatus);
+          const searchTerm = this._searchInputElement?.value || '';
+          const matchCase = document.querySelector(`#${this._pdfState.containerId} .a-option-button.active`)?.textContent === 'Aa';
+          const wholeWord = document.querySelector(`#${this._pdfState.containerId} .a-option-button.active`)?.textContent === 'ab';
+          const regex = document.querySelector(`#${this._pdfState.containerId} .a-option-button.active`)?.textContent === 'Regex';
+          this._debounceSearch(searchCallback, searchTerm, { matchCase, regex, wholeWord }, getMatchStatus);
         });
         // const label = document.createElement('label');
         // label.classList.add('a-option-label');
@@ -155,11 +155,11 @@ class SearchBar {
 
       // Append the search container to the parent container.
       parentContainer.appendChild(container);
-      this.container = container;
+      this._container = container;
     }
   }
 
-  private debounceSearch = debounce(async (searchCallback, searchTerm: string, options: SearchOptions, getMatchStatusCallback: any) => {
+  private _debounceSearch = debounce(async (searchCallback, searchTerm: string, options: SearchOptions, getMatchStatusCallback: any) => {
     await searchCallback(searchTerm, options);
     const { current, total } = getMatchStatusCallback();
     this.updateMatchCounter(current, total);
@@ -169,8 +169,8 @@ class SearchBar {
    * Optionally, expose methods to show/hide or update the search bar.
    */
   public show(): void {
-    if (this.container) {
-      this.container.classList.remove('a-search-hidden');
+    if (this._container) {
+      this._container.classList.remove('a-search-hidden');
     }
   }
 
@@ -178,8 +178,8 @@ class SearchBar {
    * Hides the search bar.
    */
   public hide(): void {
-    if (this.container) {
-      this.container.classList.add('a-search-hidden');
+    if (this._container) {
+      this._container.classList.add('a-search-hidden');
     }
   }
 
@@ -189,8 +189,8 @@ class SearchBar {
    * @param total The total number of matches.
    */
   public updateMatchCounter(current: number, total: number): void {
-    if (this.matchCounterElement) {
-      this.matchCounterElement.textContent = `${current} / ${total}`;
+    if (this._matchCounterElement) {
+      this._matchCounterElement.textContent = `${current} / ${total}`;
     }
   }
 }

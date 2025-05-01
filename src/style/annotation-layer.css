@@ -1,20 +1,7 @@
-/*
-  Copyright 2015 Mozilla Foundation
-
-  Licensed under the Apache License, Version 2.0 (the "License");
-  You may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  See the License for the specific language governing permissions and
-  limitations under the License.
-*/
-
 .a-annotation-layer {
+  --csstools-color-scheme--light: initial;
+  color-scheme: only light;
+
   --annotation-unfocused-field-background: url("data:image/svg+xml;charset=UTF-8,<svg width='1px' height='1px' xmlns='http://www.w3.org/2000/svg'><rect width='100%' height='100%' style='fill:rgba(0, 54, 255, 0.13);'/></svg>");
   --input-focus-border-color: Highlight;
   --input-focus-outline: 1px solid Canvas;
@@ -56,7 +43,7 @@
   }
 
   .a-annotation-layer .popupAnnotation .popup {
-    outline: calc(1.5px * var(--scale-factor)) solid CanvasText !important;
+    outline: calc(1.5px * var(--total-scale-factor)) solid CanvasText !important;
     background-color: ButtonFace !important;
     color: ButtonText !important;
   }
@@ -74,7 +61,7 @@
   }
 
   .a-annotation-layer .popupAnnotation.focused .popup {
-    outline: calc(3px * var(--scale-factor)) solid Highlight !important;
+    outline: calc(3px * var(--total-scale-factor)) solid Highlight !important;
   }
 }
 
@@ -118,9 +105,6 @@
   white-space: nowrap;
   font: 10px sans-serif;
   line-height: 1.35;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  user-select: none;
 }
 
 .a-annotation-layer section {
@@ -177,7 +161,7 @@
   background-image: var(--annotation-unfocused-field-background);
   border: 2px solid var(--input-unfocused-border-color);
   box-sizing: border-box;
-  font: calc(9px * var(--scale-factor)) sans-serif;
+  font: calc(9px * var(--total-scale-factor)) sans-serif;
   height: 100%;
   margin: 0;
   vertical-align: top;
@@ -301,7 +285,7 @@
 
 .a-annotation-layer .popupAnnotation {
   position: absolute;
-  font-size: calc(9px * var(--scale-factor));
+  font-size: calc(9px * var(--total-scale-factor));
   pointer-events: none;
   width: -moz-max-content;
   width: max-content;
@@ -311,15 +295,19 @@
 
 .a-annotation-layer .popup {
   background-color: rgb(255 255 153);
-  box-shadow: 0 calc(2px * var(--scale-factor)) calc(5px * var(--scale-factor)) rgb(136 136 136);
-  border-radius: calc(2px * var(--scale-factor));
+  color: black;
+  box-shadow: 0 calc(2px * var(--total-scale-factor)) calc(5px * var(--total-scale-factor)) rgb(136 136 136);
+  border-radius: calc(2px * var(--total-scale-factor));
   outline: 1.5px solid rgb(255 255 74);
-  padding: calc(6px * var(--scale-factor));
+  padding: calc(6px * var(--total-scale-factor));
   cursor: pointer;
   font: message-box;
   white-space: normal;
   word-wrap: break-word;
   pointer-events: auto;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 .a-annotation-layer .popupAnnotation.focused .popup {
@@ -327,7 +315,7 @@
 }
 
 .a-annotation-layer .popup * {
-  font-size: calc(9px * var(--scale-factor));
+  font-size: calc(9px * var(--total-scale-factor));
 }
 
 .a-annotation-layer .popup>.header {
@@ -340,20 +328,20 @@
 
 .a-annotation-layer .popup>.header .popupDate {
   display: inline-block;
-  margin-left: calc(5px * var(--scale-factor));
+  margin-left: calc(5px * var(--total-scale-factor));
   width: -moz-fit-content;
   width: fit-content;
 }
 
 .a-annotation-layer .popupContent {
   border-top: 1px solid rgb(51 51 51);
-  margin-top: calc(2px * var(--scale-factor));
-  padding-top: calc(2px * var(--scale-factor));
+  margin-top: calc(2px * var(--total-scale-factor));
+  padding-top: calc(2px * var(--total-scale-factor));
 }
 
 .a-annotation-layer .richText>* {
   white-space: pre-wrap;
-  font-size: calc(9px * var(--scale-factor));
+  font-size: calc(9px * var(--total-scale-factor));
 }
 
 .a-annotation-layer .popupTriggerArea {

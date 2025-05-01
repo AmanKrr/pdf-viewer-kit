@@ -14,286 +14,372 @@
   limitations under the License.
 */
 
-import PdfState from '../components/PdfState';
+import { INNER_PADDING_PX } from '../../constants/geometry-constants';
+import { RectangleConfig } from '../../types/geometry';
+import PdfState from '../ui/PDFState';
 import { Annotation } from './Annotation';
 import { Resizer } from './Resizer';
 
+/**
+ * Rectangle annotation supporting interactive drawing, programmatic creation,
+ * selection, deletion, and automatic zoom synchronization.
+ */
 export class RectangleAnnotation extends Annotation {
-  private fillColor: string;
-  private strokeColor: string;
-  private strokeWidth: number;
-  private strokeStyle: string;
-  private resizer: Resizer | null = null;
-  private onDeleteBind = this.onDeleteKey.bind(this);
-  private isDragging: boolean = false;
-  private offsetX: number = 0;
-  private offsetY: number = 0;
-  private originalLeft: number = 0;
-  private originalTop: number = 0;
-  private originalWidth: number = 0;
-  private originalHeight: number = 0;
-  private shapeInfo: {
-    id: string;
-    fillColor: string;
-    strokeColor: string;
-    strokeWidth: number;
-    strokeStyle: string;
-    x0?: number | undefined;
-    x1?: number | undefined;
-    y0?: number | undefined;
-    y1?: number | undefined;
-    type: 'rectangle';
-    pageNumber: number | undefined;
-  } | null = null;
-  private pageNumber: number | undefined;
-  private constraints;
+  private _fillColor: string;
+  private _strokeColor: string;
+  private _strokeWidth: number;
+  private _strokeStyle: string;
+  private _opacity: number;
+  private _resizer: Resizer | null = null;
+  private _originalLeft = 0;
+  private _originalTop = 0;
+  private _originalWidth = 0;
+  private _originalHeight = 0;
+  private _shapeInfo: RectangleConfig | null = null;
+  private _pageNumber?: number;
+  private _constraints: DOMRect;
+  private _pdfState: PdfState;
+  private _onDeleteKeyBound = this._onDeleteKey.bind(this);
+  private _bindOnScaleChange = this._onScaleChange.bind(this);
 
-  constructor(container: HTMLElement, pdfState: PdfState, fillColor: string, strokeColor: string, strokeWidth: number, strokeStyle: string) {
-    super(container, pdfState);
-    this.constraints = container?.getBoundingClientRect();
-    this.fillColor = fillColor;
-    this.strokeColor = strokeColor;
-    this.strokeWidth = strokeWidth;
-    this.strokeStyle = strokeStyle;
-    this.__pdfState?.on('scaleChange', () => {
-      this.constraints = this.container?.getBoundingClientRect();
-      this.updateZoom(this.__pdfState?.scale!);
-    });
+  /** Unique identifier of this annotation. */
+  public get id(): string {
+    return this.annotationId;
   }
 
-  get getId() {
-    return this.element?.id;
+  /** Discriminator for serialization. */
+  public readonly type = 'rectangle';
+
+  /**
+   * @param container   Host element for the annotation SVG
+   * @param pdfState    Viewer state, emits 'scaleChange' events
+   * @param fillColor   SVG fill color
+   * @param strokeColor SVG stroke color
+   * @param strokeWidth Stroke width in CSS pixels
+   * @param strokeStyle 'solid' | 'dashed' | 'dotted'
+   * @param opacity     Opacity for rectangle
+   * @param id          Optional annotation ID
+   */
+  constructor(container: HTMLElement, pdfState: PdfState, fillColor: string, strokeColor: string, strokeWidth: number, strokeStyle: string, opacity: number, id?: string) {
+    super(container, pdfState, id);
+    this._pdfState = pdfState;
+    this._constraints = container.getBoundingClientRect();
+    this._fillColor = fillColor;
+    this._strokeColor = strokeColor;
+    this._strokeWidth = strokeWidth;
+    this._strokeStyle = strokeStyle;
+    this._opacity = opacity;
+
+    pdfState.on('scaleChange', this._bindOnScaleChange);
   }
 
-  get rectInfo() {
-    return this.shapeInfo;
+  private _onScaleChange(event: any) {
+    this._constraints = this.__annotationDrawerContainer.getBoundingClientRect();
+    this._updateZoom(this._pdfState.scale);
   }
 
-  private addDeleteEvent(): void {
-    if (this.resizer) {
-      this.svg.addEventListener('keydown', this.onDeleteBind);
-    }
-  }
-
-  private removeDeleteEvent(): void {
-    if (!this.resizer) {
-      this.svg.removeEventListener('keydown', this.onDeleteBind);
-    }
-  }
-
-  private onDeleteKey(event: KeyboardEvent) {
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      this.deletAnnotation();
-    }
-  }
-
-  private createSvgRect(padding: string = '0', height: number = 0, width: number = 0) {
-    this.element = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    this.element.id = this.svg.getAttribute('annotation-id')!;
-    this.element.setAttribute('x', padding);
-    this.element.setAttribute('y', padding);
-    this.element.setAttribute('width', Math.abs(width).toString());
-    this.element.setAttribute('height', Math.abs(height).toString());
-    this.element.setAttribute('fill', this.fillColor);
-    this.element.setAttribute('stroke', this.strokeColor);
-    this.element.setAttribute('stroke-width', this.strokeWidth.toString());
-    this.element.setAttribute('stroke-dasharray', this.getStrokeDashArray());
-
-    this.svg.appendChild(this.element);
-
-    // The invisible (hit test) rect
-    this.hitElementRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    this.hitElementRect.setAttribute('x', padding);
-    this.hitElementRect.setAttribute('y', padding);
-    this.hitElementRect.setAttribute('width', Math.abs(width).toString());
-    this.hitElementRect.setAttribute('height', Math.abs(height).toString());
-    this.hitElementRect.setAttribute('fill', 'none');
-    this.hitElementRect.setAttribute('stroke', 'transparent');
-    this.hitElementRect.style.strokeWidth = (this.strokeWidth + 10).toString(); // increase if needed
-    this.hitElementRect.style.cursor = 'pointer';
-    // Make sure it receives pointer events even if the container is not interactive
-    this.hitElementRect.style.pointerEvents = 'auto';
-    this.hitElementRect.onclick = (event: MouseEvent) => this.onAnnotationClick(event, this.rectInfo!);
-    // Append the hit test rect above or after the visible rect
-    this.svg.appendChild(this.hitElementRect);
-  }
-
-  public startDrawing(x: number, y: number): void {
-    super.startDrawing(x, y);
-    this.svg.style.left = `${x}px`;
-    this.svg.style.top = `${y}px`;
-    this.createSvgRect();
-    this.pageNumber = this.__pdfState?.currentPage;
-  }
-
-  public updateDrawing(x: number, y: number): void {
-    if (!this.isDrawing || !this.element || !this.hitElementRect) return;
-    const padding = 10;
-
-    // Clamp x and y inside page (container) bounds
-    const maxX = this.constraints.width - padding;
-    const maxY = this.constraints.height - padding;
-
-    const clampedX = Math.min(Math.max(x, 0), maxX);
-    const clampedY = Math.min(Math.max(y, 0), maxY);
-
-    const width = clampedX - this.startX;
-    const height = clampedY - this.startY;
-
-    this.svg.setAttribute('width', (Math.abs(width) + padding * 2).toString());
-    this.svg.setAttribute('height', (Math.abs(height) + padding * 2).toString());
-
-    this.element.setAttribute('x', padding.toString());
-    this.element.setAttribute('y', padding.toString());
-    this.element.setAttribute('width', Math.abs(width).toString());
-    this.element.setAttribute('height', Math.abs(height).toString());
-    this.hitElementRect.setAttribute('x', padding.toString());
-    this.hitElementRect.setAttribute('y', padding.toString());
-    this.hitElementRect.setAttribute('width', Math.abs(width).toString());
-    this.hitElementRect.setAttribute('height', Math.abs(height).toString());
-
-    if (width < 0) this.svg.style.left = `${clampedX - padding}px`;
-    if (height < 0) this.svg.style.top = `${clampedY - padding}px`;
-  }
-
-  private onShapeUpdate() {
-    this.__pdfState?.emit('ANNOTATION_CREATED', this.rectInfo);
-  }
-
-  public stopDrawing(select = true): void {
-    super.stopDrawing();
-    this.maintainOriginalBounding();
-    this.setRectInfo();
-    if (select) {
-      this.select();
-      this.onAnnotationClick(null, this.rectInfo!);
-    }
-    this.onShapeUpdate();
-  }
-
-  private maintainOriginalBounding(zoomLevel = 0) {
-    // Get the current zoom factor (defaulting to 1 if not set)
-    const currentZoom = zoomLevel || this.__pdfState?.scale || 1;
-
-    // Capture the current values—but convert them back to base coordinates.
-    this.originalLeft = (parseFloat(this.svg.style.left) || 0) / currentZoom;
-    this.originalTop = (parseFloat(this.svg.style.top) || 0) / currentZoom;
-    this.originalWidth = parseFloat(this.svg.getAttribute('width') || '0') / currentZoom;
-    this.originalHeight = parseFloat(this.svg.getAttribute('height') || '0') / currentZoom;
-  }
-
-  public select(): void {
-    // ✅ Show resizers when the rectangle is selected
-    if (!this.resizer) {
-      this.resizer = new Resizer(this.svg, this.element! as any, this.onShapeUpdate.bind(this), this.constraints);
-      this.svg.focus();
-      this.addDeleteEvent();
-    }
-  }
-
-  public deselect(): void {
-    // ✅ Remove resizers when another shape is selected
-    if (this.resizer) {
-      this.resizer.removeResizers();
-      this.resizer = null;
-      this.removeDeleteEvent();
-    }
-  }
-
-  private getStrokeDashArray(): string {
-    return this.strokeStyle === 'dashed' ? '5,5' : this.strokeStyle === 'dotted' ? '2,2' : '0';
-  }
-
-  public deletAnnotation(): void {
-    if (this.svg) {
-      if (this.resizer) {
-        this.resizer.removeResizers();
-        this.resizer = null;
-      }
-      this.svg.remove();
-    }
-  }
-
-  private updateZoom(zoomFactor: number): void {
-    // Calculate new values based on the stored original values.
-    const newLeft = this.originalLeft * zoomFactor;
-    const newTop = this.originalTop * zoomFactor;
-    const newWidth = this.originalWidth * zoomFactor;
-    const newHeight = this.originalHeight * zoomFactor;
-
-    // Update the annotation's SVG container.
-    this.svg.style.left = newLeft + 'px';
-    this.svg.style.top = newTop + 'px';
-    this.svg.setAttribute('width', newWidth.toString());
-    this.svg.setAttribute('height', newHeight.toString());
-
-    // If you update internal elements (like the inner rect or hit test rect),
-    // you may need to adjust those as well.
-    if (this.element) {
-      // Assuming a fixed padding of 10 was used during drawing:
-      const padding = 10 * zoomFactor;
-      this.element.setAttribute('x', padding.toString());
-      this.element.setAttribute('y', padding.toString());
-      this.element.setAttribute('width', (newWidth - padding * 2).toString());
-      this.element.setAttribute('height', (newHeight - padding * 2).toString());
-    }
-    if (this.hitElementRect) {
-      const padding = 10 * zoomFactor;
-      this.hitElementRect.setAttribute('x', padding.toString());
-      this.hitElementRect.setAttribute('y', padding.toString());
-      this.hitElementRect.setAttribute('width', (newWidth - padding * 2).toString());
-      this.hitElementRect.setAttribute('height', (newHeight - padding * 2).toString());
-    }
-
-    // Tell the resizer to re-sync its overlay and handles.
-    if (this.resizer) {
-      this.resizer.constraintsValue = this.constraints;
-      this.resizer.syncOverlayToSvg();
-    }
-  }
-
-  public draw(x0: number, x1: number, y0: number, y1: number, pageNumber: number) {
-    const padding = 10;
-
-    this.startX = x0;
-    this.startY = y0;
+  /**
+   * Programmatically draws a rectangle without user interaction.
+   * @param x0         X-coordinate of top-left corner
+   * @param x1         Width of the rectangle
+   * @param y0         Y-coordinate of top-left corner
+   * @param y1         Height of the rectangle
+   * @param pageNumber PDF page index
+   */
+  public draw(x0: number, x1: number, y0: number, y1: number, pageNumber: number): void {
+    this.__startX = x0;
+    this.__startY = y0;
     this.isDrawing = false;
 
-    this.svg.style.left = x0 + 'px';
-    this.svg.style.top = y0 + 'px';
-    this.svg.setAttribute('width', (x1 + padding * 2).toString());
-    this.svg.setAttribute('height', (y1 + padding * 2).toString());
-    this.pageNumber = pageNumber;
+    this.__svg.style.left = `${x0}px`;
+    this.__svg.style.top = `${y0}px`;
+    this.__svg.setAttribute('width', `${x1 + INNER_PADDING_PX * 2}`);
+    this.__svg.setAttribute('height', `${y1 + INNER_PADDING_PX * 2}`);
+    this._pageNumber = pageNumber;
 
-    this.createSvgRect('10', y1, x1);
-    this.maintainOriginalBounding(1);
-    this.updateZoom(this.__pdfState?.scale!);
+    this._createSvgRect(INNER_PADDING_PX.toString(), y1, x1);
+    this._maintainOriginalBounding(1);
+    this._updateZoom(this.__pdfState!.scale);
+    this._setRectInfo();
   }
 
-  private setRectInfo() {
-    const info = {
-      ...this.getCoordinates(),
-      id: this.element!.id,
-      pageNumber: this.pageNumber,
-      fillColor: this.fillColor,
-      strokeColor: this.strokeColor,
-      strokeWidth: this.strokeWidth,
-      strokeStyle: this.strokeStyle,
+  /** @inheritdoc */
+  public startDrawing(x: number, y: number, pageNumber: number): void {
+    super.startDrawing(x, y, pageNumber);
+    this.__svg.style.left = `${x}px`;
+    this.__svg.style.top = `${y}px`;
+    this._createSvgRect();
+    this._pageNumber = pageNumber;
+  }
+
+  /** @inheritdoc */
+  public updateDrawing(x: number, y: number): void {
+    if (!this.isDrawing || !this.__element || !this.__hitElementRect) return;
+
+    const maxX = this._constraints.width - INNER_PADDING_PX;
+    const maxY = this._constraints.height - INNER_PADDING_PX;
+    const clampedX = Math.min(Math.max(x, 0), maxX);
+    const clampedY = Math.min(Math.max(y, 0), maxY);
+    const width = clampedX - this.__startX;
+    const height = clampedY - this.__startY;
+
+    this.__svg.setAttribute('width', `${Math.abs(width) + INNER_PADDING_PX * 2}`);
+    this.__svg.setAttribute('height', `${Math.abs(height) + INNER_PADDING_PX * 2}`);
+
+    this.__element.setAttribute('x', `${INNER_PADDING_PX}`);
+    this.__element.setAttribute('y', `${INNER_PADDING_PX}`);
+    this.__element.setAttribute('width', `${Math.abs(width)}`);
+    this.__element.setAttribute('height', `${Math.abs(height)}`);
+
+    this.__hitElementRect.setAttribute('x', `${INNER_PADDING_PX}`);
+    this.__hitElementRect.setAttribute('y', `${INNER_PADDING_PX}`);
+    this.__hitElementRect.setAttribute('width', `${Math.abs(width)}`);
+    this.__hitElementRect.setAttribute('height', `${Math.abs(height)}`);
+
+    if (width < 0) this.__svg.style.left = `${clampedX - INNER_PADDING_PX}px`;
+    if (height < 0) this.__svg.style.top = `${clampedY - INNER_PADDING_PX}px`;
+  }
+
+  /**
+   * Ends interactive drawing, caches geometry, and optionally selects
+   * or emits an update event.
+   * @param opts.select       Auto-select after drawing
+   * @param opts.shapeUpdate  Emit ANNOTATION_CREATED event
+   */
+  public stopDrawing(opts: { select?: boolean; shapeUpdate?: boolean } = { select: true, shapeUpdate: true }): void {
+    super.stopDrawing();
+    this._maintainOriginalBounding();
+    this._setRectInfo();
+    if (opts.select) this.select();
+    if (opts.shapeUpdate) this._onShapeUpdate();
+  }
+
+  /**
+   * Selects this annotation, adding resizers and Delete/Backspace handler.
+   */
+  public select(): void {
+    if (!this._resizer) {
+      this._resizer = new Resizer(this.__svg, this.__element as SVGGraphicsElement, this._onShapeUpdate.bind(this), this._constraints);
+      this.__svg.focus();
+      this._addDeleteEvent();
+    }
+  }
+
+  /**
+   * Deselects this annotation, removing resizers and keyboard handler.
+   */
+  public deselect(): void {
+    if (this._resizer) {
+      this._removeDeleteEvent();
+      this._resizer.removeResizers();
+      this._resizer = null;
+    }
+  }
+
+  /**
+   * Deletes this annotation from the DOM.
+   * @param suppressEvent If true, skips ANNOTATION_DELETED emission
+   */
+  public deleteAnnotation(suppressEvent = false): void {
+    if (this.__svg) {
+      if (this._resizer) {
+        this._removeDeleteEvent();
+        this._resizer.removeResizers();
+        this._resizer = null;
+      }
+      this.__svg.remove();
+    }
+    if (!suppressEvent) {
+      this.__pdfState?.emit('ANNOTATION_DELETED', this.id);
+    }
+  }
+
+  /**
+   * Cancels pointer cursor and click handler on the hit-test rectangle.
+   */
+  public revokeSelection(): void {
+    if (this.__hitElementRect) {
+      this.__hitElementRect.style.cursor = 'default';
+      this.__hitElementRect.onclick = null;
+    }
+  }
+
+  /**
+   * Scrolls the annotation into view (centered in viewport).
+   */
+  public scrollToView(): void {
+    this.__svg?.scrollIntoView({ block: 'center' });
+  }
+
+  /**
+   * Returns a serializable snapshot of this annotation.
+   */
+  public getConfig(): Partial<RectangleConfig> {
+    return this._shapeInfo ?? {};
+  }
+
+  /**
+   * Creates the visible <rect> and an invisible hit-test <rect> inside the SVG.
+   * @param padding  Optional x/y offset inside the SVG
+   * @param height   Rectangle height
+   * @param width    Rectangle width
+   */
+  private _createSvgRect(padding: string = '0', height: number = 0, width: number = 0): void {
+    this.__element = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    this.__element.id = this.annotationId;
+    this.__element.setAttribute('x', padding);
+    this.__element.setAttribute('y', padding);
+    this.__element.setAttribute('width', Math.abs(width).toString());
+    this.__element.setAttribute('height', Math.abs(height).toString());
+    this.__element.setAttribute('fill', this._fillColor);
+    this.__element.setAttribute('stroke', this._strokeColor);
+    this.__element.setAttribute('stroke-width', this._strokeWidth.toString());
+    this.__element.setAttribute('stroke-dasharray', this._getStrokeDashArray());
+    this.__element.setAttribute('opacity', this._opacity.toString());
+    this.__svg.appendChild(this.__element);
+
+    this.__hitElementRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    this.__hitElementRect.setAttribute('x', padding);
+    this.__hitElementRect.setAttribute('y', padding);
+    this.__hitElementRect.setAttribute('width', Math.abs(width).toString());
+    this.__hitElementRect.setAttribute('height', Math.abs(height).toString());
+    this.__hitElementRect.setAttribute('fill', 'none');
+    this.__hitElementRect.setAttribute('stroke', 'transparent');
+    this.__hitElementRect.style.strokeWidth = (this._strokeWidth + 10).toString();
+    this.__hitElementRect.style.cursor = 'pointer';
+    this.__hitElementRect.style.pointerEvents = 'auto';
+    this.__hitElementRect.onclick = (event) => {
+      event.stopPropagation();
+      event.preventDefault();
+      this.__onAnnotationClick(event, this.getConfig());
+    };
+    this.__svg.appendChild(this.__hitElementRect);
+  }
+
+  /** Adds keyboard listener for Delete/Backspace. */
+  private _addDeleteEvent(): void {
+    this.__svg.addEventListener('keydown', this._onDeleteKeyBound);
+  }
+
+  /** Removes keyboard listener for Delete/Backspace. */
+  private _removeDeleteEvent(): void {
+    this.__svg.removeEventListener('keydown', this._onDeleteKeyBound);
+  }
+
+  /**
+   * Handles Delete or Backspace key to delete the annotation.
+   */
+  private _onDeleteKey(event: KeyboardEvent): void {
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      this.deleteAnnotation();
+    }
+  }
+
+  /** Captures current un-scaled position and size for zoom adjustments. */
+  private _maintainOriginalBounding(zoomLevel = 0): void {
+    const scale = zoomLevel || this.__pdfState?.scale || 1;
+    this._originalLeft = (parseFloat(this.__svg.style.left) || 0) / scale;
+    this._originalTop = (parseFloat(this.__svg.style.top) || 0) / scale;
+    this._originalWidth = parseFloat(this.__svg.getAttribute('width') || '0') / scale;
+    this._originalHeight = parseFloat(this.__svg.getAttribute('height') || '0') / scale;
+  }
+
+  /**
+   * Re-applies scaled position and size based on captured original values.
+   * @param zoomFactor Current viewer scale
+   */
+  private _updateZoom(zoomFactor: number): void {
+    const left = this._originalLeft * zoomFactor;
+    const top = this._originalTop * zoomFactor;
+    const width = this._originalWidth * zoomFactor;
+    const height = this._originalHeight * zoomFactor;
+
+    this.__svg.style.left = `${left}px`;
+    this.__svg.style.top = `${top}px`;
+    this.__svg.setAttribute('width', `${width}`);
+    this.__svg.setAttribute('height', `${height}`);
+
+    if (this.__element) {
+      const pad = INNER_PADDING_PX * zoomFactor;
+      this.__element.setAttribute('x', `${pad}`);
+      this.__element.setAttribute('y', `${pad}`);
+      this.__element.setAttribute('width', `${width - pad * 2}`);
+      this.__element.setAttribute('height', `${height - pad * 2}`);
+    }
+
+    if (this.__hitElementRect) {
+      const pad = INNER_PADDING_PX * zoomFactor;
+      this.__hitElementRect.setAttribute('x', `${pad}`);
+      this.__hitElementRect.setAttribute('y', `${pad}`);
+      this.__hitElementRect.setAttribute('width', `${width - pad * 2}`);
+      this.__hitElementRect.setAttribute('height', `${height - pad * 2}`);
+    }
+
+    if (this._resizer) {
+      this._resizer.constraintsValue = this._constraints;
+      this._resizer.syncOverlayToSvg();
+    }
+  }
+
+  /**
+   * Returns stroke-dasharray string corresponding to the stroke style.
+   */
+  private _getStrokeDashArray(): string {
+    return this._strokeStyle === 'dashed' ? '5,5' : this._strokeStyle === 'dotted' ? '2,2' : '0';
+  }
+
+  /**
+   * Computes current un-scaled coordinates from the SVG element.
+   */
+  private _getCoordinates(): { x0: number; x1: number; y0: number; y1: number } {
+    const bbox = (this.__svg as SVGGraphicsElement).getBBox();
+    const left = parseFloat(this.__svg.style.left);
+    const top = parseFloat(this.__svg.style.top);
+    return { x0: left, y0: top, x1: bbox.width, y1: bbox.height };
+  }
+
+  /**
+   * Computes logical (un-scaled) coordinates, preferring captured originals.
+   */
+  private _getLogicalCoordinates(): { x0: number; y0: number; x1: number; y1: number } {
+    const scale = this.__pdfState?.scale || 1;
+    if (this._originalWidth) {
+      return {
+        x0: this._originalLeft,
+        y0: this._originalTop,
+        x1: this._originalWidth,
+        y1: this._originalHeight,
+      };
+    }
+    const bbox = (this.__svg as SVGGraphicsElement).getBBox();
+    const left = parseFloat(this.__svg.style.left) / scale;
+    const top = parseFloat(this.__svg.style.top) / scale;
+    return { x0: left, y0: top, x1: bbox.width / scale, y1: bbox.height / scale };
+  }
+
+  /** Updates internal shape info for serialization or events. */
+  private _setRectInfo(): void {
+    const { x0, y0, x1, y1 } = this._getLogicalCoordinates();
+    this._shapeInfo = {
+      id: this.annotationId,
+      pageNumber: this._pageNumber!,
+      x0,
+      y0,
+      x1,
+      y1,
+      fillColor: this._fillColor,
+      strokeColor: this._strokeColor,
+      strokeWidth: this._strokeWidth,
+      strokeStyle: this._strokeStyle,
+      opacity: this._opacity,
       type: 'rectangle',
     };
-    this.shapeInfo = info as any;
   }
 
-  public revokeSelection() {
-    if (this.hitElementRect) {
-      this.hitElementRect.style.cursor = 'default';
-      this.hitElementRect.onclick = null;
-    }
-  }
-
-  public scrollToView() {
-    if (this.svg) {
-      this.svg.scrollIntoView({ block: 'center' });
-    }
+  /** Emits ANNOTATION_CREATED after geometry changes. */
+  private _onShapeUpdate(): void {
+    this._maintainOriginalBounding();
+    this._setRectInfo();
+    this.__pdfState?.emit('ANNOTATION_CREATED', this.getConfig());
   }
 }

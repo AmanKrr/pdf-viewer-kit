@@ -15,7 +15,7 @@
 */
 
 import { PageViewport } from 'pdfjs-dist';
-import { aPdfViewerClassNames, aPdfViewerIds } from '../../constant/ElementIdClass';
+import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
 
 /**
  * A utility class for managing and creating various elements related to rendering PDF pages in a viewer.
@@ -40,7 +40,7 @@ class PageElement {
     div.style.top = `${pagePositionInfo.get(pageNumber)}px`;
 
     div.id = `pageContainer-${pageNumber}`;
-    div.classList.add(aPdfViewerClassNames._A_PAGE_VIEW);
+    div.classList.add(PDF_VIEWER_CLASSNAMES.A_PAGE_VIEW);
 
     // Set page container dimensions
     div.style.height = `${viewport.height}px`;
@@ -82,33 +82,33 @@ class PageElement {
   static containerCreation(containerId: string, scale: number) {
     // Create the parent container for the PDF viewer
     const pdfParentViewer = document.createElement('div');
-    pdfParentViewer.setAttribute('class', `${aPdfViewerClassNames._A_PDF_VIEWER} pdf-loading`);
+    pdfParentViewer.setAttribute('class', `${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} pdf-loading`);
 
     // Create the toolbar container
     const toolbarParent = document.createElement('div');
-    toolbarParent.classList.add(aPdfViewerClassNames._A_TOOLBAR_ITEMS);
-    toolbarParent.setAttribute('id', aPdfViewerIds._TOOLBAR_CONTAINER);
+    toolbarParent.classList.add(PDF_VIEWER_CLASSNAMES.A_TOOLBAR_ITEMS);
+    toolbarParent.setAttribute('id', PDF_VIEWER_IDS.TOOLBAR_CONTAINER);
 
     // Create and append toolbar groups
     const groupOneParent = document.createElement('div');
-    groupOneParent.setAttribute('id', aPdfViewerIds._TOOLBAR_GROUP_1);
-    groupOneParent.classList.add(aPdfViewerClassNames._TOOLBAR_GROUP);
+    groupOneParent.setAttribute('id', PDF_VIEWER_IDS.TOOLBAR_GROUP_ONE);
+    groupOneParent.classList.add(PDF_VIEWER_CLASSNAMES.TOOLBAR_GROUP);
     toolbarParent.appendChild(groupOneParent);
 
     const groupTwoParent = document.createElement('div');
-    groupTwoParent.setAttribute('id', aPdfViewerIds._TOOLBAR_GROUP_2);
-    groupTwoParent.classList.add(aPdfViewerClassNames._TOOLBAR_GROUP);
+    groupTwoParent.setAttribute('id', PDF_VIEWER_IDS.TOOLBAR_GROUP_TWO);
+    groupTwoParent.classList.add(PDF_VIEWER_CLASSNAMES.TOOLBAR_GROUP);
     toolbarParent.appendChild(groupTwoParent);
 
     // Create the main page viewer container
     const pageParentViewer = document.createElement('div');
-    pageParentViewer.classList.add(aPdfViewerClassNames._A_VIEWER_CONTAINER);
-    pageParentViewer.setAttribute('id', aPdfViewerIds._MAIN_VIEWER_CONTAINER);
+    pageParentViewer.classList.add(PDF_VIEWER_CLASSNAMES.A_VIEWER_CONTAINER);
+    pageParentViewer.setAttribute('id', PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER);
 
     // Create an inner container that will hold all the pages
     const pageContainer = document.createElement('div');
-    pageContainer.classList.add(aPdfViewerClassNames._A_PAGE_CONTAINER);
-    pageContainer.setAttribute('id', aPdfViewerIds._MAIN_PAGE_VIEWER_CONTAINER);
+    pageContainer.classList.add(PDF_VIEWER_CLASSNAMES.A_PAGE_CONTAINER);
+    pageContainer.setAttribute('id', PDF_VIEWER_IDS.MAIN_PAGE_VIEWER_CONTAINER);
     pageContainer.style.setProperty('--scale-factor', String(scale));
 
     // Append page container to the page viewer
@@ -117,7 +117,7 @@ class PageElement {
 
     // Create a wrapper to hold the sidebar and page viewer
     const sidebarAndPageViewerWrapper = document.createElement('div');
-    sidebarAndPageViewerWrapper.classList.add(aPdfViewerClassNames._A_VIEWER_WRAPPER);
+    sidebarAndPageViewerWrapper.classList.add(PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER);
     sidebarAndPageViewerWrapper.appendChild(pageParentViewer);
     pdfParentViewer.appendChild(sidebarAndPageViewerWrapper);
 
@@ -127,7 +127,7 @@ class PageElement {
 
     return {
       parent: pdfParentViewer,
-      injectElementId: aPdfViewerIds._MAIN_PAGE_VIEWER_CONTAINER,
+      injectElementId: PDF_VIEWER_IDS.MAIN_PAGE_VIEWER_CONTAINER,
     };
   }
 

@@ -14,18 +14,20 @@
   limitations under the License.
 */
 
-import PageElement from './PageElement';
-import { aPdfViewerClassNames, aPdfViewerIds } from '../../constant/ElementIdClass';
-import { PageViewport, PDFPageProxy, TextLayer as pdfjsTextLayer } from 'pdfjs-dist';
+import PageElement from './PDFPageElement';
+import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
+import { PageViewport, PDFPageProxy, TextLayer as pdfjsTextLayer, AnnotationLayer } from 'pdfjs-dist';
+import { PDFLinkService } from '../services/LS';
+import WebViewer from './WebViewer';
 
 /**
  * Manages the creation and rendering of a text layer for a specific page in the PDF viewer.
  * The text layer overlays text content extracted from the PDF, enabling text selection and interactions.
  */
 class TextLayer extends PageElement {
-  private pageWrapper!: HTMLElement;
-  private page!: PDFPageProxy;
-  private viewport!: PageViewport;
+  private _pageWrapper!: HTMLElement;
+  private _page!: PDFPageProxy;
+  private _viewport!: PageViewport;
 
   /**
    * Constructs a `TextLayer` instance for a given PDF page.
@@ -37,9 +39,9 @@ class TextLayer extends PageElement {
    */
   constructor(pageWrapper: HTMLElement, page: PDFPageProxy, viewport: PageViewport) {
     super();
-    this.pageWrapper = pageWrapper;
-    this.page = page;
-    this.viewport = viewport;
+    this._pageWrapper = pageWrapper;
+    this._page = page;
+    this._viewport = viewport;
   }
 
   /**
@@ -55,14 +57,14 @@ class TextLayer extends PageElement {
    */
   async createTextLayer(): Promise<HTMLDivElement[]> {
     // Create a text layer div with appropriate class and ID based on viewport dimensions.
-    const textLayerDiv = PageElement.createLayers(aPdfViewerClassNames._A_TEXT_LAYER, aPdfViewerIds._TEXT_LAYER, this.viewport);
-    this.pageWrapper.appendChild(textLayerDiv);
+    const textLayerDiv = PageElement.createLayers(PDF_VIEWER_CLASSNAMES.ATEXT_LAYER, PDF_VIEWER_IDS.TEXT_LAYER, this._viewport);
+    this._pageWrapper.appendChild(textLayerDiv);
 
-    const annotaionLayerDiv = PageElement.createLayers(aPdfViewerClassNames._A_ANNOTATION_DRAWING_LAYER, aPdfViewerIds._ANNOTATION_DRAWING_LAYER, this.viewport);
-    this.pageWrapper.appendChild(annotaionLayerDiv);
+    const annotaionLayerDiv = PageElement.createLayers(PDF_VIEWER_CLASSNAMES.AANNOTATION_DRAWING_LAYER, PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER, this._viewport);
+    this._pageWrapper.appendChild(annotaionLayerDiv);
 
     // Retrieve the text content of the current page.
-    const textContent = await this.page.getTextContent();
+    const textContent = await this._page.getTextContent();
 
     /**
      * Text layer rendering was changed after `pdfjs 4.0.379`.
@@ -85,26 +87,26 @@ class TextLayer extends PageElement {
     const pdfJsInternalTextLayer = new pdfjsTextLayer({
       textContentSource: textContent,
       container: textLayerDiv,
-      viewport: this.viewport,
+      viewport: this._viewport,
     });
 
     // Render the text layer into the container.
     await pdfJsInternalTextLayer.render();
-    this.wrapTextLayerIntoPTag();
+    // this._wrapTextLayerIntoPTag();
     // this.copyAndPateText();
 
     // Attach a click event handler to each text div for future interactivity.
-    // pdfJsInternalTextLayer.textDivs.forEach((ele) => {
-    //   ele.onclick = (e) => console.log('Coming soon'); // Placeholder for future interaction
-    // });
+    pdfJsInternalTextLayer.textDivs.forEach((ele) => {
+      ele.onclick = (e) => console.log('Coming soon'); // Placeholder for future interaction
+    });
 
     return [textLayerDiv, annotaionLayerDiv];
   }
 
-  private wrapTextLayerIntoPTag() {
-    if (!this.pageWrapper) return;
+  private _wrapTextLayerIntoPTag() {
+    if (!this._pageWrapper) return;
 
-    const textLayer = this.pageWrapper.querySelector(`.${aPdfViewerClassNames._A_TEXT_LAYER}`);
+    const textLayer = this._pageWrapper.querySelector(`.${PDF_VIEWER_CLASSNAMES.ATEXT_LAYER}`);
 
     if (!textLayer) return;
     const innerHtml = textLayer.innerHTML;
@@ -113,9 +115,9 @@ class TextLayer extends PageElement {
   }
 
   private copyAndPateText() {
-    if (!this.pageWrapper) return;
+    if (!this._pageWrapper) return;
 
-    const textLayer = this.pageWrapper.querySelector(`.${aPdfViewerClassNames._A_TEXT_LAYER}`) as HTMLElement;
+    const textLayer = this._pageWrapper.querySelector(`.${PDF_VIEWER_CLASSNAMES.ATEXT_LAYER}`) as HTMLElement;
 
     if (!textLayer) return;
 

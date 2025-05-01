@@ -16,36 +16,40 @@
 
 // If using Webpack to create the build, use the Webpack-referenced file instead of /pdf.js.
 import { PDFDocumentProxy } from 'pdfjs-dist';
-import WebViewer from '../Viewer/components/WebViewer';
-import WebUiUtils from '../utils/WebUiUtils';
-import PdfState from '../Viewer/components/PdfState';
-import PageElement from '../Viewer/components/PageElement';
-import PasswordManager from '../Viewer/manager/Password';
+import WebViewer from '../viewer/ui/WebViewer';
+import WebUiUtils from '../utils/web-ui-utils';
+import PdfState from '../viewer/ui/PDFState';
+import PageElement from '../viewer/ui/PDFPageElement';
+import PasswordManager from '../viewer/manager/PDFPasswordManager';
 
 // Import stylesheets for different PDF UI layers.
 import '../style/toolbar.css';
-import '../style/root.css';
-import '../style/textlayer.css';
+import '../style/global.css';
+import '../style/text-layer.css';
 import '../style/thumbnail.css';
-import '../style/annotationlayer.css';
-import '../style/annotationDrawerLayer.css';
+import '../style/annotation-layer.css';
+import '../style/annotation-drawer-layer.css';
 
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist';
 import { LoadOptions } from '../types/webpdf.types';
-GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href;
+import { getPdfWorkerSrc } from '../utils/worker-factory';
+GlobalWorkerOptions.workerSrc = getPdfWorkerSrc();
 
 /**
  * Class responsible for loading and managing PDF documents within a web viewer.
  * Extends functionalities from `WebViewer` and integrates PDF.js for rendering.
  */
 class WebPdf {
+  private static _loadingTasks = new Map<string, any>();
+  private static _viewers = new Map<string, WebViewer>();
+
   /**
    * Loads a PDF document into the web viewer.
    *
    * @param {LoadOptions} options - Configuration options for loading the document.
    * @returns {Promise<WebViewer | undefined>} Resolves to a `WebViewer` instance upon successful load or `undefined` on failure.
    */
-  static async load(options: LoadOptions) {
+  static async load(options: LoadOptions): Promise<WebViewer | undefined> {
     // Default options for configuring the PDF viewer during the load process.
     let loadOptions: LoadOptions = {
       containerId: '', // ID of the container where the PDF will be displayed
@@ -88,7 +92,10 @@ class WebPdf {
         withCredentials: options.withCredentials, // Send credentials if needed
         data: options.data, // Raw binary PDF data
         httpHeaders: options.httpHeaders, // Custom HTTP headers
+        // disableRange: true,
+        // disableStream: true,
       });
+      WebPdf._loadingTasks.set(options.containerId, initiateLoadPdf);
 
       // Track progress while fetching the PDF (Commented out but can be enabled for debugging)
       /*
@@ -130,11 +137,59 @@ class WebPdf {
 
       // Initialize the WebViewer instance with the loaded PDF.
       const viewer = new WebViewer(pdf, loadOptions, internalContainers['parent'], container);
+      await viewer.ready;
+      WebUiUtils.hideLoading(uiLoading, options.containerId);
+      WebPdf._viewers.set(options.containerId, viewer);
       return viewer;
-    } catch (err) {
+    } catch (err: any) {
+      // swallow the “Worker was destroyed” cancellation:
+      if (err.message?.includes('Worker was destroyed')) {
+        console.warn('Worker destroyed. If you unload your pdf ignore.');
+        return undefined;
+      }
       // Handle errors during the document loading process.
       console.error('Error loading PDF:', err);
       return undefined;
+    }
+  }
+
+  /**
+   * Completely tears down everything for the given container:
+   *  • stops any in-flight PDF.js loads
+   *  • destroys the PDFDocumentProxy
+   *  • removes UI spinners
+   *  • unsubscribes PdfState
+   *  • destroys the WebViewer and its sub-components
+   *  • clears out any injected DOM
+   */
+  static unload(containerId: string): void {
+    const task = WebPdf._loadingTasks.get(containerId);
+    if (task) {
+      task.destroy();
+      task.worker?.terminate();
+      WebPdf._loadingTasks.delete(containerId);
+    }
+
+    const pdfState = PdfState.getInstance(containerId);
+    pdfState.pdfInstance?.destroy();
+
+    (pdfState.uiLoading?.parentNode as HTMLElement)?.remove();
+
+    // 5) destroy the viewer and its children
+    const viewer = WebPdf._viewers.get(containerId);
+    viewer?.destroy();
+    WebPdf._viewers.delete(containerId);
+
+    const root = document.getElementById(containerId);
+    if (root) {
+      root.innerHTML = '';
+    }
+  }
+
+  static unloadAll(): void {
+    // unload every containerId
+    for (const id of WebPdf._loadingTasks.keys()) {
+      WebPdf.unload(id);
     }
   }
 }

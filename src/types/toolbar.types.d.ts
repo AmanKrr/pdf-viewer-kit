@@ -1,158 +1,58 @@
+// src/ui/Toolbar/types.ts
+import WebViewer from './WebViewer';
+
 /**
- * Configuration for a single toolbar button.
+ * Contract for a pluggable toolbar implementation.
  */
-interface ToolbarButtonConfig {
-  /** Unique identifier for the button. */
+export interface IToolbar {
+  /** Render toolbar UI into the given container element */
+  render(container: HTMLElement): void;
+  /** Tear down any DOM or event listeners created in render() */
+  destroy(): void;
+}
+
+/**
+ * Fine‑grain show/hide toggles and CSS namespace for default toolbar.
+ */
+export interface ToolbarOptions {
+  /** Show “First Page” button */
+  showFirstPage?: boolean;
+  /** Show “Previous/Next Page” buttons */
+  showPrevNext?: boolean;
+  /** Show “Last Page” button */
+  showLastPage?: boolean;
+  /** Show “Page Number” control */
+  showPageNumber?: boolean;
+  /** Show “Zoom In/Out” buttons */
+  showZoom?: boolean;
+  /** Show “Search” button */
+  showSearch?: boolean;
+  /** Show “Thumbnail” toggle button */
+  showThumbnail?: boolean;
+  /** Show “Annotation” toggle button */
+  showAnnotation?: boolean;
+  /** Prefix for all toolbar CSS classes */
+  classPrefix?: string;
+  // showFitWidth?: boolean;
+  // showFitPage?: boolean;
+  showDownload?: boolean;
+}
+
+/**
+ * Configuration for each button or custom element in the toolbar.
+ */
+export interface ToolbarButtonConfig {
+  /** Unique key/id for this item (used in CSS classes) */
   id: string;
-
-  /** Label text displayed for the button. */
-  label: string;
-
-  /** Optional icon represented as an SVG. */
-  icon?: svg;
-
-  /** Optional CSS class for styling the button. */
-  class?: string;
-
-  /** If `true`, a separator will be placed before this button in the toolbar. */
+  /** CSS class(es) for icon; ignored if using `render` */
+  iconClass?: string;
+  /** Tooltip text (title attribute) */
+  tooltip?: string;
+  /** Standard click handler; ignored if using `render` */
+  onClick?: (viewer: WebViewer) => void;
+  /** Alternative: return your own element instead of button+icon */
+  render?: (viewer: WebViewer) => HTMLElement;
+  /** Insert a separator just before this item */
   isSeparatorBefore?: boolean;
-
-  /** Indicates if the button is a custom toolbar item. */
-  type?: 'custom';
-
-  /** Function executed when the button is clicked. */
-  onClick: (e: any, params: any) => void;
-
-  /** Custom rendering function for the button (if applicable). */
-  render?: (params: any | null) => HTMLElement;
-
-  /** Determines whether the button should be hidden. */
-  hide: boolean;
-
-  /** Specifies which toolbar group this button belongs to (1 or 2). */
-  group: 1 | 2;
-}
-
-/**
- * Defines the available toolbar options and their visibility state.
- */
-interface ToolbarOptions {
-  /** Enables/disables zoom-in functionality. */
-  zoomIn: boolean;
-
-  /** Enables/disables zoom-out functionality. */
-  zoomOut: boolean;
-
-  /** Enables/disables page rotation functionality. */
-  rotate: boolean;
-
-  /** Enables/disables the print button. */
-  print: boolean;
-
-  /** Enables/disables the download button. */
-  download: boolean;
-
-  /** Enables/disables the next-page navigation button. */
-  nextPage: boolean;
-
-  /** Enables/disables the previous-page navigation button. */
-  previousPage: boolean;
-
-  /** Enables/disables the first-page navigation button. */
-  firstPage: boolean;
-
-  /** Enables/disables the last-page navigation button. */
-  lastPage: boolean;
-
-  /** Enables/disables the search functionality. */
-  search: boolean;
-
-  /** Enables/disables the page-number display/input field. */
-  pageNumber: boolean;
-
-  /** Enables/disables the thumbnail viewer button. */
-  thumbnail: boolean;
-
-  /** Controls visibility of annotation tools. */
-  annotation: {
-    /** Enables/disables the signature annotation tool. */
-    signature: boolean;
-
-    /** Enables/disables the drawing annotation tool. */
-    drawing: boolean;
-
-    /** Enables/disables the stamp annotation tool. */
-    stamp: boolean;
-
-    /** Enables/disables the circle annotation tool. */
-    circle: boolean;
-
-    /** Enables/disables the rectangle annotation tool. */
-    rectangle: boolean;
-
-    /** Enables/disables the line annotation tool. */
-    line: boolean;
-  };
-}
-
-/**
- * Defines CSS class names for different toolbar buttons.
- */
-interface ToolbarClass {
-  /** CSS class for the zoom-in button. */
-  zoomIn: string;
-
-  /** CSS class for the zoom-out button. */
-  zoomOut: string;
-
-  /** CSS class for the rotate button. */
-  rotate: string;
-
-  /** CSS class for the print button. */
-  print: string;
-
-  /** CSS class for the download button. */
-  download: string;
-
-  /** CSS class for the next-page navigation button. */
-  nextPage: string;
-
-  /** CSS class for the previous-page navigation button. */
-  previousPage: string;
-
-  /** CSS class for the first-page navigation button. */
-  firstPage: string;
-
-  /** CSS class for the last-page navigation button. */
-  lastPage: string;
-
-  /** CSS class for the search button. */
-  search: string;
-
-  /** CSS class for the page-number display/input field. */
-  pageNumber: string;
-
-  /** CSS class for the thumbnail viewer button. */
-  thumbnail: string;
-
-  /** CSS class names for annotation tools. */
-  annotation: {
-    /** CSS class for the signature annotation tool. */
-    signature: string;
-
-    /** CSS class for the drawing annotation tool. */
-    drawing: string;
-
-    /** CSS class for the stamp annotation tool. */
-    stamp: string;
-
-    /** CSS class for the circle annotation tool. */
-    circle: string;
-
-    /** CSS class for the rectangle annotation tool. */
-    rectangle: string;
-
-    /** CSS class for the line annotation tool. */
-    line: string;
-  };
+  breakBefore?: boolean;
 }

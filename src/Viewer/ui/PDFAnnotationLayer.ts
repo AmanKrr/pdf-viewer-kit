@@ -1,33 +1,32 @@
-// import * as pdfjsLib from 'pdfjs-dist/webpack.mjs';
 import { AnnotationLayer as ALayer, PageViewport, PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
-import { aPdfViewerClassNames, aPdfViewerIds } from '../../constant/ElementIdClass';
-import TextLayer from './TextLayer';
-import PageElement from './PageElement';
+import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
+import TextLayer from './PDFTextLayer';
+import { PDFLinkService } from '../services/LS';
+import PageElement from './PDFPageElement';
 import WebViewer from './WebViewer';
-import { PDFLinkService } from '../service/LS';
 
 class AnnotationLayer extends PageElement {
-  private pageWrapper!: HTMLElement;
-  private page!: PDFPageProxy;
-  private viewport!: PageViewport;
+  private _pageWrapper!: HTMLElement;
+  private _page!: PDFPageProxy;
+  private _viewport!: PageViewport;
 
   constructor(pageWrapper: HTMLElement, page: PDFPageProxy, viewport: PageViewport) {
     super();
-    this.pageWrapper = pageWrapper;
-    this.page = page;
-    this.viewport = viewport;
+    this._pageWrapper = pageWrapper;
+    this._page = page;
+    this._viewport = viewport;
   }
 
   async createAnnotationLayer(webViewer: WebViewer, pdfDocument: PDFDocumentProxy) {
-    const annotationLayerDiv = TextLayer.createLayers(aPdfViewerClassNames._A_ANNOTATION_LAYER, aPdfViewerIds._ANNOTATION_LAYER, this.viewport);
-    this.pageWrapper.appendChild(annotationLayerDiv);
+    const annotationLayerDiv = TextLayer.createLayers(PDF_VIEWER_CLASSNAMES.AANNOTATION_LAYER, PDF_VIEWER_IDS.ANNOTATION_LAYER, this._viewport);
+    this._pageWrapper.appendChild(annotationLayerDiv);
 
-    const annotationContent = await this.page.getAnnotations();
+    const annotationContent = await this._page.getAnnotations();
 
     const annotationLayer = new ALayer({
       div: annotationLayerDiv,
-      page: this.page,
-      viewport: this.viewport,
+      page: this._page,
+      viewport: this._viewport,
       accessibilityManager: null,
       annotationCanvasMap: null,
       annotationEditorUIManager: null,
@@ -35,10 +34,10 @@ class AnnotationLayer extends PageElement {
     });
 
     await annotationLayer.render({
-      viewport: this.viewport.clone({ dontFlip: true }),
+      viewport: this._viewport.clone({ dontFlip: true }),
       div: annotationLayerDiv,
       annotations: annotationContent,
-      page: this.page,
+      page: this._page,
       linkService: new PDFLinkService({ pdfDocument: pdfDocument, pdfViewer: webViewer }),
       renderForms: false,
     });

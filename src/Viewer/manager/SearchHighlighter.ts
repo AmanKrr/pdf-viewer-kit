@@ -15,9 +15,9 @@
 */
 
 import { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
-import PdfState from '../components/PdfState';
+import PdfState from '../ui/PDFState';
 import SearchIndexManager from './SearchIndexManager';
-import WebViewer from '../components/WebViewer';
+import WebViewer from '../ui/WebViewer';
 
 export interface SearchOptions {
   matchCase: boolean;
@@ -43,17 +43,21 @@ export interface PageSearchResult {
  * have the attribute role="presentation".
  */
 class SearchHighlighter {
-  private currentSearchTerm: string = '';
-  private currentOptions: SearchOptions = { matchCase: false, wholeWord: false, regex: false };
+  private _currentSearchTerm: string = '';
+  private _currentOptions: SearchOptions = { matchCase: false, wholeWord: false, regex: false };
 
   // Flat list for navigation among highlighted elements.
-  private flatResults: { pageNumber: number; element: HTMLElement }[] = [];
-  private allFlatResults: { pageNumber: number; matchPosition: { startIndex: number; length: number } }[] = [];
-  private currentMatchIndex: number = -1;
-  private pdfViewer: WebViewer | null = null;
+  private _flatResults: { pageNumber: number; element: HTMLElement }[] = [];
+  private _allFlatResults: { pageNumber: number; matchPosition: { startIndex: number; length: number } }[] = [];
+  private _currentMatchIndex: number = -1;
+  private _pdfViewer: WebViewer;
+  private _pdfState: PdfState;
+  private _searchIndexManager: SearchIndexManager;
 
-  set viewer(pdfViewer: WebViewer) {
-    this.pdfViewer = pdfViewer;
+  constructor(pdfState: PdfState, pdfViewer: WebViewer) {
+    this._pdfState = pdfState;
+    this._pdfViewer = pdfViewer;
+    this._searchIndexManager = new SearchIndexManager();
   }
 
   /**
@@ -63,29 +67,29 @@ class SearchHighlighter {
    * @returns An array of PageSearchResult objects.
    */
   async search(searchTerm: string, options: SearchOptions, pdfState: PdfState): Promise<PageSearchResult[]> {
-    this.currentSearchTerm = searchTerm;
-    this.currentOptions = options;
-    this.flatResults = [];
+    this._currentSearchTerm = searchTerm;
+    this._currentOptions = options;
+    this._flatResults = [];
     // First, remove any existing highlights.
     this.removeHighlights();
 
     if (!searchTerm) return [];
 
     const results: PageSearchResult[] = [];
-    let pageNumbers = SearchIndexManager.getAllPageNumbers();
+    let pageNumbers = this._searchIndexManager.getAllPageNumbers();
 
     if (pageNumbers.length === 0) {
       // If no pages are indexed, extract content from the PDF.
       await this.extractPdfContent(pdfState.pdfInstance.numPages, pdfState.pdfInstance);
       // Re-fetch the page numbers after extraction.
-      pageNumbers = SearchIndexManager.getAllPageNumbers();
+      pageNumbers = this._searchIndexManager.getAllPageNumbers();
     }
 
     for (const pageNum of pageNumbers) {
-      const text = SearchIndexManager.getPageText(pageNum);
+      const text = this._searchIndexManager.getPageText(pageNum);
       if (!text) continue;
 
-      const regex = this.buildRegex(searchTerm, options);
+      const regex = this._buildRegex(searchTerm, options);
       let match: RegExpExecArray | null;
       const matchPositions: { startIndex: number; length: number }[] = [];
       while ((match = regex.exec(text)) !== null) {
@@ -98,16 +102,16 @@ class SearchHighlighter {
       }
     }
 
-    this.allFlatResults = [];
+    this._allFlatResults = [];
     for (const result of results) {
       // result: { pageNumber, matchPositions }
       for (const pos of result.matchPositions) {
-        this.allFlatResults.push({ pageNumber: result.pageNumber, matchPosition: pos });
+        this._allFlatResults.push({ pageNumber: result.pageNumber, matchPosition: pos });
       }
     }
 
     // Sort by page number then by start index.
-    this.allFlatResults.sort((a, b) => {
+    this._allFlatResults.sort((a, b) => {
       if (a.pageNumber !== b.pageNumber) {
         return a.pageNumber - b.pageNumber;
       }
@@ -115,7 +119,7 @@ class SearchHighlighter {
     });
 
     // Optionally, auto-select the first match if any are found.
-    if (this.flatResults.length > 0) {
+    if (this._flatResults.length > 0) {
       this.selectMatch(0);
     }
 
@@ -129,14 +133,14 @@ class SearchHighlighter {
     for (let i = 1; i <= totalPages; i++) {
       const page = await pdf.getPage(i);
       // Extract text and cache it.
-      await SearchIndexManager.extractPageText(i, page);
+      await this._searchIndexManager.extractPageText(i, page);
     }
   }
 
   /**
    * Builds a RegExp based on the search term and options.
    */
-  private buildRegex(searchTerm: string, options: SearchOptions): RegExp {
+  private _buildRegex(searchTerm: string, options: SearchOptions): RegExp {
     if (options.regex) {
       return new RegExp(searchTerm, options.matchCase ? 'g' : 'gi');
     }
@@ -150,7 +154,7 @@ class SearchHighlighter {
    * This method waits for the page container to exist (up to a timeout) and then processes its text layer.
    */
   async highlightPage(pageNumber: number, searchTerm: string, options: SearchOptions): Promise<void> {
-    const container = await this.waitForPageContainer(pageNumber);
+    const container = await this._waitForPageContainer(pageNumber);
     if (!container) return;
     const textLayer = container.querySelector('.a-text-layer');
     if (!textLayer) return;
@@ -158,7 +162,7 @@ class SearchHighlighter {
     // Process each text span (assumed to have role="presentation")
     textLayer.querySelectorAll('span[role="presentation"]').forEach((span) => {
       if (span.textContent) {
-        const regex = this.buildRegex(searchTerm, options);
+        const regex = this._buildRegex(searchTerm, options);
         // Replace matching text with a span that has the "search-highlight" class.
         span.innerHTML = span.textContent.replace(regex, (match) => `<span class="search-highlight" style="position: relative; display: inline-block;">${match}</span>`);
       }
@@ -167,7 +171,7 @@ class SearchHighlighter {
     // Update flat results for navigation.
     const matches = Array.from(textLayer.querySelectorAll('.search-highlight')) as HTMLElement[];
     matches.forEach((el) => {
-      this.flatResults.push({ pageNumber, element: el });
+      this._flatResults.push({ pageNumber, element: el });
     });
   }
 
@@ -175,12 +179,12 @@ class SearchHighlighter {
    * Waits until the page container (with ID "pageContainer-{pageNumber}") is available in the DOM.
    * Returns null after a timeout.
    */
-  private waitForPageContainer(pageNumber: number): Promise<HTMLElement | null> {
+  private _waitForPageContainer(pageNumber: number): Promise<HTMLElement | null> {
     return new Promise((resolve) => {
       let attempts = 0;
       const maxAttempts = 0.2; // 50 * 100ms = 5 seconds
       const check = () => {
-        const el = document.getElementById(`pageContainer-${pageNumber}`);
+        const el = document.querySelector(`#${this._pdfState?.containerId} #pageContainer-${pageNumber}`) as HTMLElement;
         if (el) {
           resolve(el);
         } else {
@@ -200,15 +204,15 @@ class SearchHighlighter {
    * Removes all inline highlights from all text layers.
    */
   removeHighlights(): void {
-    document.querySelectorAll('.a-text-layer').forEach((layer) => {
+    document.querySelectorAll(`#${this._pdfState?.containerId} .a-text-layer`).forEach((layer) => {
       layer.querySelectorAll('span[role="presentation"]').forEach((span) => {
         if (span.textContent) {
           span.innerHTML = span.textContent;
         }
       });
     });
-    this.flatResults = [];
-    this.currentMatchIndex = -1;
+    this._flatResults = [];
+    this._currentMatchIndex = -1;
   }
 
   /**
@@ -216,8 +220,8 @@ class SearchHighlighter {
    * If a search is active, reapply highlights on that page.
    */
   async registerPage(pageNumber: number): Promise<void> {
-    if (this.currentSearchTerm) {
-      await this.highlightPage(pageNumber, this.currentSearchTerm, this.currentOptions);
+    if (this._currentSearchTerm) {
+      await this.highlightPage(pageNumber, this._currentSearchTerm, this._currentOptions);
     }
   }
 
@@ -225,7 +229,7 @@ class SearchHighlighter {
    * Called when a page is unmounted; cleans up any highlight data for that page.
    */
   deregisterPage(pageNumber: number): void {
-    const container = document.getElementById(`pageContainer-${pageNumber}`);
+    const container = document.querySelector(`#${this._pdfState?.containerId} #pageContainer-${pageNumber}`);
     if (container) {
       const textLayer = container.querySelector('.a-text-layer');
       if (textLayer) {
@@ -235,7 +239,7 @@ class SearchHighlighter {
       }
     }
     // Remove flat results for this page.
-    this.flatResults = this.flatResults.filter((r) => r.pageNumber !== pageNumber);
+    this._flatResults = this._flatResults.filter((r) => r.pageNumber !== pageNumber);
   }
 
   /**
@@ -243,17 +247,17 @@ class SearchHighlighter {
    * and adds an active highlight style.
    */
   selectMatch(index: number): void {
-    if (this.allFlatResults.length === 0) return;
-    this.currentMatchIndex = index;
-    const targetMatch = this.allFlatResults[index];
+    if (this._allFlatResults.length === 0) return;
+    this._currentMatchIndex = index;
+    const targetMatch = this._allFlatResults[index];
 
     // if match result page is not in vitualization buffer then go to that page
     // and wait for the page to be rendered.
     // This is a workaround for the issue where the page is not rendered yet.
     if (targetMatch) {
-      const container = document.getElementById(`pageContainer-${targetMatch.pageNumber}`);
-      if (!container && this.pdfViewer) {
-        this.pdfViewer.goToPage(targetMatch.pageNumber);
+      const container = document.querySelector(`#${this._pdfState?.containerId} #pageContainer-${targetMatch.pageNumber}`);
+      if (!container && this._pdfViewer) {
+        this._pdfViewer.goToPage(targetMatch.pageNumber);
         setTimeout(() => {
           this.selectMatch(index);
         }, 300);
@@ -262,7 +266,7 @@ class SearchHighlighter {
     }
 
     // Wait until the page is rendered.
-    this.waitForPageContainer(targetMatch.pageNumber).then((container) => {
+    this._waitForPageContainer(targetMatch.pageNumber).then((container) => {
       if (!container) return;
       const textLayer = container.querySelector('.a-text-layer');
       if (!textLayer) return;
@@ -270,7 +274,7 @@ class SearchHighlighter {
       const highlights = Array.from(textLayer.querySelectorAll('.search-highlight')) as HTMLElement[];
 
       // Determine the match’s index on that page:
-      const indexOnPage = this.allFlatResults.filter((m) => m.pageNumber === targetMatch.pageNumber && m.matchPosition.startIndex < targetMatch.matchPosition.startIndex).length;
+      const indexOnPage = this._allFlatResults.filter((m) => m.pageNumber === targetMatch.pageNumber && m.matchPosition.startIndex < targetMatch.matchPosition.startIndex).length;
 
       const targetElement = highlights[indexOnPage];
       if (targetElement) {
@@ -286,8 +290,8 @@ class SearchHighlighter {
    * Navigate to the next match.
    */
   nextMatch(): void {
-    if (this.allFlatResults.length === 0) return;
-    const next = (this.currentMatchIndex + 1) % this.allFlatResults.length;
+    if (this._allFlatResults.length === 0) return;
+    const next = (this._currentMatchIndex + 1) % this._allFlatResults.length;
     this.selectMatch(next);
   }
 
@@ -295,17 +299,17 @@ class SearchHighlighter {
    * Navigate to the previous match.
    */
   prevMatch(): void {
-    if (this.allFlatResults.length === 0) return;
-    const prev = (this.currentMatchIndex - 1 + this.allFlatResults.length) % this.allFlatResults.length;
+    if (this._allFlatResults.length === 0) return;
+    const prev = (this._currentMatchIndex - 1 + this._allFlatResults.length) % this._allFlatResults.length;
     this.selectMatch(prev);
   }
 
   public getMatchStatus(): { current: number; total: number } {
     return {
-      current: this.allFlatResults.length > 0 && this.currentMatchIndex >= 0 ? this.currentMatchIndex + 1 : 0,
-      total: this.allFlatResults.length,
+      current: this._allFlatResults.length > 0 && this._currentMatchIndex >= 0 ? this._currentMatchIndex + 1 : 0,
+      total: this._allFlatResults.length,
     };
   }
 }
 
-export default new SearchHighlighter();
+export default SearchHighlighter;

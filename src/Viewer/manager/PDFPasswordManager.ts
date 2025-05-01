@@ -18,8 +18,8 @@
  * Manages password input and validation for protected PDF documents.
  */
 class PasswordManager {
-  private readonly inpField: HTMLInputElement;
-  private readonly inpLabel: HTMLLabelElement;
+  private readonly _inpField: HTMLInputElement;
+  private readonly _inpLabel: HTMLLabelElement;
 
   /**
    * Constructs a `PasswordManager` instance.
@@ -28,9 +28,9 @@ class PasswordManager {
    * @param {(pass: string) => void} updatePasswordCallback - Callback function to update the entered password.
    */
   constructor(parentContainer: HTMLElement, updatePasswordCallback: (pass: string) => void) {
-    const [inpField, inpLabel] = this.view(parentContainer, updatePasswordCallback);
-    this.inpField = inpField as HTMLInputElement;
-    this.inpLabel = inpLabel as HTMLLabelElement;
+    const [inpField, inpLabel] = this._view(parentContainer, updatePasswordCallback);
+    this._inpField = inpField as HTMLInputElement;
+    this._inpLabel = inpLabel as HTMLLabelElement;
     // Prevent prototype tampering
     Object.freeze(PasswordManager.prototype);
   }
@@ -41,10 +41,10 @@ class PasswordManager {
    * @param {string} errorMessage - The error message to display.
    */
   set onError(errorMessage: string) {
-    if (this.inpField && this.inpLabel) {
-      this.inpLabel.textContent = errorMessage;
-      this.inpField.focus();
-      const parentDiv = this.inpField.parentElement?.parentElement;
+    if (this._inpField && this._inpLabel) {
+      this._inpLabel.textContent = errorMessage;
+      this._inpField.focus();
+      const parentDiv = this._inpField.parentElement?.parentElement;
       if (parentDiv) {
         parentDiv.removeAttribute('style');
       }
@@ -57,7 +57,7 @@ class PasswordManager {
    * @param {string} password - The password to hash.
    * @returns {Promise<string>} The base64-encoded SHA-256 hash of the password.
    */
-  private async hashPassword(password: string): Promise<string> {
+  private async _hashPassword(password: string): Promise<string> {
     const encoder = new TextEncoder();
     const data = encoder.encode(password);
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -71,15 +71,14 @@ class PasswordManager {
    * @param {(pass: string) => void} updatePasswordCallback - The callback function for handling the password submission.
    * @param {HTMLDivElement} parentDiv - The parent div of the password form.
    */
-  private onFormSumbit(event: SubmitEvent, updatePasswordCallback: (pass: string) => void, parentDiv: HTMLDivElement): void {
+  private _onFormSumbit(event: SubmitEvent, updatePasswordCallback: (pass: string) => void, parentDiv: HTMLDivElement): void {
     event.preventDefault();
     event.stopPropagation();
 
-    console.log('submit event', event);
     if (event.target) {
       const formData = new FormData(event.target as HTMLFormElement);
-      if (this.inpField) {
-        this.inpField.value = '';
+      if (this._inpField) {
+        this._inpField.value = '';
       }
       const pass = formData.get('pass');
       if (pass) {
@@ -94,7 +93,7 @@ class PasswordManager {
    *
    * @param {HTMLInputElement} inputField - The password input field.
    */
-  private securityMeasures(inputField: HTMLInputElement): void {
+  private _securityMeasures(inputField: HTMLInputElement): void {
     inputField.oncopy = (e: ClipboardEvent) => e.preventDefault();
     inputField.onpaste = (e: ClipboardEvent) => e.preventDefault();
     inputField.ondragstart = (e: DragEvent) => e.preventDefault();
@@ -109,7 +108,7 @@ class PasswordManager {
    * @param {(pass: string) => void} updatePasswordCallback - Callback function for handling password input.
    * @returns {[HTMLFormElement, HTMLInputElement, HTMLLabelElement]} The form, input field, and label elements.
    */
-  private createForm(parentDiv: HTMLDivElement, updatePasswordCallback: (pass: string) => void): [HTMLFormElement, HTMLInputElement, HTMLLabelElement] {
+  private _createForm(parentDiv: HTMLDivElement, updatePasswordCallback: (pass: string) => void): [HTMLFormElement, HTMLInputElement, HTMLLabelElement] {
     const form = document.createElement('form');
 
     const inputField = document.createElement('input');
@@ -125,8 +124,8 @@ class PasswordManager {
     inputSubmit.setAttribute('type', 'submit');
     inputSubmit.setAttribute('value', 'Submit');
 
-    this.securityMeasures(inputField);
-    form.onsubmit = (e: SubmitEvent) => this.onFormSumbit(e, updatePasswordCallback, parentDiv);
+    this._securityMeasures(inputField);
+    form.onsubmit = (e: SubmitEvent) => this._onFormSumbit(e, updatePasswordCallback, parentDiv);
 
     form.append(label, inputField, inputSubmit);
     return [form, inputField, label];
@@ -138,10 +137,10 @@ class PasswordManager {
    * @param {(pass: string) => void} updatePasswordCallback - Callback function for handling password input.
    * @returns {[HTMLDivElement, HTMLInputElement, HTMLLabelElement]} The div container, input field, and label elements.
    */
-  private createElement(updatePasswordCallback: (pass: string) => void): [HTMLDivElement, HTMLInputElement, HTMLLabelElement] {
+  private _createElement(updatePasswordCallback: (pass: string) => void): [HTMLDivElement, HTMLInputElement, HTMLLabelElement] {
     const div = document.createElement('div');
     div.classList.add('a-password-viewer');
-    const [form, inputField, label] = this.createForm(div, updatePasswordCallback);
+    const [form, inputField, label] = this._createForm(div, updatePasswordCallback);
     div.append(form);
     return [div, inputField, label];
   }
@@ -153,8 +152,8 @@ class PasswordManager {
    * @param {(pass: string) => void} updatePasswordCallback - Callback function for handling password input.
    * @returns {[HTMLInputElement, HTMLLabelElement]} The input field and label elements.
    */
-  private view(parentContainer: HTMLElement, updatePasswordCallback: (pass: string) => void): [HTMLInputElement, HTMLLabelElement] {
-    const [div, inputField, label] = this.createElement(updatePasswordCallback);
+  private _view(parentContainer: HTMLElement, updatePasswordCallback: (pass: string) => void): [HTMLInputElement, HTMLLabelElement] {
+    const [div, inputField, label] = this._createElement(updatePasswordCallback);
     parentContainer.prepend(div);
     return [inputField, label];
   }
@@ -163,8 +162,8 @@ class PasswordManager {
    * Destroys the password input UI, removing it from the DOM.
    */
   public destroy(): void {
-    if (this.inpField) {
-      const parentContainer = this.inpField.parentElement?.parentElement;
+    if (this._inpField) {
+      const parentContainer = this._inpField.parentElement?.parentElement;
       if (parentContainer) {
         parentContainer.remove();
       }

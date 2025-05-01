@@ -34,8 +34,8 @@ class TrieNode {
 /**
  * Implements a Trie (prefix tree) for efficient word storage and retrieval.
  */
-class Trie {
-  private root: TrieNode = new TrieNode();
+class SearchTrie {
+  private _root: TrieNode = new TrieNode();
 
   /**
    * Inserts a word into the Trie.
@@ -43,7 +43,7 @@ class Trie {
    * @param {string} word - The word to be inserted into the Trie.
    */
   insert(word: string): void {
-    let node = this.root;
+    let node = this._root;
     for (const char of word) {
       if (!node.children[char]) {
         node.children[char] = new TrieNode();
@@ -60,12 +60,12 @@ class Trie {
    * @returns {string[]} A list of words that start with the specified prefix.
    */
   search(prefix: string): string[] {
-    let node = this.root;
+    let node = this._root;
     for (const char of prefix) {
       if (!node.children[char]) return [];
       node = node.children[char];
     }
-    return this.collectWords(node, prefix);
+    return this._collectWords(node, prefix);
   }
 
   /**
@@ -75,7 +75,7 @@ class Trie {
    * @param {string} prefix - The prefix accumulated so far.
    * @returns {string[]} A list of words found in the Trie from the given node.
    */
-  private collectWords(node: TrieNode, prefix: string): string[] {
+  private _collectWords(node: TrieNode, prefix: string): string[] {
     let results: string[] = [];
 
     if (node.isEndOfWord) {
@@ -83,11 +83,11 @@ class Trie {
     }
 
     for (const char in node.children) {
-      results.push(...this.collectWords(node.children[char], prefix + char));
+      results.push(...this._collectWords(node.children[char], prefix + char));
     }
 
     return results;
   }
 }
 
-export default Trie;
+export default SearchTrie;

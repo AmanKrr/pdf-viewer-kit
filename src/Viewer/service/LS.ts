@@ -1,4 +1,20 @@
-import WebViewer from '../components/WebViewer';
+/*
+  Copyright 2025 Aman Kumar
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+import WebViewer from '../ui/WebViewer';
 
 // Define the link target options.
 export enum LinkTarget {
@@ -9,12 +25,11 @@ export enum LinkTarget {
   TOP,
 }
 
-// Options interface for initializing PDFLinkService.
 export interface PDFLinkServiceOptions {
   baseUrl?: string | null;
-  pdfDocument?: any; // Replace `any` with your PDFDocument type if available.
-  pdfViewer?: any; // Replace `any` with your PDFViewer type if available.
-  pdfHistory?: any; // Replace `any` with your history type if needed.
+  pdfDocument?: any;
+  pdfViewer?: any;
+  pdfHistory?: any;
   externalLinkTarget?: LinkTarget;
   externalLinkRel?: string;
   ignoreDestinationZoom?: boolean;
@@ -93,24 +108,6 @@ export class PDFLinkService {
     // return this.pdfViewer ? this.pdfViewer.isInPresentationMode : false;
     return false;
   }
-
-  /**
-   * Navigate to a destination.
-   * This minimal implementation supports only a simple numeric page destination.
-   *
-   * @param {string | number | any[]} dest - The destination.
-   */
-  // async goToDestination(dest: string | number | any[]): Promise<void> {
-  //   console.log('goToDestination called with dest:', dest);
-  //   if (typeof dest === 'number') {
-  //     this.goToPage(dest);
-  //   } else if (typeof dest === 'string') {
-  //     console.warn('Named destinations are not fully supported in this minimal implementation:', dest);
-  //     // Optionally, add your own mapping for named destinations.
-  //   } else if (Array.isArray(dest)) {
-  //     console.warn('Explicit destination arrays are not supported in this minimal implementation:', dest);
-  //   }
-  // }
 
   /**
    * Navigate to a destination in the PDF.
@@ -210,7 +207,6 @@ export class PDFLinkService {
    * @param {number | string} val - The page number (or label) to navigate to.
    */
   goToPage(val: number | string): void {
-    console.log('goToPage called with:', val);
     if (this.pdfViewer) {
       // Convert to number if needed.
       const pageNum = typeof val === 'string' ? parseInt(val, 10) : val;

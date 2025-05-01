@@ -14,8 +14,9 @@
   limitations under the License.
 */
 
-import EventEmitter from '../event/EventUtils';
+import EventEmitter from '../events/EventUtils';
 import { PDFDocumentProxy } from 'pdfjs-dist';
+
 /**
  * Manages the state of the PDF viewer, including scale, loading status, and page navigation.
  * Extends EventEmitter to allow event-based updates.
@@ -30,6 +31,8 @@ class PdfState extends EventEmitter {
   private _currentPage: number = 1;
   private _containerId: string = '';
   private _uiLoading!: HTMLElement;
+  private _isAnnotationEnabled: boolean = false;
+  private _isAnnotationConfigurationPropertiesEnabled: boolean = false;
 
   /** Private constructor to enforce singleton pattern per container ID */
   private constructor() {
@@ -100,6 +103,46 @@ class PdfState extends EventEmitter {
   }
 
   /**
+   * Checks if annotations are enabled.
+   *
+   * @returns {boolean} `true` if annotations are enabled, `false` otherwise.
+   */
+  get isAnnotationEnabled(): boolean {
+    return this._isAnnotationEnabled;
+  }
+
+  /**
+   * Sets the annotation state.
+   *
+   * @param {boolean} value - `true` to enable annotations, `false` to disable.
+   */
+  set isAnnotationEnabled(value: boolean) {
+    if (this._isAnnotationEnabled !== value) {
+      this._isAnnotationEnabled = value;
+    }
+  }
+
+  /**
+   * Checks if annotation configuration properties are enabled.
+   *
+   * @returns {boolean} `true` if enabled, `false` otherwise.
+   */
+  get isAnnotationConfigurationPropertiesEnabled(): boolean {
+    return this._isAnnotationConfigurationPropertiesEnabled;
+  }
+
+  /**
+   * Sets the annotation configuration properties state.
+   *
+   * @param {boolean} value - `true` to enable, `false` to disable.
+   */
+  set isAnnotationConfigurationPropertiesEnabled(value: boolean) {
+    if (this._isAnnotationConfigurationPropertiesEnabled !== value) {
+      this._isAnnotationConfigurationPropertiesEnabled = value;
+    }
+  }
+
+  /**
    * Gets the PDF.js document instance.
    *
    * @returns {PDFDocumentProxy} The current PDF document instance.
@@ -116,7 +159,7 @@ class PdfState extends EventEmitter {
   set pdfInstance(instance: PDFDocumentProxy) {
     if (this._pdfInstance !== instance) {
       this._pdfInstance = instance;
-      this.emit('pdfInstanceChange', instance);
+      // this.emit('pdfInstanceChange', instance);
     }
   }
 
@@ -137,7 +180,7 @@ class PdfState extends EventEmitter {
   set isLoading(value: boolean) {
     if (this._isLoading !== value) {
       this._isLoading = value;
-      this.emit('loadingChange', value);
+      // this.emit('loadingChange', value);
     }
   }
 
@@ -201,6 +244,10 @@ class PdfState extends EventEmitter {
     if (this._uiLoading !== element) {
       this._uiLoading = element;
     }
+  }
+
+  public destroy(): void {
+    PdfState.removeInstance(this.containerId);
   }
 }
 

@@ -1,3 +1,5 @@
+import { IToolbar, ToolbarButtonConfig, ToolbarOptions } from './toolbar.types';
+
 /**
  * Represents the options for loading a PDF document in the web viewer.
  */
@@ -35,8 +37,10 @@ export interface LoadOptions extends DocumentInitParameters {
   /** Specifies a specific page number to render only that page (optional). */
   renderSpecificPageOnly?: number | null;
 
-  /** Custom toolbar items that can be added to the viewer (optional). */
+  disableToolbar?: boolean;
+  customToolbar?: IToolbar;
   customToolbarItems?: ToolbarButtonConfig[];
+  toolbarOptions?: ToolbarOptions;
 
   /** If `true`, enables credentials for cross-origin requests (optional). */
   withCredentials?: boolean;
@@ -49,12 +53,12 @@ export interface LoadOptions extends DocumentInitParameters {
  * Represents viewer options for loading a PDF, excluding sensitive properties.
  * This omits `password`, `withCredentials`, and `httpHeaders` for security reasons.
  */
-type ViewerLoadOptions = Omit<LoadOptions, 'password', 'withCredentials', 'httpHeaders'>;
+export type ViewerLoadOptions = Omit<LoadOptions, 'password', 'withCredentials', 'httpHeaders'>;
 
 /**
  * Options used when retrieving a PDF document from a URL or other sources.
  */
-interface GetDocumentOptions {
+export interface GetDocumentOptions {
   /** The URL or path to the PDF document. */
   url: string | URL;
 

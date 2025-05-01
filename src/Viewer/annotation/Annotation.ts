@@ -2,7 +2,7 @@
   Copyright 2025 Aman Kumar
 
   Licensed under the Apache License, Version 2.0 (the "License");
-  you may not use this file except in compliance with the License.
+  You may not use this file except in compliance with the License.
   You may obtain a copy of the License at
 
       http://www.apache.org/licenses/LICENSE-2.0
@@ -14,67 +14,120 @@
   limitations under the License.
 */
 
-import { RectConfig } from '../../types/geometry';
-import PdfState from '../components/PdfState';
+import { IAnnotation } from '../../interface/IAnnotation';
+import { EllipseConfig, RectangleConfig } from '../../types/geometry';
+import PdfState from '../ui/PDFState';
 
 /**
- * Base class for handling annotations in a PDF viewer.
- * Responsible for managing annotation elements, interactions, and coordinates.
+ * Abstract base class for handling annotations in a PDF viewer.
+ * Provides shared logic for creating an SVG container, tracking drawing state, etc.
  */
-export class Annotation {
-  /** The container element where the annotation SVG is placed */
-  protected container: HTMLElement;
+export abstract class Annotation implements IAnnotation {
+  public readonly annotationId: string;
+  public abstract readonly type: string;
 
-  /** The SVG element that represents the annotation */
-  protected svg: SVGSVGElement;
-
-  /** The actual annotation element inside the SVG (e.g., rectangle, line) */
-  protected element: SVGElement | null = null;
-
-  /** An invisible hit-area rectangle for interaction */
-  protected hitElementRect: SVGElement | null = null;
-
-  /** Flag to indicate if the annotation is being drawn */
+  protected __annotationDrawerContainer: HTMLElement;
+  protected __svg: SVGSVGElement;
+  protected __element: SVGElement | null = null;
+  protected __hitElementRect: SVGElement | null = null;
   public isDrawing: boolean = false;
 
-  /** Starting X-coordinate of the annotation */
-  protected startX: number = 0;
-
-  /** Starting Y-coordinate of the annotation */
-  protected startY: number = 0;
-
-  /** Reference to the PdfState instance for event handling */
+  protected __startX: number = 0;
+  protected __startY: number = 0;
   protected __pdfState: PdfState | null = null;
 
   /**
    * Creates a new annotation instance.
    *
-   * @param {HTMLElement} container - The container where the annotation is placed.
+   * @param {HTMLElement} annotationDrawerContainer - The container where the annotation is placed.
    * @param {PdfState} pdfState - The PdfState instance to manage annotation state.
    */
-  constructor(container: HTMLElement, pdfState: PdfState) {
-    this.container = container;
+  constructor(annotationDrawerContainer: HTMLElement, pdfState: PdfState, id?: string) {
+    this.annotationId = id ?? this.__generateUniqueId();
+
+    this.__annotationDrawerContainer = annotationDrawerContainer;
     this.__pdfState = pdfState;
 
     // Create a new SVG instance for this annotation
-    this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    this.svg.style.position = 'absolute';
-    this.svg.setAttribute('tabindex', '0'); // Enables keyboard focus
-    this.svg.style.outline = 'none';
-    this.svg.setAttribute('annotation-id', this.generateUniqueId());
-    this.svg.style.pointerEvents = 'none'; // Prevents unwanted interactions
-    this.container.appendChild(this.svg);
+    this.__svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    this.__svg.style.position = 'absolute';
+    this.__svg.setAttribute('tabindex', '0'); // Enables keyboard focus
+    this.__svg.style.outline = 'none';
+
+    this.__svg.setAttribute('annotation-id', this.annotationId);
+
+    // By default, pointer events are off. Derived classes can enable if needed
+    this.__svg.style.pointerEvents = 'none';
+
+    this.__annotationDrawerContainer.appendChild(this.__svg);
   }
 
   /**
-   * Handles click events on an annotation.
-   * Emits an event when an annotation is selected.
-   *
-   * @param {MouseEvent} event - The mouse event triggering the click.
-   * @param {any} context - The context object associated with the annotation.
-   * @param {'rectangle'} type - The type of annotation clicked.
+   * Begins the drawing process for the annotation.
+   * @param x - The starting X-coordinate.
+   * @param y - The starting Y-coordinate.
    */
-  protected onAnnotationClick(event: MouseEvent | null, annotationData: Partial<RectConfig>) {
+  public startDrawing(x: number, y: number, pageNumber: number): void {
+    this.isDrawing = true;
+    this.__startX = x;
+    this.__startY = y;
+  }
+
+  /**
+   * Updates the drawing of the annotation as the pointer moves.
+   * @param x - The current X-coordinate.
+   * @param y - The current Y-coordinate.
+   */
+  public abstract updateDrawing(x: number, y: number): void;
+
+  /**
+   * Stops the drawing process for the annotation.
+   */
+  public stopDrawing(): void {
+    this.isDrawing = false;
+
+    if (this.__pdfState) {
+      const button = document.querySelector(`#${this.__pdfState.containerId} .a-annotation-container-icon`) as HTMLElement;
+      if (button && button.parentElement?.classList.contains('active')) {
+        button.parentElement.classList.toggle('active');
+      }
+      (this.__annotationDrawerContainer as HTMLElement).style.cursor = 'default';
+    }
+  }
+
+  /**
+   * Selects the annotation.
+   */
+  public abstract select(): void;
+
+  /**
+   * Deselects the annotation.
+   */
+  public abstract deselect(): void;
+
+  /**
+   * Removes the annotation from the DOM.
+   */
+  public abstract deleteAnnotation(suppressEvent: boolean): void;
+
+  /**
+   * Returns the configuration data for the annotation.
+   * @returns A record representing the annotation configuration.
+   */
+  public abstract getConfig(): Record<string, any>;
+
+  /**
+   * Optionally scrolls to the annotation's position in the PDF view.
+   * This can be implemented in derived classes if needed.
+   */
+  public scrollToView?(): void {}
+
+  /**
+   * Emits an event when the annotation is clicked, indicating it's selected.
+   * @param event - The MouseEvent triggering the click.
+   * @param annotationData - Data describing the annotation.
+   */
+  protected __onAnnotationClick(event: MouseEvent | null, annotationData: Partial<RectangleConfig | EllipseConfig>) {
     if (event) {
       event.stopPropagation();
     }
@@ -82,60 +135,10 @@ export class Annotation {
   }
 
   /**
-   * Starts drawing the annotation.
-   *
-   * @param {number} x - The X-coordinate where drawing starts.
-   * @param {number} y - The Y-coordinate where drawing starts.
+   * Generates a unique ID for the annotation.
+   * @returns A unique string ID.
    */
-  protected startDrawing(x: number, y: number): void {
-    this.isDrawing = true;
-    this.startX = x;
-    this.startY = y;
-  }
-
-  /**
-   * Stops drawing the annotation and logs its coordinates.
-   */
-  protected stopDrawing(): void {
-    this.isDrawing = false;
-    if (this.__pdfState) {
-      const button = document.querySelector(`#${this.__pdfState.containerId} .a-annotation-container-icon`) as HTMLElement;
-      if (button) {
-        button.parentElement?.classList?.toggle('active');
-      }
-      (this.container as HTMLElement).style.cursor = 'default';
-    }
-  }
-
-  /**
-   * Retrieves the coordinates of the annotation.
-   *
-   * @returns {{ x0: number; x1: number; y0: number; y1: number } | null}
-   * An object containing the annotation's top-left (x0, y0)
-   * and its width (x1) and height (y1), or `null` if the SVG is not available.
-   */
-  protected getCoordinates(): { x0: number; x1: number; y0: number; y1: number } | null {
-    if (!this.svg) return null;
-
-    const bbox = (this.svg as any).getBBox(); // Get bounding box of SVG
-
-    const top = parseInt(this.svg.style.top);
-    const left = parseInt(this.svg.style.left);
-
-    const rectInfo = JSON.stringify({
-      x0: left, // X-coordinate of the annotation
-      x1: bbox.width, // Width of the annotation
-      y0: top, // Y-coordinate of the annotation
-      y1: bbox.height, // Height of the annotation
-    });
-
-    return JSON.parse(rectInfo);
-  }
-
-  /**
-   * Generates a unique id string.
-   */
-  private generateUniqueId(): string {
+  protected __generateUniqueId(): string {
     return 'anno-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now().toString();
   }
 }

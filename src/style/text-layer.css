@@ -31,7 +31,7 @@
   text-size-adjust: none;
   forced-color-adjust: none;
   transform-origin: 0 0;
-  z-index: 2;
+  /* z-index: 2; */
   caret-color: CanvasText;
 }
 
@@ -53,14 +53,14 @@
   transform-origin: 0% 0%;
 }
 
+.a-text-layer :is(span) {
+  display: block;
+}
+
 /* Special handling for marked content */
 .a-text-layer span.markedContent {
   top: 0;
   height: 0;
-}
-
-.a-text-layer :is(span) {
-  display: block;
 }
 
 /* ========================== */

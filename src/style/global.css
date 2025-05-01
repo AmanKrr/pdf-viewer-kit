@@ -15,7 +15,20 @@
 */
 
 /* Importing variable definitions */
-@import "./variable.css";
+@import "./variables.css";
+
+.hiddenCanvasElement {
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.material-symbols-outlined {
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24
+}
 
 /* ========================== */
 /* PDF Viewer Container */
@@ -62,6 +75,10 @@
   flex-direction: column;
   justify-content: flex-start;
   align-items: center;
+  --user-unit: 1;
+  --total-scale-factor: calc(var(--scale-factor) * var(--user-unit));
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
 }
 
 /* Individual page styling */
@@ -197,7 +214,53 @@
   }
 }
 
-/* Search Highlight */
+.dropdown {
+  position: relative;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: #222;
+  padding: 5px 0;
+  border-radius: 5px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  width: 180px;
+  display: none;
+}
+
+.dropdown-menu.show {
+  display: block;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.dropdown-item img {
+  width: 20px;
+  height: 20px;
+}
+
+.dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* .a-shape-selection-dropdown {
+  display: inline-block;
+} */
+
+.a-shape-selection-dropdown::before {
+  content: '\e313';
+  font-size: 1.4rem !important;
+}
+
 .search-highlight {
   background-color: rgba(125, 183, 25, 0.25);
   backdrop-filter: none;
