@@ -1,1 +1,0 @@
-class SelectionManager{constructor(){this.selectedShape=null,this.listeners=[]}setSelected(e){this.selectedShape=e,this._notifyListeners()}getSelected(){return this.selectedShape}onSelectionChange(t){return this.listeners.push(t),()=>{this.listeners=this.listeners.filter(e=>e!==t)}}_notifyListeners(){this.listeners.forEach(e=>e(this.selectedShape))}}export{SelectionManager};
