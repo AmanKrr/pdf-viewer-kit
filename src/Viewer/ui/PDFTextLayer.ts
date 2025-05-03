@@ -16,9 +16,7 @@
 
 import PageElement from './PDFPageElement';
 import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
-import { PageViewport, PDFPageProxy, TextLayer as pdfjsTextLayer, AnnotationLayer } from 'pdfjs-dist';
-import { PDFLinkService } from '../services/LS';
-import WebViewer from './WebViewer';
+import { PageViewport, PDFPageProxy, TextLayer as pdfjsTextLayer } from 'pdfjs-dist';
 
 /**
  * Manages the creation and rendering of a text layer for a specific page in the PDF viewer.
@@ -92,8 +90,7 @@ class TextLayer extends PageElement {
 
     // Render the text layer into the container.
     await pdfJsInternalTextLayer.render();
-    // this._wrapTextLayerIntoPTag();
-    // this.copyAndPateText();
+    this._wrapTextLayerIntoPTag();
 
     // Attach a click event handler to each text div for future interactivity.
     pdfJsInternalTextLayer.textDivs.forEach((ele) => {
@@ -104,24 +101,27 @@ class TextLayer extends PageElement {
   }
 
   private _wrapTextLayerIntoPTag() {
-    if (!this._pageWrapper) return;
-
     const textLayer = this._pageWrapper.querySelector(`.${PDF_VIEWER_CLASSNAMES.ATEXT_LAYER}`);
-
     if (!textLayer) return;
-    const innerHtml = textLayer.innerHTML;
+
+    // Grab all child nodes (spans and <br>s)
+    const nodes = Array.from(textLayer.childNodes);
+    // Build a single <p> to host them
+    const p = document.createElement('p');
+    // let the browser preserve spaces & wrap lines at <br>
+    p.style.whiteSpace = 'pre-wrap';
+    p.style.margin = '0'; // avoid extra paragraph spacing
+
+    nodes.forEach((node) => {
+      if ((node as HTMLElement).nodeName !== 'BR') {
+        // move your span (or text node) into the <p>
+        p.appendChild(node);
+      }
+    });
+
+    // clear out the layer and insert your <p>
     textLayer.innerHTML = '';
-    textLayer.innerHTML = `<p>${innerHtml}</p>`.replaceAll(`<br role="presentation">`, '');
-  }
-
-  private copyAndPateText() {
-    if (!this._pageWrapper) return;
-
-    const textLayer = this._pageWrapper.querySelector(`.${PDF_VIEWER_CLASSNAMES.ATEXT_LAYER}`) as HTMLElement;
-
-    if (!textLayer) return;
-
-    textLayer.onkeydown = this.keyDown;
+    textLayer.appendChild(p);
   }
 
   private keyDown(event: KeyboardEvent) {

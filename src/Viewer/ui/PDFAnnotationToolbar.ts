@@ -20,6 +20,7 @@ import { ShapeType } from '../../types/geometry.types';
 import { ToolbarButtonConfig } from '../../types/toolbar.types';
 import PdfState from './PDFState';
 import WebViewer from './WebViewer';
+import { createPopper, Instance as PopperInstance } from '@popperjs/core';
 
 /**
  * A toolbar for creating and configuring annotations using only DOM APIs.
@@ -53,6 +54,7 @@ export class AnnotationToolbar {
   private _onAnnotationCreated = this._handleAnnotationCreated.bind(this);
 
   private _activeAnnotation: IAnnotation | null = null;
+  private _popper: PopperInstance | null = null;
 
   /**
    * @param viewer    The WebViewer instance containing PDF pages.
@@ -337,6 +339,37 @@ export class AnnotationToolbar {
     );
   }
 
+  private _popover(isVisible: boolean, button: HTMLButtonElement, dropdown: HTMLDivElement): void {
+    this._popper?.destroy();
+
+    if (!isVisible) {
+      this._popper = createPopper(button, dropdown, {
+        placement: 'bottom-start',
+        modifiers: [
+          {
+            name: 'offset',
+            options: { offset: [0, 4] },
+          },
+          {
+            name: 'flip',
+            options: {
+              fallbackPlacements: ['top-start'],
+            },
+          },
+          {
+            name: 'preventOverflow',
+            options: {
+              boundary: document.querySelector(`#${this._pdfState.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`), // your viewer container
+              padding: 8,
+            },
+          },
+        ],
+      });
+    } else {
+      this._popper?.destroy();
+    }
+  }
+
   /**
    * Create a color picker dropdown (stroke or fill).
    */
@@ -357,8 +390,10 @@ export class AnnotationToolbar {
     button.style.border = '1px solid #ccc';
     button.style.background = initialColor;
     button.style.cursor = 'pointer';
-    button.onclick = () => {
-      dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    button.onclick = (e) => {
+      const isVisible = dropdown.style.display === 'block';
+      dropdown.style.display = isVisible ? 'none' : 'block';
+      this._popover(isVisible, button, dropdown);
     };
     container.appendChild(button);
 
@@ -412,7 +447,8 @@ export class AnnotationToolbar {
       if (!container.contains(ev.target as Node)) dropdown.style.display = 'none';
     });
 
-    container.appendChild(dropdown);
+    const dropdownWrapper = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
+    dropdownWrapper?.parentElement?.insertBefore(dropdown, dropdownWrapper);
     return container;
   }
 
@@ -520,7 +556,9 @@ export class AnnotationToolbar {
     };
 
     button.onclick = () => {
-      dropdown.style.display = dropdown.style.display === 'none' ? '' : 'none';
+      const isVisible = dropdown.style.display === 'block';
+      dropdown.style.display = isVisible ? 'none' : '';
+      this._popover(isVisible, button, dropdown);
     };
     document.addEventListener('click', (ev) => {
       if (!container.contains(ev.target as Node)) dropdown.style.display = 'none';
@@ -528,7 +566,8 @@ export class AnnotationToolbar {
         updateThumb(initialValue);
       }
     });
-    container.appendChild(dropdown);
+    const dropdownWrapper = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
+    dropdownWrapper?.parentElement?.insertBefore(dropdown, dropdownWrapper);
     return container;
   }
 
@@ -565,7 +604,8 @@ export class AnnotationToolbar {
     const dropdown = document.createElement('div');
     dropdown.classList.add(PDF_VIEWER_CLASSNAMES.A_ANNOTATION_BORDER_DROPDOWN);
     dropdown.style.display = 'none';
-    container.appendChild(dropdown);
+    const dropdownWrapper = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
+    dropdownWrapper?.parentElement?.insertBefore(dropdown, dropdownWrapper);
 
     styles.forEach((style) => {
       const row = document.createElement('div');
@@ -580,7 +620,9 @@ export class AnnotationToolbar {
     });
 
     btn.onclick = () => {
-      dropdown.style.display = dropdown.style.display === 'none' ? '' : 'none';
+      const isVisible = dropdown.style.display === 'block';
+      dropdown.style.display = isVisible ? 'none' : '';
+      this._popover(isVisible, btn, dropdown);
     };
     document.addEventListener('click', (ev) => {
       if (!container.contains(ev.target as Node)) dropdown.style.display = 'none';

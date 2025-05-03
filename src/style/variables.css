@@ -23,7 +23,8 @@
   --toolbarHeight: 40px;
 
   /* Minimum width allowed for the PDF viewer */
-  --min-pdf-width: 400px;
+  --min-pdf-width: 190px;
+  --min-pdf-height: 100px;
 
   /* Default light theme background color for the PDF viewer */
   --pdf-viewer-theme: #eaecef;

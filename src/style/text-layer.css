@@ -161,3 +161,10 @@
 .a-text-layer .endOfContent.active {
   top: 0;
 }
+
+.textLayer>p,
+.textLayer>p>span {
+  pointer-events: all;
+  user-select: text;
+  -webkit-user-select: text;
+}
