@@ -64,7 +64,14 @@
       }
     ],
     "plugins": [
-      "@semantic-release/commit-analyzer",
+      [
+        "@semantic-release/commit-analyzer",
+        {
+          "gitRawCommitOpts": {
+            "from": "v0.1.0"
+          }
+        }
+      ],
       "@semantic-release/release-notes-generator",
       "@semantic-release/changelog",
       [
