@@ -6,7 +6,7 @@ on:
       - main
 
 permissions:
-  contents: write # needed to push tags, changelog, etc.
+  contents: write # push tags, changelog, etc.
   issues: write # if you use GitHub issues for release notes
   pull-requests: write
 
@@ -17,7 +17,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # semantic-release needs full history
+          fetch-depth: 0 # full history for semantic-release
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -28,8 +28,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build
+        run: npm run build
+
       - name: Run semantic-release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # provided by Actions
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }} # only if you're publishing to npm
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npx semantic-release
