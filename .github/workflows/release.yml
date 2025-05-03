@@ -28,7 +28,7 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org/
           always-auth: true
-          auth-token: ${{ secrets.NPM_TOKEN }}
+          token: ${{ secrets.NPM_TOKEN }}
 
       - name: Install dependencies
         run: npm ci
