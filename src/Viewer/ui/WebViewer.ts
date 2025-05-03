@@ -375,6 +375,7 @@ class WebViewer {
     this._annotationService.destroy();
     this._toolbar?.destroy && this._toolbar.destroy();
     this._pageVirtualization.destroy();
+    this._zoomHandler.destroy();
 
     const pagesWrapper = document.querySelector(`#${this._viewerOptions.containerId} .${PDF_VIEWER_CLASSNAMES.A_PAGE_VIEW}`)?.parentElement;
     if (pagesWrapper) pagesWrapper.innerHTML = '';

@@ -58,16 +58,19 @@ export class DownloadManager {
   private async _getOriginalBytes(): Promise<ArrayBuffer> {
     const pdf = this._pdfState.pdfInstance;
 
-    // Try to get in-memory data
     if (pdf?.getData) {
-      const data = await pdf.getData();
+      const data = await pdf.getData(); // Uint8Array
       const buf = data.buffer as ArrayBuffer;
-      return this._cacheSource ? buf : buf.slice(0);
+      // Quick header check
+      if (new TextDecoder().decode(new Uint8Array(buf.slice(0, 5))) === '%PDF-') {
+        return this._cacheSource ? buf : buf.slice(0);
+      }
+      console.warn('pdf.js.getData did not return a full PDF; falling back to fetch.');
     }
 
-    // Fallback to fetch from URL
+    // Fallback to HTTP fetch
     if (!this._sourceUrl) {
-      throw new Error('DownloadManager: sourceUrl required when pdf.js cannot provide bytes.');
+      throw new Error('No valid PDF data and sourceUrl is undefined.');
     }
     const fetched = await fetch(this._sourceUrl).then((r) => r.arrayBuffer());
     return this._cacheSource ? fetched : fetched.slice(0);

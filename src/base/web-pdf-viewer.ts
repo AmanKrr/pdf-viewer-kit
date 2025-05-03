@@ -39,7 +39,7 @@ GlobalWorkerOptions.workerSrc = getPdfWorkerSrc();
  * Class responsible for loading and managing PDF documents within a web viewer.
  * Extends functionalities from `WebViewer` and integrates PDF.js for rendering.
  */
-class WebPdf {
+class PdfKit {
   private static _loadingTasks = new Map<string, any>();
   private static _viewers = new Map<string, WebViewer>();
 
@@ -95,7 +95,7 @@ class WebPdf {
         // disableRange: true,
         // disableStream: true,
       });
-      WebPdf._loadingTasks.set(options.containerId, initiateLoadPdf);
+      PdfKit._loadingTasks.set(options.containerId, initiateLoadPdf);
 
       // Track progress while fetching the PDF (Commented out but can be enabled for debugging)
       /*
@@ -139,7 +139,7 @@ class WebPdf {
       const viewer = new WebViewer(pdf, loadOptions, internalContainers['parent'], container);
       await viewer.ready;
       WebUiUtils.hideLoading(uiLoading, options.containerId);
-      WebPdf._viewers.set(options.containerId, viewer);
+      PdfKit._viewers.set(options.containerId, viewer);
       return viewer;
     } catch (err: any) {
       // swallow the “Worker was destroyed” cancellation:
@@ -163,11 +163,11 @@ class WebPdf {
    *  • clears out any injected DOM
    */
   static unload(containerId: string): void {
-    const task = WebPdf._loadingTasks.get(containerId);
+    const task = PdfKit._loadingTasks.get(containerId);
     if (task) {
       task.destroy();
       task.worker?.terminate();
-      WebPdf._loadingTasks.delete(containerId);
+      PdfKit._loadingTasks.delete(containerId);
     }
 
     const pdfState = PdfState.getInstance(containerId);
@@ -176,9 +176,9 @@ class WebPdf {
     (pdfState.uiLoading?.parentNode as HTMLElement)?.remove();
 
     // 5) destroy the viewer and its children
-    const viewer = WebPdf._viewers.get(containerId);
+    const viewer = PdfKit._viewers.get(containerId);
     viewer?.destroy();
-    WebPdf._viewers.delete(containerId);
+    PdfKit._viewers.delete(containerId);
 
     const root = document.getElementById(containerId);
     if (root) {
@@ -188,10 +188,10 @@ class WebPdf {
 
   static unloadAll(): void {
     // unload every containerId
-    for (const id of WebPdf._loadingTasks.keys()) {
-      WebPdf.unload(id);
+    for (const id of PdfKit._loadingTasks.keys()) {
+      PdfKit.unload(id);
     }
   }
 }
 
-export default WebPdf;
+export default PdfKit;

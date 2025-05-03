@@ -20,6 +20,7 @@ import WebViewer from '../ui/WebViewer';
 import { AnnotationManager } from '../manager/AnnotationManager';
 import { ShapeAnno } from './AnnotationExportService';
 import { toShapeAnnos } from '../../utils/annotation-utils';
+import { PDF_VIEWER_CLASSNAMES } from '../../constants/pdf-viewer-selectors';
 
 /**
  * Service to manage annotations across pages.
@@ -91,6 +92,188 @@ export class AnnotationService {
     if (this._pdfState.isAnnotationEnabled && this._pdfState.isAnnotationConfigurationPropertiesEnabled) {
       manager?._initAnnotationCleanup();
     }
+  }
+
+  /**
+   * Waits until the page container element for the given page number appears in the DOM.
+   *
+   * @param page - 1-based page number whose container to wait for.
+   * @param timeoutMs - Maximum time in milliseconds to wait (default: 5000).
+   * @returns Promise that resolves with the HTMLElement once found.
+   * @throws Error if the element does not appear within the specified timeout.
+   */
+  private _waitForPageContainer(page: number, timeoutMs = 5000): Promise<HTMLElement> {
+    return new Promise((resolve, reject) => {
+      const id = `pageContainer-${page}`;
+      const start = performance.now();
+
+      const check = () => {
+        const elapsed = performance.now() - start;
+        if (elapsed > timeoutMs) {
+          return reject(new Error(`Timed out after ${timeoutMs}ms waiting for pageContainer-${page}`));
+        }
+        const el = document.getElementById(id);
+        if (el) {
+          return resolve(el);
+        }
+        requestAnimationFrame(check);
+      };
+
+      check();
+    });
+  }
+
+  /**
+   * Waits until a text-layer element appears within the given container.
+   *
+   * @param container - The parent HTMLElement under which to look for the text layer.
+   * @param timeoutMs - Maximum time in milliseconds to wait (default: 5000).
+   * @returns Promise that resolves with the text-layer HTMLElement once found.
+   * @throws Error if the text layer does not appear within the specified timeout.
+   */
+  private _waitForTextLayer(container: HTMLElement, timeoutMs = 5000): Promise<HTMLElement> {
+    return new Promise((resolve, reject) => {
+      const start = performance.now();
+      const className = PDF_VIEWER_CLASSNAMES.ATEXT_LAYER;
+
+      const existing = container.querySelector<HTMLElement>(`.${className}`);
+      if (existing) {
+        return resolve(existing);
+      }
+
+      const mo = new MutationObserver(() => {
+        const found = container.querySelector<HTMLElement>(`.${className}`);
+        if (found) {
+          mo.disconnect();
+          resolve(found);
+        } else if (performance.now() - start > timeoutMs) {
+          mo.disconnect();
+          reject(new Error(`Timed out after ${timeoutMs}ms waiting for text layer`));
+        }
+      });
+
+      mo.observe(container, { childList: true, subtree: true });
+    });
+  }
+
+  /**
+   * Waits until an SVG element with the given annotation-id attribute
+   * appears under the specified container.
+   *
+   * @param container - The parent HTMLElement under which to look for the SVG.
+   * @param annotationId - The annotation-id attribute to match.
+   * @param timeoutMs - Maximum time in milliseconds to wait (default: 5000).
+   * @returns Promise that resolves with the SVGGraphicsElement once found.
+   * @throws Error if the SVG element does not appear within the specified timeout.
+   */
+  private _waitForAnnotationEl(container: HTMLElement, annotationId: string, timeoutMs = 5000): Promise<SVGGraphicsElement> {
+    return new Promise((resolve, reject) => {
+      const selector = `svg[annotation-id="${annotationId}"]`;
+      const start = performance.now();
+
+      const poll = () => {
+        const elapsed = performance.now() - start;
+        if (elapsed > timeoutMs) {
+          return reject(new Error(`Timed out after ${timeoutMs}ms waiting for annotation "${annotationId}"`));
+        }
+        const el = container.querySelector<SVGGraphicsElement>(selector);
+        if (el) {
+          return resolve(el);
+        }
+        requestAnimationFrame(poll);
+      };
+
+      poll();
+    });
+  }
+
+  /**
+   * Retrieves all text runs that intersect the bounding box of a rectangle annotation.
+   *
+   * @param annotationId - ID of an existing rectangle annotation.
+   * @returns Promise that resolves to the concatenated text inside the rectangle,
+   *          preserving word order and line breaks.
+   * @throws Error if no rectangle with the given ID exists.
+   */
+  public async getTextInsideRectangle(annotationId: string): Promise<string> {
+    // 1. Find the page containing the rectangle annotation
+    let pageNumber: number | undefined;
+    for (const [page, configs] of this._annotations.entries()) {
+      if (configs.some((c) => c.id === annotationId && c.type === 'rectangle')) {
+        pageNumber = page;
+        break;
+      }
+    }
+    if (pageNumber == null) {
+      throw new Error(`No rectangle annotation found with id "${annotationId}"`);
+    }
+
+    // 2. Navigate to the page and await necessary DOM elements
+    this._goTo(pageNumber);
+    const pageContainer = await this._waitForPageContainer(pageNumber);
+    const textLayerDiv = await this._waitForTextLayer(pageContainer);
+    const svgEl = await this._waitForAnnotationEl(pageContainer, annotationId);
+
+    // 3. Determine bounding box of the rectangle
+    const shapeEl = svgEl.querySelector<SVGGraphicsElement>('rect') || svgEl;
+    const box = shapeEl.getBoundingClientRect();
+
+    // 4. Collect candidate text runs that intersect the box
+    const runs = Array.from(textLayerDiv.querySelectorAll<HTMLElement>('span, div'));
+    const candidateRuns = runs.filter((run) => {
+      const r = run.getBoundingClientRect();
+      return r.right >= box.left && r.left <= box.right && r.bottom >= box.top && r.top <= box.bottom;
+    });
+
+    // 5. Split runs into words and keep those whose rect intersects
+    const wordRects: { text: string; rect: DOMRect }[] = [];
+    for (const run of candidateRuns) {
+      const textNode = run.firstChild;
+      const fullText = run.textContent ?? '';
+      if (!textNode || textNode.nodeType !== Node.TEXT_NODE) continue;
+
+      for (const match of fullText.matchAll(/\S+/g)) {
+        const word = match[0];
+        const start = match.index!;
+        const end = start + word.length;
+
+        const range = document.createRange();
+        range.setStart(textNode, start);
+        range.setEnd(textNode, end);
+
+        for (const r of Array.from(range.getClientRects())) {
+          if (r.right >= box.left && r.left <= box.right && r.bottom >= box.top && r.top <= box.bottom) {
+            wordRects.push({ text: word, rect: r });
+            break;
+          }
+        }
+        range.detach();
+      }
+    }
+
+    // 6. Sort words by vertical then horizontal position
+    wordRects.sort((a, b) => {
+      const vDiff = a.rect.top - b.rect.top;
+      if (Math.abs(vDiff) > a.rect.height / 2) return vDiff;
+      return a.rect.left - b.rect.left;
+    });
+
+    // 7. Concatenate words, inserting spaces and line breaks
+    let result = '';
+    let prevTop: number | null = null;
+    for (const { text, rect } of wordRects) {
+      if (prevTop !== null) {
+        if (Math.abs(rect.top - prevTop) > rect.height / 2) {
+          result += '\n';
+        } else {
+          result += ' ';
+        }
+      }
+      result += text;
+      prevTop = rect.top;
+    }
+
+    return result;
   }
 
   /**

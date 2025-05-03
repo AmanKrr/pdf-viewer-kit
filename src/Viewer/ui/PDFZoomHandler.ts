@@ -16,7 +16,8 @@
 
 import PdfState from './PDFState';
 import PageVirtualization from './PDFPageVirtualization';
-import { PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
+import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
+import { debounce } from 'lodash';
 
 interface ZoomOptions {
   minScale: number;
@@ -35,6 +36,8 @@ export default class ZoomHandler {
   private _pageVirtualization: PageVirtualization;
   private _options: ZoomOptions;
 
+  private _onWindowResize: () => void;
+
   /**
    * @param pdfState           Shared PdfState instance for scale and page info.
    * @param pageVirtualization Manages page measurements and rendering buffers.
@@ -48,28 +51,39 @@ export default class ZoomHandler {
       maxScale: 4.0,
       zoomStep: 0.5,
     };
+
+    this._onWindowResize = debounce(() => {
+      this.fitWidth();
+    }, 40);
+
+    window.addEventListener('resize', this._onWindowResize);
+  }
+
+  private _snapToStep(scale: number): number {
+    const { zoomStep } = this._options;
+    return Math.round(scale / zoomStep) * zoomStep;
   }
 
   /**
    * Increase zoom by one step, up to the maximum scale.
    */
   public async zoomIn(): Promise<void> {
+    if (this._pdfState.scale >= this._options.maxScale) return;
     const currentScale = this._pdfState.scale;
-    if (currentScale < this._options.maxScale) {
-      const newScale = currentScale + this._options.zoomStep;
-      await this.applyZoom(newScale);
-    }
+    const base = this._snapToStep(currentScale);
+    const target = Math.min(base + this._options.zoomStep, this._options.maxScale);
+    await this.applyZoom(target);
   }
 
   /**
    * Decrease zoom by one step, down to the minimum scale.
    */
   public async zoomOut(): Promise<void> {
+    if (this._pdfState.scale <= this._options.minScale) return;
     const currentScale = this._pdfState.scale;
-    if (currentScale > this._options.minScale) {
-      const newScale = currentScale - this._options.zoomStep;
-      await this.applyZoom(newScale);
-    }
+    const base = this._snapToStep(currentScale);
+    const target = Math.max(base - this._options.zoomStep, this._options.minScale);
+    await this.applyZoom(target);
   }
 
   /**
@@ -170,7 +184,7 @@ export default class ZoomHandler {
    */
   public async fitWidth(): Promise<void> {
     const currScale = this._pdfState.scale;
-    const container = document.getElementById(PDF_VIEWER_IDS.MAIN_PAGE_VIEWER_CONTAINER)!;
+    const container = document.querySelector(`.${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`)!;
     const containerWidth = container.getBoundingClientRect().width;
 
     const pageCount = this._pdfState.pdfInstance.numPages;
@@ -191,5 +205,9 @@ export default class ZoomHandler {
    */
   public async fitPage(): Promise<void> {
     await this.applyZoom(1);
+  }
+
+  public destroy(): void {
+    window.removeEventListener('resize', this._onWindowResize);
   }
 }
