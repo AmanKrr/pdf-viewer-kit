@@ -30,6 +30,9 @@ jobs:
           always-auth: true
           token: ${{ secrets.NPM_TOKEN }}
 
+      - name: Verify npm authentication
+        run: npm whoami
+
       - name: Install dependencies
         run: npm ci
 
