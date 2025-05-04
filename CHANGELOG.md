@@ -1,3 +1,10 @@
+## [0.1.2](https://github.com/AmanKrr/pdf-kit/compare/v0.1.1...v0.1.2) (2025-05-04)
+
+
+### Bug Fixes
+
+* NPM Publish bump ([651fa05](https://github.com/AmanKrr/pdf-kit/commit/651fa052806e61c45d697d1013bed0828763754a))
+
 ## [0.1.1](https://github.com/AmanKrr/pdf-kit/compare/v0.1.0...v0.1.1) (2025-05-03)
 
 
