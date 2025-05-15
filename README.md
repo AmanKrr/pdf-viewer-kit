@@ -1,12 +1,12 @@
 # pdf-viewer-kit
 
-PDF-Kit is a versatile, framework-agnostic library designed to render, manipulate, and interact with PDF documents seamlessly. Whether you're building a React, Next.js, Angular, or any other frontend application, PDF-Kit provides you with a well-structured, modular, and feature-rich solution for embedding PDF viewers into your web applications.
+PDF-VIEWER-KIT is a versatile, framework-agnostic library designed to render, manipulate, and interact with PDF documents seamlessly. Whether you're building a React, Next.js, Angular, or any other frontend application, PDF-VIEWER-KIT provides you with a well-structured, modular, and feature-rich solution for embedding PDF viewers into your web applications.
 
-Doc: https://github.com/AmanKrr/pdf-kit/wiki
+Doc: https://github.com/AmanKrr/pdf-viewer-kit/wiki
 
 ### Overview
 
-**pdf-kit** is an open-source, robust PDF viewer and annotation library built on top of **pdf.js**, fully implemented in TypeScript. The primary goal of pdf-kit is to offer high-performance, customizable PDF viewing and annotation capabilities that closely match the experience provided by commercial libraries like PSPDFKit.
+**pdf-viewer-kit** is an open-source, robust PDF viewer and annotation library built on top of **pdf.js**, fully implemented in TypeScript. The primary goal of pdf-viewer-kit is to offer high-performance, customizable PDF viewing and annotation capabilities that closely match the experience provided by commercial libraries like PSPDFKit.
 
 ### Features
 
@@ -33,16 +33,16 @@ Doc: https://github.com/AmanKrr/pdf-kit/wiki
 
 ### Installation
 
-Install pdf-kit via npm:
+Install pdf-viewer-kit via npm:
 
 ```bash
-npm install pdf-kit
+npm install pdf-viewer-kit
 ```
 
 ### Quick Start
 
 ```typescript
-import { PdfKit, RectangleConfig } from 'pdf-kit';
+import { PdfKit, RectangleConfig } from 'pdf-viewer-kit';
 
 PdfKit.load({
   document: 'adient-test.pdf',
@@ -122,7 +122,7 @@ const viewer = await PdfKit.load({
 
 *(Coming Soon)*
 
-An upcoming feature will include detailed benchmarks and performance comparisons between **pdf-kit** and **PSPDFKit** to help developers make informed decisions based on their needs.
+An upcoming feature will include detailed benchmarks and performance comparisons between **pdf-viewer-kit** and **PSPDFKit** to help developers make informed decisions based on their needs.
 
 ### Demonstrations
 
@@ -137,4 +137,4 @@ Contributions are warmly welcomed! Please submit issues, enhancements, or pull r
 
 ### License
 
-pdf-kit is licensed under the MIT License. See the [[LICENSE](https://chatgpt.com/c/LICENSE)](LICENSE) file for details.
+pdf-viewer-kit is licensed under the MIT License. See the [[LICENSE](https://chatgpt.com/c/LICENSE)](LICENSE) file for details.
