@@ -16,116 +16,132 @@
 
 import PageElement from './PDFPageElement';
 import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
-import { PageViewport, PDFPageProxy, TextLayer as pdfjsTextLayer } from 'pdfjs-dist';
+import { PageViewport, PDFPageProxy, TextLayer as PdfJsTextLayerInternal } from 'pdfjs-dist';
+import { debugWarn, reportError } from '../../utils/debug-utils';
 
 /**
- * Manages the creation and rendering of a text layer for a specific page in the PDF viewer.
- * The text layer overlays text content extracted from the PDF, enabling text selection and interactions.
+ * Manages the rendering of the PDF.js text layer and a matching annotation layer.
  */
-class TextLayer extends PageElement {
-  private _pageWrapper!: HTMLElement;
-  private _page!: PDFPageProxy;
-  private _viewport!: PageViewport;
+class TextLayer {
+  private _pageWrapper: HTMLElement | null;
+  private _page: PDFPageProxy | null;
+  private _viewport: PageViewport | null;
+  private _textLayerDiv: HTMLDivElement | null = null;
+  private _annotationHostDiv: HTMLDivElement | null = null;
+  private _pdfJsInternalTextLayerInstance: PdfJsTextLayerInternal | null = null;
+  private _isDestroyed = false;
 
   /**
-   * Constructs a `TextLayer` instance for a given PDF page.
-   *
-   * @param {HTMLElement} pageWrapper - The HTML element wrapping the current PDF page.
-   * @param {HTMLElement} container - The HTML container for the text layer.
-   * @param {PDFPageProxy} page - The PDF.js page proxy object representing the current page.
-   * @param {PageViewport} viewport - The viewport defining the dimensions and scale of the text layer.
+   * @param pageWrapper - Container element for this page's layers.
+   * @param page - PDFPageProxy for accessing text content.
+   * @param viewport - Viewport for coordinate mapping.
    */
   constructor(pageWrapper: HTMLElement, page: PDFPageProxy, viewport: PageViewport) {
-    super();
+    if (!viewport) {
+      reportError('TextLayer init: viewport is null or undefined', { pageNumber: page?.pageNumber });
+    }
     this._pageWrapper = pageWrapper;
     this._page = page;
     this._viewport = viewport;
   }
 
   /**
-   * Creates and renders the text layer for the current PDF page.
+   * Creates and renders the text layer and annotation host layer.
    *
-   * This method:
-   * - Retrieves text content from the PDF page.
-   * - Creates a text layer `<div>` with appropriate styles and dimensions.
-   * - Uses PDF.js's `TextLayer` class to render the extracted text into the layer.
-   * - Assigns a click handler to each text element for future interactions.
-   *
-   * @returns {Promise<HTMLDivElement>} A promise that resolves to the created text layer `<div>`.
+   * @returns A promise resolving to the text-layer and annotation-layer divs.
+   * @throws If called after destruction or if initialization failed.
    */
-  async createTextLayer(): Promise<HTMLDivElement[]> {
-    // Create a text layer div with appropriate class and ID based on viewport dimensions.
-    const textLayerDiv = PageElement.createLayers(PDF_VIEWER_CLASSNAMES.ATEXT_LAYER, PDF_VIEWER_IDS.TEXT_LAYER, this._viewport);
-    this._pageWrapper.appendChild(textLayerDiv);
+  public async createTextLayer(): Promise<[HTMLDivElement, HTMLDivElement]> {
+    if (this._isDestroyed) {
+      debugWarn(`TextLayer-${this._page?.pageNumber}: createTextLayer after destroy`);
+      throw new Error(`TextLayer for page ${this._page?.pageNumber} was destroyed.`);
+    }
+    if (!this._pageWrapper || !this._page || !this._viewport) {
+      reportError('TextLayer.createTextLayer init error', { page: this._page?.pageNumber, viewport: this._viewport });
+      throw new Error('TextLayer not properly initialized or already destroyed.');
+    }
 
-    const annotaionLayerDiv = PageElement.createLayers(PDF_VIEWER_CLASSNAMES.AANNOTATION_DRAWING_LAYER, PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER, this._viewport);
-    this._pageWrapper.appendChild(annotaionLayerDiv);
+    this._textLayerDiv = PageElement.createLayers(PDF_VIEWER_CLASSNAMES.ATEXT_LAYER, PDF_VIEWER_IDS.TEXT_LAYER, this._viewport);
+    this._pageWrapper.appendChild(this._textLayerDiv);
 
-    // Retrieve the text content of the current page.
+    this._annotationHostDiv = PageElement.createLayers(PDF_VIEWER_CLASSNAMES.AANNOTATION_DRAWING_LAYER, PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER, this._viewport);
+    this._pageWrapper.appendChild(this._annotationHostDiv);
+
     const textContent = await this._page.getTextContent();
 
-    /**
-     * Text layer rendering was changed after `pdfjs 4.0.379`.
-     * The old approach using `renderTextLayer` is deprecated.
-     *
-     * Old method:
-     * ```js
-     * pdfjsLib.renderTextLayer({
-     *   textContentSource: textContent,
-     *   container: textLayerDiv,
-     *   viewport: viewport,
-     * });
-     * ```
-     *
-     * New approach (introduced in `pdfjs 4.8.69`):
-     * - Create a new instance of `TextLayer` and call `render()`.
-     */
+    if (this._isDestroyed) {
+      debugWarn(`TextLayer-${this._page?.pageNumber}: destroyed during getTextContent`);
+      this._textLayerDiv?.remove();
+      this._annotationHostDiv?.remove();
+      throw new Error(`TextLayer for page ${this._page?.pageNumber} was destroyed.`);
+    }
+    if (!this._viewport) {
+      reportError('TextLayer render: viewport unexpectedly null', { page: this._page?.pageNumber });
+      throw new Error('TextLayer critical error: Viewport became null unexpectedly.');
+    }
 
-    // Create an instance of PDF.js's internal TextLayer for rendering text content.
-    const pdfJsInternalTextLayer = new pdfjsTextLayer({
+    this._pdfJsInternalTextLayerInstance = new PdfJsTextLayerInternal({
       textContentSource: textContent,
-      container: textLayerDiv,
+      container: this._textLayerDiv,
       viewport: this._viewport,
     });
-
-    // Render the text layer into the container.
-    await pdfJsInternalTextLayer.render();
+    await this._pdfJsInternalTextLayerInstance.render();
     this._wrapTextLayerIntoPTag();
 
-    // Attach a click event handler to each text div for future interactivity.
-    pdfJsInternalTextLayer.textDivs.forEach((ele) => {
-      ele.onclick = (e) => console.log('Coming soon'); // Placeholder for future interaction
-    });
+    if (this._isDestroyed) {
+      debugWarn(`TextLayer-${this._page?.pageNumber}: destroyed during render`);
+      throw new Error(`TextLayer for page ${this._page?.pageNumber} was destroyed.`);
+    }
 
-    return [textLayerDiv, annotaionLayerDiv];
+    return [this._textLayerDiv, this._annotationHostDiv];
   }
 
-  private _wrapTextLayerIntoPTag() {
-    const textLayer = this._pageWrapper.querySelector(`.${PDF_VIEWER_CLASSNAMES.ATEXT_LAYER}`);
+  /**
+   * Wraps the rendered text spans into a single <p> for better formatting.
+   */
+  private _wrapTextLayerIntoPTag(): void {
+    const textLayer = this._pageWrapper?.querySelector<HTMLElement>(`.${PDF_VIEWER_CLASSNAMES.ATEXT_LAYER}`);
     if (!textLayer) return;
 
-    // Grab all child nodes (spans and <br>s)
     const nodes = Array.from(textLayer.childNodes);
-    // Build a single <p> to host them
     const p = document.createElement('p');
-    // let the browser preserve spaces & wrap lines at <br>
     p.style.whiteSpace = 'pre-wrap';
-    p.style.margin = '0'; // avoid extra paragraph spacing
+    p.style.margin = '0';
 
     nodes.forEach((node) => {
-      if ((node as HTMLElement).nodeName !== 'BR') {
-        // move your span (or text node) into the <p>
+      if (node.nodeName !== 'BR') {
         p.appendChild(node);
       }
     });
 
-    // clear out the layer and insert your <p>
     textLayer.innerHTML = '';
     textLayer.appendChild(p);
   }
 
-  private keyDown(event: KeyboardEvent) {
+  /**
+   * Example keydown handler; replace or remove as needed.
+   */
+  private keyDown(event: KeyboardEvent): void {
     console.log(event);
+  }
+
+  /**
+   * Destroys the text layer, annotation layer, and internal references.
+   */
+  public destroy(): void {
+    if (this._isDestroyed) return;
+    this._isDestroyed = true;
+
+    this._textLayerDiv?.remove();
+    this._textLayerDiv = null;
+
+    this._annotationHostDiv?.remove();
+    this._annotationHostDiv = null;
+
+    this._pageWrapper = null;
+    this._page = null;
+    this._viewport = null;
+    this._pdfJsInternalTextLayerInstance = null;
   }
 }
 

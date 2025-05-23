@@ -20,42 +20,44 @@ import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewe
 import { debounce } from 'lodash';
 
 interface ZoomOptions {
+  /** Minimum permitted scale. */
   minScale: number;
+  /** Maximum permitted scale. */
   maxScale: number;
+  /** Increment for each zoom step. */
   zoomStep: number;
-  // Optionally add debounce durations, etc.
 }
 
 /**
- * Handles zooming operations (in, out, fit width, fit page) for the PDF viewer.
- * Updates PdfState, applies CSS transforms, preserves scroll position,
- * and coordinates with PageVirtualization for rendering.
+ * Handles zooming and panning operations for the PDF viewer.
+ * Debounces window resize to auto–fit width.
  */
 export default class ZoomHandler {
   private _pdfState: PdfState;
   private _pageVirtualization: PageVirtualization;
   private _options: ZoomOptions;
-
-  private _onWindowResize: () => void;
+  private _scrollableContainerElement: HTMLElement | null;
+  private _onWindowResize;
 
   /**
-   * @param pdfState           Shared PdfState instance for scale and page info.
-   * @param pageVirtualization Manages page measurements and rendering buffers.
+   * @param pdfState           Shared PDF state (scale, currentPage, etc.).
+   * @param pageVirtualization Manages page measurements and rendering.
    * @param options            Optional zoom limits and step size.
    */
   constructor(pdfState: PdfState, pageVirtualization: PageVirtualization, options?: ZoomOptions) {
     this._pdfState = pdfState;
     this._pageVirtualization = pageVirtualization;
-    this._options = options || {
-      minScale: 0.5,
-      maxScale: 4.0,
-      zoomStep: 0.5,
+    this._options = options ?? {
+      minScale: 0.25,
+      maxScale: 5.0,
+      zoomStep: 0.25,
     };
 
-    this._onWindowResize = debounce(() => {
-      this.fitWidth();
-    }, 40);
+    // Cache the main scrollable container for performance
+    this._scrollableContainerElement = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} #${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}`);
 
+    // On window resize, refit width (debounced)
+    this._onWindowResize = debounce(() => this.fitWidth(), 100);
     window.addEventListener('resize', this._onWindowResize);
   }
 
@@ -88,126 +90,126 @@ export default class ZoomHandler {
 
   /**
    * Apply a specific zoom level:
-   * 1. Calculate scroll offset relative to current page
-   * 2. Update PdfState.scale and CSS variables
-   * 3. Recompute page layout and buffers
-   * 4. Restore scroll to keep the same point in view
-   * 5. Emit scaleChange and redraw visible pages
+   * - Clamp to [minScale, maxScale]
+   * - Preserve scroll position relative to current page
+   * - Recalculate page positions
+   * - Emit scaleChange
    *
-   * @param newScale Desired scale factor
+   * @param newScaleInput Desired scale value
    */
-  public async applyZoom(newScale: number): Promise<void> {
-    const currentScale = this._pdfState.scale;
-    const currentPage = this._pdfState.currentPage;
+  public async applyZoom(newScaleInput: number): Promise<void> {
+    const oldScale = this._pdfState.scale;
 
-    // Preserve scroll position relative to the top of the current page
-    const relativeScrollOffset = this._getScrollOffsetRelativeToPage(currentPage);
+    const page = this._pdfState.currentPage;
+    const offset = this._getScrollOffsetRelativeToPage(page);
 
-    // Update scale state and CSS
-    this._pdfState.scale = newScale;
-    this._applyCssScale(newScale);
+    this._pdfState.scale = newScaleInput;
+    this._applyCssScale(newScaleInput);
 
-    // Recalculate page layout
-    await this._pageVirtualization.calculatePagePositioning();
+    await this._pageVirtualization.calculatePagePositions();
+    this._adjustScrollPosition(page, offset, oldScale, newScaleInput);
 
-    // Adjust scroll on next frame for smooth update
-    requestAnimationFrame(() => {
-      this._adjustScrollPosition(currentPage, relativeScrollOffset, currentScale, newScale);
-    });
-
-    // Update buffers and emit events
-    await this._pageVirtualization.updatePageBuffers();
     this._pdfState.emit('scaleChange');
-    await this._pageVirtualization.redrawVisiblePages(currentPage);
   }
 
   /**
-   * Compute scrollTop minus the top coordinate of the target page,
-   * giving the offset within that page.
+   * Pan the viewer by the given pixel offsets.
    *
-   * @param targetPage Page index to calculate relative scroll for
-   */
-  private _getScrollOffsetRelativeToPage(targetPage: number): number {
-    const pageTop = this._pageVirtualization.cachedPagePosition.get(targetPage) || 0;
-    const scrollElement = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} #${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}`);
-    return scrollElement ? scrollElement.scrollTop - pageTop : 0;
-  }
-
-  /**
-   * After zoom, reposition scrollTop so that the same logical point
-   * on the page remains visible.
-   *
-   * @param targetPage            Page index being held constant
-   * @param relativeScrollOffset  Offset within page before zoom
-   * @param previousScale         Scale before zoom
-   * @param newScale              Scale after zoom
-   */
-  private _adjustScrollPosition(targetPage: number, relativeScrollOffset: number, previousScale: number, newScale: number): void {
-    const pageTop = this._pageVirtualization.cachedPagePosition.get(targetPage) || 0;
-    const scaledOffset = relativeScrollOffset * (newScale / previousScale);
-    const newScrollTop = pageTop + scaledOffset;
-    const scrollElement = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} #${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}`);
-    if (scrollElement) {
-      scrollElement.scrollTop = newScrollTop;
-    }
-  }
-
-  /**
-   * Apply CSS scaling by setting a custom property on the main page container.
-   *
-   * @param scaleFactor The new zoom factor
-   */
-  private _applyCssScale(scaleFactor: number): void {
-    const container = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} #${PDF_VIEWER_IDS.MAIN_PAGE_VIEWER_CONTAINER}`);
-    if (container) {
-      container.style.setProperty('--scale-factor', String(scaleFactor));
-    }
-  }
-
-  /**
-   * Pan the view by adjusting scrollLeft/scrollTop.
-   *
-   * @param deltaX Horizontal pan in pixels
-   * @param deltaY Vertical pan in pixels
+   * @param deltaX Horizontal pan in pixels.
+   * @param deltaY Vertical pan in pixels.
    */
   public pan(deltaX: number, deltaY: number): void {
-    const container = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} .main-viewer-container`);
-    if (container) {
-      container.scrollLeft += deltaX;
-      container.scrollTop += deltaY;
+    if (this._scrollableContainerElement) {
+      this._scrollableContainerElement.scrollLeft += deltaX;
+      this._scrollableContainerElement.scrollTop += deltaY;
     }
   }
 
   /**
-   * Zoom to fit the width of the widest page into the container.
-   * Calculates original page widths and sets scale accordingly.
+   * Zoom so that the widest page fits the container width.
    */
   public async fitWidth(): Promise<void> {
+    const { minScale, maxScale, zoomStep } = this._options;
     const currScale = this._pdfState.scale;
-    const container = document.querySelector(`.${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`)!;
+
+    const container = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`)!;
     const containerWidth = container.getBoundingClientRect().width;
 
     const pageCount = this._pdfState.pdfInstance.numPages;
     let maxOrigWidth = 0;
     for (let i = 1; i <= pageCount; i++) {
       const page = await this._pdfState.pdfInstance.getPage(i);
-      const wAtCurrScale = page.getViewport({ scale: currScale }).width;
-      const origWidth = wAtCurrScale / currScale;
+      const vpAtCurr = page.getViewport({ scale: currScale });
+      const origWidth = vpAtCurr.width / currScale;
       maxOrigWidth = Math.max(maxOrigWidth, origWidth);
     }
 
-    const newScale = containerWidth / maxOrigWidth;
-    await this.applyZoom(newScale);
+    const rawScale = containerWidth / maxOrigWidth;
+    let snapped = Math.round(rawScale / zoomStep) * zoomStep;
+
+    snapped = Math.max(minScale, Math.min(maxScale, snapped));
+
+    if (Math.abs(snapped - currScale) < 1e-6) {
+      return;
+    }
+    await this.applyZoom(snapped);
   }
 
   /**
-   * Reset zoom to 1:1 (original size).
+   * Reset zoom to 100% (scale = 1.0).
    */
   public async fitPage(): Promise<void> {
-    await this.applyZoom(1);
+    await this.applyZoom(1.0);
   }
 
+  /**
+   * Clean up resources and event listeners.
+   */
   public destroy(): void {
+    this._onWindowResize.cancel();
     window.removeEventListener('resize', this._onWindowResize);
+    this._scrollableContainerElement = null;
+  }
+
+  /**
+   * Compute scrollTop minus the top position of the target page.
+   *
+   * @param targetPage 1-based page number.
+   * @returns Vertical offset in pixels within the page.
+   */
+  private _getScrollOffsetRelativeToPage(targetPage: number): number {
+    const pageTop = this._pageVirtualization.pagePositionsMap.get(targetPage) ?? 0;
+    return this._scrollableContainerElement ? this._scrollableContainerElement.scrollTop - pageTop : 0;
+  }
+
+  /**
+   * After zoom change, adjust scrollTop so that the same point remains in view.
+   *
+   * @param targetPage             Page number to keep in view.
+   * @param previousOffset         Offset before zoom.
+   * @param previousScale          Scale before zoom.
+   * @param newScale               Scale after zoom.
+   */
+  private _adjustScrollPosition(targetPage: number, previousOffset: number, previousScale: number, newScale: number): void {
+    const pageTop = this._pageVirtualization.pagePositionsMap.get(targetPage) ?? 0;
+    const scaledOffset = previousOffset * (newScale / previousScale);
+    const newScrollTop = pageTop + scaledOffset;
+
+    if (this._scrollableContainerElement) {
+      this._scrollableContainerElement.scrollTop = newScrollTop;
+    }
+  }
+
+  /**
+   * Apply CSS scaling via a --scale-factor CSS variable
+   * on the main page viewer container.
+   *
+   * @param scaleFactor New scale value.
+   */
+  private _applyCssScale(scaleFactor: number): void {
+    const container = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} #${PDF_VIEWER_IDS.MAIN_PAGE_VIEWER_CONTAINER}`);
+    if (container) {
+      container.style.setProperty('--scale-factor', String(scaleFactor));
+    }
   }
 }

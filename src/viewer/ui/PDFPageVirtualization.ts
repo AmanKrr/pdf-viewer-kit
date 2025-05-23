@@ -14,7 +14,7 @@
   limitations under the License.
 */
 
-import { PageViewport, PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
+import { PageViewport, PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist';
 import TextLayer from './PDFTextLayer';
 import PdfState from './PDFState';
 import { RenderParameters } from 'pdfjs-dist/types/src/display/api';
@@ -22,629 +22,1235 @@ import PageElement from './PDFPageElement';
 import { debounce, throttle } from 'lodash';
 import ThumbnailViewer from './PDFThumbnailViewer';
 import WebViewer from './WebViewer';
-import { PDFLinkService } from '../services/LinkService';
 import { ViewerLoadOptions } from '../../types/webpdf.types';
 import AnnotationLayer from './PDFAnnotationLayer';
-import { PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
+import { PDF_VIEWER_IDS, PDF_VIEWER_CLASSNAMES } from '../../constants/pdf-viewer-selectors';
 import { AnnotationManager } from '../manager/AnnotationManager';
 import { SelectionManager } from '../manager/SelectionManager';
 import SearchHighlighter from '../manager/SearchHighlighter';
+import CanvasPool from './CanvasPool';
+import { debugWarn, reportError } from '../../utils/debug-utils';
+import Logger from '../../utils/logger-utils';
+import { PDFLinkService } from '../services/LS';
+
+interface CachedPageInfo {
+  pageNumber: number;
+  pdfPageProxy: PDFPageProxy | null;
+  pageWrapperDiv: HTMLDivElement;
+  canvasElement?: HTMLCanvasElement;
+  renderTask?: RenderTask;
+  highResImageBitmap?: ImageBitmap;
+  highResRenderTask?: RenderTask;
+  textLayer?: TextLayer;
+  annotationLayer?: AnnotationLayer;
+  isVisible: boolean;
+  isFullyRendered: boolean;
+  renderFailed: boolean;
+  isTransitioningToFullRender: boolean;
+}
 
 /**
- * Handles virtualization of PDF pages, rendering only those visible within the viewport.
+ * Handles virtualized rendering of PDF pages:
+ * - placeholders for offscreen pages
+ * - low-res “blurry” base renders
+ * - high-res final renders
+ * - text layer & annotation layers
  */
 class PageVirtualization {
-  private _options: ViewerLoadOptions | null = null;
-  private _parentContainer: HTMLElement | null = null;
-  private _container: HTMLElement | null = null;
-  private _pageBuffer: number = 3; // Number of pages to keep in the buffer around the viewport.
+  private _options: ViewerLoadOptions;
+  private _scrollableContainer: HTMLElement;
+  private _pagesParentDiv: HTMLElement;
+
+  private _pageBuffer: number;
   private _totalPages: number;
-  private _pdf!: PDFDocumentProxy;
-  private _renderedPages: Set<number> = new Set();
+  private _pdfDocument: PDFDocumentProxy;
+
+  private _pageWrapperPool: HTMLDivElement[] = [];
+  private _maxPooledWrappers!: number;
+  private _cachedPages: Map<number, CachedPageInfo> = new Map();
+
   private _lastScrollTop: number = 0;
-  private _pagePosition: Map<number, number> = new Map();
-  private _pdfState!: PdfState;
-  private _pdfViewer!: WebViewer;
+  private _thumbnailViewer: ThumbnailViewer | null = null;
+  private _pagePositions: Map<number, number> = new Map();
+  private _pdfState: PdfState;
+  private _pdfViewer: WebViewer;
   private _selectionManager: SelectionManager;
   private _searchHighlighter: SearchHighlighter;
-  private _bindOnScaleChange = this._onScaleChange.bind(this);
-  private _isScaleChangeActive = false;
+  private _canvasPool!: CanvasPool;
 
-  private _resolveReady!: () => void;
-  private _observer: IntersectionObserver | null = null;
+  private _boundOnScaleChange = this._onScaleChange.bind(this);
+  private _isScaleChangeInProgress = false;
+
+  private _resolveReadyPromise!: () => void;
+  private _pageIntersectionObserver: IntersectionObserver | null = null;
+  private _intersectionObserver: IntersectionObserver | null = null;
 
   /**
-   * Constructor initializes the PageVirtualization with required parameters.
-   *
-   * @param {LoadOptions} options - Configuration options for the PDF viewer.
-   * @param {HTMLElement} parentContainer - The parent container element for the viewer.
-   * @param {HTMLElement} container - The container element for the pages.
-   * @param {number} totalPages - Total number of pages in the PDF.
-   * @param {WebViewer} pdfViewer - Instance of the WebViewer.
-   * @param {number} [pageBuffer=3] - Number of extra pages to render around the viewport.
+   * @param options            Viewer configuration & container IDs.
+   * @param scrollableContainer The scrollable wrapper element.
+   * @param pagesParentDiv      The element into which page wrappers are inserted.
+   * @param totalPages          Total number of PDF pages.
+   * @param pdfViewer           Host WebViewer instance.
+   * @param selectionManager    Manages text/annotation selection.
+   * @param searchHighlighter   Highlights search matches.
+   * @param pageBuffer          Number of pages to render around the viewport.
    */
   constructor(
     options: ViewerLoadOptions,
-    parentContainer: HTMLElement,
-    container: HTMLElement,
+    scrollableContainer: HTMLElement,
+    pagesParentDiv: HTMLElement,
     totalPages: number,
     pdfViewer: WebViewer,
     selectionManager: SelectionManager,
     searchHighlighter: SearchHighlighter,
     pageBuffer = 3,
   ) {
-    pdfViewer.ready = new Promise((res) => (this._resolveReady = res));
+    Logger.info('PageVirtualization ctor', { containerId: options.containerId, totalPages });
     this._options = options;
     this._totalPages = totalPages;
-    this._parentContainer = parentContainer;
-    this._container = container.parentElement;
+    this._scrollableContainer = scrollableContainer;
+    this._pagesParentDiv = pagesParentDiv;
     this._pageBuffer = pageBuffer;
+
     this._pdfState = PdfState.getInstance(options.containerId);
-    this._pdf = this._pdfState.pdfInstance;
+    this._pdfDocument = this._pdfState.pdfInstance;
     this._pdfViewer = pdfViewer;
     this._selectionManager = selectionManager;
     this._searchHighlighter = searchHighlighter;
 
-    this.calculatePagePositioning().then(async () => {
-      if (this.isThereSpecificPageToRender == null || this.isThereSpecificPageToRender == undefined) {
-        await this._renderInitialPages();
-        this._attachScrollListener();
-      } else {
-        await this._renderInitialPages();
-      }
+    // Signal readiness after initialization completes
+    this._pdfViewer.ready = new Promise<void>((res) => (this._resolveReadyPromise = res));
+    this._initAsync();
+  }
 
-      this._resolveReady();
-      if ((this._options?.toolbarOptions ?? {})?.showThumbnail) {
-        await this.generateThumbnail();
+  /**
+   * Initializes page wrapper pool, computes positions, and sets up scroll/observer.
+   */
+  private async _initAsync(): Promise<void> {
+    Logger.info('_initAsync start');
+    const initialPagesToFillViewport = await this._calculateInitialPagesToRender();
+    Logger.info('_calculateInitialPagesToRender →', initialPagesToFillViewport);
+    const calculatedWrappers = initialPagesToFillViewport * 2 + 5;
+    this._maxPooledWrappers = Math.min(this._totalPages > 0 ? this._totalPages : calculatedWrappers, calculatedWrappers);
+    if (this._totalPages === 0) this._maxPooledWrappers = 5; // Fallback for empty PDF
+
+    this._canvasPool = new CanvasPool(this._maxPooledWrappers > 0 ? this._maxPooledWrappers + 2 : 5);
+    PageElement.init(this._canvasPool);
+    if (this._maxPooledWrappers > 0) {
+      this._initializePageWrapperPool();
+    }
+
+    await this.calculatePagePositions();
+
+    if (this.isRenderingSpecificPageOnly == null) {
+      await this._updateRenderedPagesOnScroll(this._scrollableContainer.scrollTop, true);
+      this._debouncedEnsureVisiblePagesRendered();
+      if (!this._intersectionObserver) {
+        this._intersectionObserver = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              const ratio = entry.intersectionRatio;
+              if (ratio < 0.5) continue;
+
+              const wrapper = entry.target as HTMLDivElement;
+              const pageNum = Number(wrapper.dataset.pageNumber);
+
+              // **only** fully render the page the app thinks is "current"
+              if (pageNum !== this._pdfState.currentPage) {
+                // optionally unobserve so we don't even get called again for this page
+                this._intersectionObserver?.unobserve(wrapper);
+                continue;
+              }
+
+              const pageInfo = this._cachedPages.get(pageNum)!;
+              if (!pageInfo.isFullyRendered) {
+                this._intersectionObserver?.unobserve(wrapper);
+                this._transitionToFullRender(pageInfo);
+              }
+            }
+          },
+          {
+            root: this._scrollableContainer,
+            threshold: [0.5],
+          },
+        );
+      }
+      this._attachScrollListener();
+    } else {
+      await this._renderSpecificPageOnly(this.isRenderingSpecificPageOnly);
+    }
+
+    this._resolveReadyPromise();
+    if ((this._options?.toolbarOptions ?? {})?.showThumbnail && this._totalPages > 0) {
+      await this.generateThumbnails();
+    }
+  }
+
+  public _forceObservePage() {
+    this._cachedPages.forEach((pageInfo) => {
+      if (pageInfo.pageWrapperDiv) {
+        this._pageIntersectionObserver?.observe(pageInfo.pageWrapperDiv);
       }
     });
   }
 
+  /**
+   * Creates a pool of recycled page wrapper DIVs.
+   */
+  private _initializePageWrapperPool(): void {
+    if (this._maxPooledWrappers === undefined || this._maxPooledWrappers <= 0) {
+      console.warn('PageVirtualization: _maxPooledWrappers is not set or invalid, skipping pool initialization.');
+      return;
+    }
+    for (let i = 0; i < this._maxPooledWrappers; i++) {
+      const div = document.createElement('div');
+      div.style.position = 'absolute';
+      div.style.display = 'none';
+      div.classList.add('recycled-page-wrapper');
+      this._pagesParentDiv.appendChild(div);
+      this._pageWrapperPool.push(div);
+    }
+  }
+
+  /** Read-only map of cached page info. */
+  get cachedPages(): ReadonlyMap<number, CachedPageInfo> {
+    return this._cachedPages;
+  }
+
+  /** Read-only map of page top-offsets. */
+  get pagePositions(): ReadonlyMap<number, number> {
+    return this._pagePositions;
+  }
+
+  /**
+   * Registers scroll and scale listeners.
+   */
+  private _attachScrollListener(): void {
+    this._pdfState.on('scaleChange', this._boundOnScaleChange);
+    this._scrollableContainer.addEventListener('scroll', this._scrollHandler);
+  }
+
+  /**
+   * Retrieves an available page wrapper from the pool or creates a new one.
+   * @returns {HTMLDivElement | null} The available page wrapper or null if not found.
+   */
+  private _getAvailablePageWrapper(): HTMLDivElement | null {
+    if (this._pageWrapperPool.length === 0 && this._maxPooledWrappers > 0) {
+      console.warn('PageVirtualization: Attempting to get wrapper from empty pool. Re-check initialization.');
+    }
+    const wrapper = this._pageWrapperPool.find((div) => div.style.display === 'none');
+    if (wrapper) {
+      wrapper.style.display = '';
+      wrapper.classList.remove('recycled-page-wrapper');
+      wrapper.classList.add('pooled-page-wrapper');
+      return wrapper;
+    }
+
+    const tempWrapper = document.createElement('div');
+    tempWrapper.style.position = 'absolute';
+    tempWrapper.classList.add('transient-page-wrapper');
+
+    if (this._pagesParentDiv) {
+      this._pagesParentDiv.appendChild(tempWrapper);
+      return tempWrapper;
+    } else {
+      return null;
+    }
+  }
+
+  /**
+   * Releases a page wrapper back to the pool or removes it if transient.
+   * @param wrapperDiv The wrapper DIV to release.
+   */
+  private _releasePageWrapper(wrapperDiv: HTMLDivElement): void {
+    while (wrapperDiv.firstChild) {
+      wrapperDiv.removeChild(wrapperDiv.firstChild);
+    }
+    wrapperDiv.removeAttribute('id');
+    wrapperDiv.removeAttribute('data-page-number');
+    wrapperDiv.className = '';
+
+    if (this._pageWrapperPool.includes(wrapperDiv)) {
+      wrapperDiv.style.display = 'none';
+      wrapperDiv.classList.add('recycled-page-wrapper');
+    } else {
+      wrapperDiv.remove();
+    }
+  }
+
+  /**
+   * Sets the page intersection observer.
+   * @param observer The IntersectionObserver instance.
+   */
   set pageObserver(observer: IntersectionObserver) {
-    this._observer = observer;
+    this._pageIntersectionObserver = observer;
   }
 
   /**
-   * Getter for the visible pages in the viewport.
-   * This returns a read-only set of page numbers that are currently rendered.
+   * Returns a read-only set of currently visible pages.
+   * @returns {ReadonlySet<number>} Set of currently visible page numbers.
    */
-  get visiblePages(): ReadonlySet<number> {
-    return new Set(this._renderedPages);
+  get currentlyVisiblePages(): ReadonlySet<number> {
+    const visible = new Set<number>();
+    this._cachedPages.forEach((info) => {
+      if (info.isVisible) {
+        visible.add(info.pageNumber);
+      }
+    });
+    return visible;
   }
 
   /**
-   * Checks if a specific page has been designated for rendering.
-   *
-   * @returns {number | undefined} The page number to be rendered if specified, otherwise `undefined` or `null`.
+   * Returns the page number being rendered if specific page rendering is enabled.
+   * @returns {number | undefined | null} The page number or undefined if not set.
    */
-  get isThereSpecificPageToRender(): number | undefined | null {
+  get isRenderingSpecificPageOnly(): number | undefined | null {
     return this._options?.renderSpecificPageOnly;
   }
 
   /**
-   * Getter for cached page positions.
-   *
-   * @returns {Map<number, number>} A map storing page positions.
+   * Returns the page positions map.
+   * @returns {ReadonlyMap<number, number>} The page positions map.
    */
-  get cachedPagePosition(): Map<number, number> {
-    return this._pagePosition;
+  get pagePositionsMap(): ReadonlyMap<number, number> {
+    return this._pagePositions;
   }
 
   /**
-   * Attach a scroll listener to dynamically load/unload pages based on the viewport.
+   * Handles PDF scaleChange events.
    */
-  private _attachScrollListener(): void {
-    if (!this._container) return;
-
-    this._pdfState.on('scaleChange', this._bindOnScaleChange);
-
-    this._container.addEventListener('scroll', this._scrollHandler);
+  private async _onScaleChange(): Promise<void> {
+    Logger.info('scale change start', { newScale: this._pdfState.scale });
+    this._isScaleChangeInProgress = true;
+    await this.updateVisiblePageBuffers();
+    await this.refreshHighResForVisiblePages();
+    await this._updateRenderedPagesOnScroll(this._scrollableContainer.scrollTop, false);
+    this._debouncedEnsureVisiblePagesRendered();
+    this._isScaleChangeInProgress = false;
+    Logger.info('scale change end');
   }
 
-  private _onScaleChange() {
-    this._isScaleChangeActive = true;
-    setTimeout(() => (this._isScaleChangeActive = false), 300);
+  /**
+   * Immediately updates the dimensions (CSS scaling) of currently visible and
+   * fully rendered pages to reflect the new scale. This provides a quick,
+   * blurry update during zoom. It also clears the high-resolution image container.
+   */
+  public async updateVisiblePageBuffers(): Promise<void> {
+    if (!this._pagesParentDiv) return;
+
+    for (const pageInfo of this._cachedPages.values()) {
+      // console.log('pageInfo', pageInfo);
+      if (pageInfo.isVisible && pageInfo.isFullyRendered && pageInfo.pdfPageProxy && pageInfo.canvasElement) {
+        const newViewport = pageInfo.pdfPageProxy.getViewport({ scale: this._pdfState.scale });
+        const pageNum = pageInfo.pageNumber;
+
+        pageInfo.pageWrapperDiv.style.width = `${newViewport.width}px`;
+        pageInfo.pageWrapperDiv.style.height = `${newViewport.height}px`;
+        pageInfo.pageWrapperDiv.style.top = `${this._pagePositions.get(pageNum) || 0}px`;
+
+        pageInfo.canvasElement.style.width = `${newViewport.width}px`;
+        pageInfo.canvasElement.style.height = `${newViewport.height}px`;
+
+        this._resizeExistingLayerDivs(pageInfo, newViewport);
+
+        const imageContainer = pageInfo.pageWrapperDiv.querySelector<HTMLElement>(`#zoomedImageContainer-${pageNum}`);
+        if (imageContainer) {
+          imageContainer.innerHTML = '';
+          imageContainer.style.width = `${newViewport.width}px`;
+          imageContainer.style.height = `${newViewport.height}px`;
+        }
+      }
+    }
   }
 
+  /**
+   * Resizes existing layer divs to match the new viewport dimensions.
+   * @param pageInfo The page information object.
+   * @param newViewport The new viewport dimensions.
+   */
+  private _resizeExistingLayerDivs(pageInfo: CachedPageInfo, newViewport: PageViewport): void {
+    const resize = (selector: string) => {
+      const div = pageInfo.pageWrapperDiv.querySelector<HTMLElement>(selector);
+      if (div) {
+        div.style.width = `${newViewport.width}px`;
+        div.style.height = `${newViewport.height}px`;
+      }
+    };
+    resize(`#${PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER}`);
+  }
+
+  /**
+   * Refreshes high-resolution images for currently visible pages.
+   * @returns {Promise<void>}
+   */
+  public async refreshHighResForVisiblePages(): Promise<void> {
+    const pagesToRefresh = Array.from(this._cachedPages.values()).filter((pInfo) => pInfo.isVisible && pInfo.isFullyRendered && pInfo.pdfPageProxy);
+
+    for (const pageInfo of pagesToRefresh) {
+      if (pageInfo.isVisible && pageInfo.isFullyRendered && pageInfo.pdfPageProxy) {
+        const newViewport = pageInfo.pdfPageProxy.getViewport({ scale: this._pdfState.scale });
+        await this.appendHighResImage(pageInfo, newViewport);
+      }
+    }
+  }
+
+  /**
+   * Updates the page for a new scale, including rendering and resizing.
+   * @param pageInfo The page information object.
+   */
+  private async _updatePageForNewScale(pageInfo: CachedPageInfo): Promise<void> {
+    if (!pageInfo.pdfPageProxy && !pageInfo.isFullyRendered) {
+      // If it was a placeholder, it needs its proxy
+      try {
+        pageInfo.pdfPageProxy = await this._pdfDocument.getPage(pageInfo.pageNumber);
+      } catch (error) {
+        // reportError(`getting page ${pageInfo.pageNumber} for scale update`, error);
+        Logger.error(`_updatePageForNewScale: failed to fetch page ${pageInfo.pageNumber}`, error);
+        return;
+      }
+    }
+
+    // If still no proxy (e.g. error above, or it's a fundamental issue), we can't get a viewport.
+    if (!pageInfo.pdfPageProxy) {
+      // debugWarn(`no PDFPageProxy for page ${pageInfo.pageNumber} during scale update, using placeholder`);
+      Logger.warn(`no proxy for page ${pageInfo.pageNumber} on scale update`);
+      // We can still try to resize the placeholder div if pagePositions are available
+      const placeholderViewportAttempt = PageElement.createLayers('', '', { width: 100, height: 100, scale: 1, rotation: 0 } as any).getBoundingClientRect();
+      const tempViewport = {
+        width: this._pagePositions.has(pageInfo.pageNumber + 1) ? this._pagesParentDiv.clientWidth - PageElement.gap * 2 : placeholderViewportAttempt.width,
+        height: this._pagePositions.has(pageInfo.pageNumber + 1)
+          ? this._pagePositions.get(pageInfo.pageNumber + 1)! - this._pagePositions.get(pageInfo.pageNumber)! - PageElement.gap
+          : placeholderViewportAttempt.height,
+        scale: this._pdfState.scale,
+        rotation: 0,
+      } as PageViewport; // This is a rough estimate if proxy fails
+
+      PageElement.createOrUpdatePageContainerDiv(pageInfo.pageNumber, tempViewport, this._pagePositions, pageInfo.pageWrapperDiv);
+      pageInfo.isFullyRendered = false;
+      return;
+    }
+
+    const newViewport = pageInfo.pdfPageProxy.getViewport({ scale: this._pdfState.scale });
+
+    PageElement.createOrUpdatePageContainerDiv(pageInfo.pageNumber, newViewport, this._pagePositions, pageInfo.pageWrapperDiv);
+
+    this._clearPageRenderArtifacts(pageInfo, true);
+    pageInfo.isFullyRendered = false;
+
+    await this._transitionToFullRender(pageInfo);
+  }
+
+  /**
+   * Handles scroll events to update rendered pages.
+   * @param event The scroll event.
+   */
   private _scrollHandler = (event: Event) => {
-    this._debouncedScrollHandler(this._isScaleChangeActive);
+    if (this.isRenderingSpecificPageOnly != null) return;
+    Logger.info('scroll event', { scrollTop: this._scrollableContainer.scrollTop });
+    this._throttledScrollHandler(this._isScaleChangeInProgress);
   };
 
-  private _debouncedScrollHandler = throttle(async (isScaleChangeActive: boolean) => {
-    if (!isScaleChangeActive) {
-      const scrollTop = this._container!.scrollTop;
-      const isScrollingDown = scrollTop > this._lastScrollTop;
-      this._lastScrollTop = scrollTop;
+  /**
+   * Throttled scroll handler to update rendered pages.
+   * @param isScaling Indicates if a scale change is in progress.
+   */
+  private _throttledScrollHandler = throttle(async (isScaling: boolean) => {
+    if (isScaling) return;
 
-      const targetPage = this._calculatePageFromScroll(scrollTop);
-      await this._updateVisiblePages(isScrollingDown, targetPage);
-    }
-  }, 160);
+    const scrollTop = this._scrollableContainer.scrollTop;
+    this._lastScrollTop = scrollTop;
+    await this._updateRenderedPagesOnScroll(scrollTop);
+    this._debouncedEnsureVisiblePagesRendered();
+  }, 100);
 
   /**
-   * Calculate the number of pages required to fill the viewport.
-   *
-   * @returns {Promise<number>} Number of pages needed to render initially.
+   * Debounced function to ensure visible pages are rendered.
+   * @returns {Promise<void>}
    */
-  private async _calculatePagesToFillViewport(): Promise<number> {
-    if (!this._container) return 0;
+  private _debouncedEnsureVisiblePagesRendered = debounce(() => {
+    this._ensureVisiblePagesRendered();
+  }, 100);
 
-    const containerHeight = this._container.getBoundingClientRect().height;
-    let accumulatedHeight = 0;
-    let pageCount = 0;
+  /**
+   * Ensures that visible pages are fully rendered.
+   * @returns {Promise<void>}
+   */
+  private async _ensureVisiblePagesRendered(): Promise<void> {
+    if (this._isScaleChangeInProgress) return;
 
-    for (let pageNumber = 1; pageNumber <= this._totalPages; pageNumber++) {
-      const page = await this._pdf.getPage(pageNumber);
-      const scale = this._pdfState.scale;
-      const viewport = page.getViewport({ scale });
-      const pageHeight = viewport.height;
+    const pagesToRenderFully: CachedPageInfo[] = [];
+    const currentPage = this._pdfState.currentPage;
 
-      if (pageHeight > containerHeight) {
-        pageCount++;
-        break;
+    // Prioritize current page
+    const centerPageInfo = this._cachedPages.get(currentPage);
+    if (centerPageInfo && centerPageInfo.isVisible && !centerPageInfo.isFullyRendered) {
+      pagesToRenderFully.push(centerPageInfo);
+    }
+
+    // Then pages in buffer around current page
+    for (let i = 1; i <= this._pageBuffer; i++) {
+      const nextPage = this._cachedPages.get(currentPage + i);
+      if (nextPage && nextPage.isVisible && !nextPage.isFullyRendered && !pagesToRenderFully.includes(nextPage)) {
+        pagesToRenderFully.push(nextPage);
       }
-
-      accumulatedHeight += pageHeight;
-
-      if (accumulatedHeight >= containerHeight) {
-        pageCount++;
-        break;
-      }
-
-      pageCount++;
-    }
-
-    return pageCount;
-  }
-
-  /**
-   * Render pages visible in the initial viewport.
-   */
-  private async _renderInitialPages(): Promise<void> {
-    const isSpecificPage = this.isThereSpecificPageToRender;
-    if (isSpecificPage != null && isSpecificPage != undefined) {
-      this._renderedPages.add(isSpecificPage);
-      await this._renderPage(isSpecificPage);
-    } else {
-      const pagesToRender = await this._calculatePagesToFillViewport();
-      const initialPages = [];
-
-      for (let pageNumber = 1; pageNumber <= pagesToRender; pageNumber++) {
-        initialPages.push(pageNumber);
-        this._renderedPages.add(pageNumber);
-      }
-
-      for (const pageNumber of initialPages) {
-        await this._renderPage(pageNumber);
-      }
-    }
-  }
-
-  /**
-   * Generates thumbnails for the document.
-   */
-  public async generateThumbnail(): Promise<void> {
-    const isSpecificPage = this.isThereSpecificPageToRender;
-    const thumbnailContainer = ThumbnailViewer.createThumbnailContainer(this._options!.containerId);
-    const linkService = new PDFLinkService({ pdfState: this._pdfState, pdfViewer: this._pdfViewer });
-
-    for (let pageNumber = isSpecificPage ?? 1; pageNumber <= (isSpecificPage ?? this._totalPages); pageNumber++) {
-      const thumbnail = new ThumbnailViewer({
-        container: thumbnailContainer as HTMLElement,
-        pageNumber,
-        pdfDocument: this._pdf,
-        linkService,
-      });
-
-      await thumbnail.initThumbnail();
-
-      if (pageNumber === isSpecificPage || pageNumber === this._pdfState.currentPage) {
-        thumbnail.activeThumbnail = this._pdfState.currentPage;
-      }
-    }
-  }
-
-  /**
-   * Precalculates page positions and sets the container dimensions.
-   * This helps in efficiently determining which pages should be rendered based on scrolling.
-   *
-   * @returns {Promise<Map<number, number>>} A map storing page positions with their page numbers.
-   */
-  async calculatePagePositioning(): Promise<Map<number, number>> {
-    const scale = this._pdfState.scale;
-    let pageHeight = PageElement.gap;
-    let pageWidth = Number.NEGATIVE_INFINITY;
-
-    const specificPage = this.isThereSpecificPageToRender;
-    for (let pageNumber = specificPage ?? 1; pageNumber <= (specificPage ?? this._pdf.numPages); pageNumber++) {
-      const page = await this._pdf.getPage(pageNumber);
-      const viewport = page.getViewport({ scale });
-
-      // Store the page's position
-      this._pagePosition.set(pageNumber, pageHeight);
-
-      // Increment total document height for the next page
-      pageHeight += viewport.height + PageElement.gap;
-      pageWidth = Math.max(pageWidth, viewport.width);
-    }
-
-    // Set the final dimensions of the container
-    this._setContainerHeight(pageHeight + PageElement.gap);
-    this._setContainerWidth(pageWidth + PageElement.gap * 2);
-
-    return this._pagePosition;
-  }
-
-  /**
-   * Sets the height of the container based on the total page height.
-   *
-   * @param {number} height - The computed height to be set.
-   */
-  private _setContainerHeight(height: number): void {
-    if (this._container?.firstChild) {
-      (this._container.firstChild as HTMLElement).style.height = `${height}px`;
-    }
-  }
-
-  /**
-   * Sets the width of the container based on the widest page.
-   *
-   * @param {number} width - The computed width to be set.
-   */
-  private _setContainerWidth(width: number): void {
-    if (this._container?.firstChild) {
-      (this._container.firstChild as HTMLElement).style.width = `${width}px`;
-    }
-  }
-
-  /**
-   * Determines the page number corresponding to a given scrollTop position.
-   * Uses a binary search on the cached page positions for efficiency.
-   *
-   * @param {number} scrollTop - The scroll position in pixels.
-   * @returns {number} The page number that is currently in view.
-   */
-  private _calculatePageFromScroll(scrollTop: number): number {
-    const sortedPositions = Array.from(this._pagePosition.entries()).sort((a, b) => a[1] - b[1]);
-    let low = 0;
-    let high = sortedPositions.length - 1;
-
-    while (low <= high) {
-      const mid = Math.floor((low + high) / 2);
-      const [, topPosition] = sortedPositions[mid];
-
-      if (scrollTop < topPosition) {
-        high = mid - 1;
-      } else {
-        low = mid + 1;
+      const prevPage = this._cachedPages.get(currentPage - i);
+      if (prevPage && prevPage.isVisible && !prevPage.isFullyRendered && !pagesToRenderFully.includes(prevPage)) {
+        pagesToRenderFully.push(prevPage);
       }
     }
 
-    return sortedPositions[Math.max(high, 0)][0];
-  }
-
-  /**
-   * Updates the pages visible within the viewport dynamically based on scrolling.
-   * Removes pages that are outside the buffer zone and loads new ones as needed.
-   *
-   * @param {boolean} isScrollingDown - Direction of scrolling.
-   * @param {number} targetPage - The current page in view.
-   */
-  private async _updateVisiblePages(isScrollingDown: boolean, targetPage: number): Promise<void> {
-    const visiblePages = this._getPagesInBuffer(targetPage);
-
-    for (const pageNumber of visiblePages) {
-      if (!this._renderedPages.has(pageNumber)) {
-        await this._renderPage(pageNumber);
-        this._renderedPages.add(pageNumber);
-      }
-    }
-
-    this._cleanupOutOfBufferPages(visiblePages);
-  }
-
-  /**
-   * Gets the page numbers that should be rendered within the buffer range.
-   *
-   * @param {number} targetPage - The current page in view.
-   * @returns {number[]} An array of page numbers that should be visible in the viewport.
-   */
-  private _getPagesInBuffer(targetPage: number): number[] {
-    if (this.isThereSpecificPageToRender) return [];
-
-    const startPage = Math.max(1, targetPage - this._pageBuffer);
-    const endPage = Math.min(this._totalPages, targetPage + this._pageBuffer);
-
-    const bufferPages: number[] = [];
-    for (let pageNumber = startPage; pageNumber <= endPage; pageNumber++) {
-      bufferPages.push(pageNumber);
-    }
-
-    return bufferPages;
-  }
-
-  /**
-   * Renders a specific page onto the canvas within the viewport.
-   *
-   * @param {number} pageNumber - The page number to render.
-   */
-  private async _renderPage(pageNumber: number): Promise<void> {
-    if (!this._container) return;
-
-    const page = await this._pdf.getPage(pageNumber);
-    const scale = this._pdfState.scale > 1 ? 1 : this._pdfState.scale;
-    let viewport = page.getViewport({ scale });
-
-    // Create and append a page container
-    const pageWrapper = PageElement.createPageContainerDiv(pageNumber, viewport, this._pagePosition);
-    pageWrapper.style.backgroundColor = 'white'; // Ensure a white placeholder is shown
-    this._container.firstChild?.appendChild(pageWrapper);
-
-    // Create and append a canvas for rendering
-    const [canvas, context] = PageElement.createCanvas(viewport);
-    const div = document.createElement('div');
-    div.setAttribute('id', 'canva-presentation');
-    div.appendChild(canvas);
-    pageWrapper.appendChild(div);
-
-    // zoom content warapper
-    const imageContainer = document.createElement('div');
-    imageContainer.setAttribute('id', 'a-zoomed-page-image-container');
-    imageContainer.style.position = 'absolute';
-    imageContainer.style.left = '0';
-    imageContainer.style.top = '0';
-    imageContainer.style.width = `${viewport.width}px`;
-    imageContainer.style.height = `${viewport.height}px`;
-    imageContainer.style.overflow = 'hidden';
-    div.appendChild(imageContainer);
-
-    // Render the page on the canvas
-    const renderContext: RenderParameters = {
-      canvasContext: context,
-      viewport,
-      annotationMode: 2,
-    };
-    if (this._pdfState.scale > 1) {
-      this.updatePageBuffers(pageNumber);
-    }
-    page.render(renderContext).promise.then(async () => {
-      if (this._options && !this._options.disableTextSelection) {
-        viewport = page.getViewport({ scale: this._pdfState.scale });
-        const [_, annotationDrawLayer] = await new TextLayer(pageWrapper, page, viewport).createTextLayer();
-        await new AnnotationLayer(pageWrapper, page, viewport).createAnnotationLayer(this._pdfViewer, this._pdf);
-        if (this._pdfState.isAnnotationEnabled && this._pdfState.isAnnotationConfigurationPropertiesEnabled) {
-          if (annotationDrawLayer) {
-            (annotationDrawLayer as HTMLElement).style.cursor = 'crosshair';
-            (annotationDrawLayer as HTMLElement).style.pointerEvents = 'all';
-          }
-        }
-        this._searchHighlighter.registerPage(pageNumber);
-        if (!this._pdfViewer.annotation.isAnnotationManagerRegistered(pageNumber)) {
-          this._pdfViewer.annotation.registerAnnotationManager(pageNumber, new AnnotationManager(annotationDrawLayer, this._pdfState, this._selectionManager));
-        }
-        if (this._pdfState.scale > 1) {
-          await this.appendHighResImageToPageContainer(pageNumber);
-        }
-        if (this._observer) {
-          this._observer.observe(pageWrapper);
-        }
+    // Add any other visible but not fully rendered pages that weren't caught by buffer logic
+    this._cachedPages.forEach((pInfo) => {
+      if (pInfo.isVisible && !pInfo.isFullyRendered && !pagesToRenderFully.includes(pInfo)) {
+        pagesToRenderFully.push(pInfo);
       }
     });
-  }
 
-  /**
-   * Removes pages from the DOM that are outside the buffer zone.
-   *
-   * @param {number[]} visiblePages - An array of currently visible pages.
-   */
-  private _cleanupOutOfBufferPages(visiblePages: number[]): void {
-    const minPage = Math.min(...visiblePages);
-    const maxPage = Math.max(...visiblePages);
-
-    for (const pageNumber of this._renderedPages) {
-      if (pageNumber < minPage || pageNumber > maxPage) {
-        this._pdfViewer.annotation.unregisterAnnotationManager(pageNumber);
-        this._searchHighlighter.deregisterPage(pageNumber);
-        this._removePage(pageNumber);
-        this._renderedPages.delete(pageNumber);
+    for (const pInfo of pagesToRenderFully) {
+      if (this._cachedPages.has(pInfo.pageNumber) && pInfo.isVisible && (!pInfo.isFullyRendered || pInfo.renderFailed)) {
+        await this._transitionToFullRender(pInfo);
       }
     }
   }
 
   /**
-   * Retrieves the viewport of a specific page for rendering purposes.
-   *
-   * @param {number} pageNumber - The page number.
-   * @returns {Promise<PageViewport>} The viewport object of the specified page.
+   * Fully renders the page content.
+   * @param pageInfo The page information object.
+   * @returns {Promise<void>}
    */
-  private async _getViewport(pageNumber: number): Promise<PageViewport> {
-    const page = await this._pdf.getPage(pageNumber);
-    return page.getViewport({ scale: this._pdfState.scale });
-  }
+  private async _transitionToFullRender(pageInfo: CachedPageInfo): Promise<void> {
+    if (pageInfo.isFullyRendered || !pageInfo.isVisible || !pageInfo.pageWrapperDiv.parentElement) {
+      return;
+    }
+    // Prevent re-entrancy
+    if (pageInfo.isTransitioningToFullRender) {
+      Logger.info(`Page ${pageInfo.pageNumber} is already transitioning to full render. Skipping.`);
+      return;
+    }
 
-  /**
-   * Removes a specific page element from the DOM.
-   *
-   * @param {number} pageNumber - The number of the page to be removed.
-   */
-  private _removePage(pageNumber: number): void {
-    const pageElement = document.querySelector(`#${this._options?.containerId} #pageContainer-${pageNumber}`);
-    if (pageElement) {
-      if (this._observer) {
-        this._observer.unobserve(pageElement);
+    pageInfo.isTransitioningToFullRender = true; // Set lock
+
+    try {
+      pageInfo.renderFailed = false;
+
+      if (!pageInfo.pdfPageProxy) {
+        try {
+          pageInfo.pdfPageProxy = await this._pdfDocument.getPage(pageInfo.pageNumber);
+        } catch (error) {
+          // console.error(`Failed to get page ${pageInfo.pageNumber} for full render:`, error);
+          Logger.error(`_transitionToFullRender: failed to fetch page ${pageInfo.pageNumber}`, error);
+          pageInfo.renderFailed = true;
+          return;
+        }
       }
-      pageElement.remove();
+      if (!pageInfo.pdfPageProxy || pageInfo.renderFailed) return;
+
+      const viewport = pageInfo.pdfPageProxy.getViewport({ scale: this._pdfState.scale });
+
+      PageElement.createOrUpdatePageContainerDiv(pageInfo.pageNumber, viewport, this._pagePositions, pageInfo.pageWrapperDiv);
+
+      Logger.info(`_transitionToFullRender → page ${pageInfo.pageNumber}`);
+      await this._renderPageContent(pageInfo, viewport);
+
+      if (!pageInfo.renderFailed && this._pdfState.scale != 1) {
+        await this.appendHighResImage(pageInfo, viewport);
+      }
+
+      pageInfo.pageWrapperDiv.classList.remove('page-placeholder');
+      pageInfo.pageWrapperDiv.style.backgroundColor = '';
+
+      pageInfo.isFullyRendered = true;
+      Logger.info(`_transitionToFullRender done page ${pageInfo.pageNumber}`);
+    } catch (error) {
+      Logger.error(`Unexpected error in _transitionToFullRender for page ${pageInfo.pageNumber}`, { rawError: error });
+      pageInfo.renderFailed = true;
+    } finally {
+      pageInfo.isTransitioningToFullRender = false;
     }
   }
 
   /**
-   * Redraws all visible pages based on the updated buffer and scale.
-   *
-   * @param {number} targetPage - The page number used to determine the visible buffer range.
-   * @returns {Promise<void>} A promise that resolves when all visible pages are rendered.
+   * Calculates the number of pages to render initially based on container height.
+   * @returns {Promise<number>} Number of pages to render.
    */
-  async redrawVisiblePages(targetPage: number): Promise<void> {
-    const visiblePages = this._renderedPages;
+  private async _calculateInitialPagesToRender(): Promise<number> {
+    if (this._totalPages === 0) return 0;
+    const containerHeight = this._scrollableContainer.getBoundingClientRect().height;
+    if (containerHeight <= 0) return 1;
 
-    // Re-render visible pages at the updated scale
-    if (this.isThereSpecificPageToRender) {
-      await this._renderPage(this.isThereSpecificPageToRender);
-      // this._renderedPages.add(this.isThereSpecificPageToRender);
-      await this.appendHighResImageToPageContainer(this.isThereSpecificPageToRender);
+    let accumulatedHeight = 0;
+    let pagesToRender = 0;
+    const scale = this._pdfState.scale;
+
+    for (let pageNum = 1; pageNum <= this._totalPages; pageNum++) {
+      const page = await this._pdfDocument.getPage(pageNum);
+      const viewport = page.getViewport({ scale });
+      const pageHeightWithGap = viewport.height + PageElement.gap;
+
+      if (pagesToRender === 0 && pageHeightWithGap > containerHeight) {
+        pagesToRender = 1;
+        break;
+      }
+      accumulatedHeight += pageHeightWithGap;
+      pagesToRender++;
+      if (accumulatedHeight >= containerHeight) {
+        break;
+      }
+    }
+    return Math.min(pagesToRender, this._totalPages);
+  }
+
+  /**
+   * Renders only the specified page and clears others.
+   * @param pageNumber The page number to render.
+   */
+  private async _renderSpecificPageOnly(pageNumber: number): Promise<void> {
+    for (const existingPageNum of this._cachedPages.keys()) {
+      this._removePageFromDom(existingPageNum);
+    }
+    this._cachedPages.clear();
+
+    let pageInfo = await this._addPageToDom(pageNumber); // Adds as placeholder
+    if (pageInfo) {
+      pageInfo.isVisible = true;
+      this._pdfState.currentPage = pageNumber;
+      await this._transitionToFullRender(pageInfo); // Then fully render it
+    }
+  }
+
+  /**
+   * Generates thumbnails for all pages.
+   * @returns {Promise<void>}
+   */
+  public async generateThumbnails(): Promise<void> {
+    if (this._totalPages === 0) return;
+    const isSpecificPage = this.isRenderingSpecificPageOnly;
+    const thumbnailContainer = ThumbnailViewer.createThumbnailContainer(this._options!.containerId);
+    const linkService = new PDFLinkService({ pdfViewer: this._pdfViewer });
+
+    for (let pageNum = isSpecificPage ?? 1; pageNum <= (isSpecificPage ?? this._totalPages); pageNum++) {
+      const thumbnail = new ThumbnailViewer({
+        container: thumbnailContainer as HTMLElement,
+        pageNumber: pageNum,
+        pdfDocument: this._pdfDocument,
+        linkService,
+      });
+      await thumbnail.initThumbnail();
+      if (pageNum === (isSpecificPage ?? this._pdfState.currentPage)) {
+        thumbnail.activeThumbnail = this._pdfState.currentPage;
+      }
+      this._thumbnailViewer = thumbnail;
+    }
+  }
+
+  /**
+   * Calculates the positions of all pages in the document.
+   * @returns {Promise<Map<number, number>>} A map of page numbers to their top offsets.
+   */
+  async calculatePagePositions(): Promise<Map<number, number>> {
+    const scale = this._pdfState.scale;
+    let currentYOffset = PageElement.gap;
+    let maxPageWidth = 0;
+    this._pagePositions.clear();
+
+    if (this._totalPages === 0 && !this.isRenderingSpecificPageOnly) {
+      this._pagesParentDiv.style.height = '0px';
+      this._pagesParentDiv.style.width = '0px';
+      return this._pagePositions;
+    }
+
+    const startPageNum = this.isRenderingSpecificPageOnly ?? 1;
+    const endPageNum = this.isRenderingSpecificPageOnly ?? this._pdfDocument.numPages;
+
+    for (let pageNum = startPageNum; pageNum <= endPageNum; pageNum++) {
+      const page = await this._pdfDocument.getPage(pageNum);
+      const viewport = page.getViewport({ scale });
+      this._pagePositions.set(pageNum, currentYOffset);
+      currentYOffset += viewport.height + PageElement.gap;
+      maxPageWidth = Math.max(maxPageWidth, viewport.width);
+    }
+
+    this._pagesParentDiv.style.height = `${currentYOffset}px`;
+    this._pagesParentDiv.style.width = `${maxPageWidth + PageElement.gap * 2}px`;
+
+    return this._pagePositions;
+  }
+
+  /**
+   * Determines the page number that is most centered in the viewport.
+   * @param scrollTop The current scroll position.
+   * @returns {number} The page number that is most centered in the viewport.
+   */
+  private _determineCenterPageInViewport(scrollTop: number): number {
+    if (this._pagePositions.size === 0) return 1;
+
+    const viewportCenterY = scrollTop + this._scrollableContainer.clientHeight / 2;
+    let bestMatchPageNum = Array.from(this._pagePositions.keys())[0] || 1;
+
+    const sortedPageNumbers = Array.from(this._pagePositions.keys()).sort((a, b) => a - b);
+
+    for (const pageNum of sortedPageNumbers) {
+      const pageTopY = this._pagePositions.get(pageNum)!;
+      const pageInfo = this._cachedPages.get(pageNum);
+      let pageBottomY = pageTopY + this._scrollableContainer.clientHeight * 0.8;
+
+      if (pageInfo?.pdfPageProxy && pageInfo.isFullyRendered) {
+        const viewport = pageInfo.pdfPageProxy.getViewport({ scale: this._pdfState.scale });
+        pageBottomY = pageTopY + viewport.height;
+      } else if (this._pagePositions.has(pageNum + 1)) {
+        pageBottomY = this._pagePositions.get(pageNum + 1)! - PageElement.gap;
+      }
+
+      if (viewportCenterY >= pageTopY && viewportCenterY < pageBottomY) {
+        return pageNum;
+      }
+      if (viewportCenterY < pageTopY) {
+        const currentIndex = sortedPageNumbers.indexOf(pageNum);
+        return currentIndex > 0 ? sortedPageNumbers[currentIndex - 1] : pageNum;
+      }
+      bestMatchPageNum = pageNum;
+    }
+    return bestMatchPageNum;
+  }
+
+  /**
+   * Updates the rendered pages based on the current scroll position.
+   * @param scrollTop The current scroll position.
+   * @param isInitialLoad Indicates if this is the initial load.
+   */
+  private async _updateRenderedPagesOnScroll(scrollTop: number, isInitialLoad: boolean = false): Promise<void> {
+    if (this.isRenderingSpecificPageOnly != null || this._totalPages === 0) return;
+
+    const centralPageNum = this._determineCenterPageInViewport(scrollTop);
+    if (this._pdfState.currentPage !== centralPageNum) {
+      this._pdfState.currentPage = centralPageNum;
+    }
+
+    const pagesToKeepInDom = new Set<number>();
+    const startPage = Math.max(1, centralPageNum - this._pageBuffer);
+    const endPage = Math.min(this._totalPages, centralPageNum + this._pageBuffer);
+
+    for (let pageNum = startPage; pageNum <= endPage; pageNum++) {
+      pagesToKeepInDom.add(pageNum);
+    }
+
+    const pagesToRemoveFromDom: number[] = [];
+    this._cachedPages.forEach((pageInfo, pageNum) => {
+      if (!pagesToKeepInDom.has(pageNum) && pageInfo.isVisible) {
+        pagesToRemoveFromDom.push(pageNum);
+      }
+    });
+    for (const pageNum of pagesToRemoveFromDom) {
+      this._removePageFromDom(pageNum);
+    }
+
+    for (const pageNum of pagesToKeepInDom) {
+      let pageInfo = this._cachedPages.get(pageNum);
+      if (!pageInfo) {
+        pageInfo = await this._addPageToDom(pageNum);
+      } else {
+        pageInfo.isVisible = true;
+      }
+    }
+  }
+
+  /**
+   * Clears rendering artifacts for a page.
+   * @param pageInfo The page information object.
+   * @param destroyLayers Indicates if layers should be destroyed.
+   */
+  private _clearPageRenderArtifacts(pageInfo: CachedPageInfo, destroyLayers: boolean = true): void {
+    if (pageInfo.renderTask) {
+      pageInfo.renderTask.cancel();
+      pageInfo.renderTask = undefined;
+    }
+    if (pageInfo.highResRenderTask) {
+      pageInfo.highResRenderTask.cancel();
+      pageInfo.highResRenderTask = undefined;
+    }
+    if (pageInfo.canvasElement) {
+      PageElement.releaseCanvasToPool(pageInfo.canvasElement);
+      pageInfo.canvasElement = undefined;
+    }
+    if (pageInfo.highResImageBitmap) {
+      pageInfo.highResImageBitmap.close();
+      pageInfo.highResImageBitmap = undefined;
+    }
+
+    const canvasPresentationDiv = pageInfo.pageWrapperDiv.querySelector(`#canvasPresentation-${pageInfo.pageNumber}`);
+    canvasPresentationDiv?.remove();
+
+    if (destroyLayers) {
+      pageInfo.textLayer?.destroy();
+      pageInfo.textLayer = undefined;
+      pageInfo.annotationLayer?.destroy();
+      pageInfo.annotationLayer = undefined;
+      this._pdfViewer.annotation.unregisterAnnotationManager(pageInfo.pageNumber);
+      this._searchHighlighter.deregisterPage(pageInfo.pageNumber);
+    }
+    pageInfo.isFullyRendered = false;
+  }
+
+  /**
+   * Adds a page to the DOM as a placeholder.
+   * @param pageNumber The page number to add.
+   * @returns {Promise<CachedPageInfo | undefined>} The cached page information or undefined if not added.
+   */
+  private async _addPageToDom(pageNumber: number): Promise<CachedPageInfo | undefined> {
+    let pageInfo = this._cachedPages.get(pageNumber);
+
+    if (pageInfo && pageInfo.pageWrapperDiv.parentElement) {
+      pageInfo.isVisible = true;
+      return pageInfo;
+    }
+
+    const pageWrapperDiv = this._getAvailablePageWrapper();
+    if (!pageWrapperDiv) {
+      return undefined;
+    }
+
+    let placeholderViewport: PageViewport;
+    try {
+      const tempPageForSize = await this._pdfDocument.getPage(pageNumber);
+      placeholderViewport = tempPageForSize.getViewport({ scale: this._pdfState.scale });
+    } catch (e) {
+      reportError(`getting page ${pageNumber} for placeholder size`, e);
+      Logger.error(`_addPageToDom: failed placeholder size for page ${pageNumber}`, e);
+      placeholderViewport = { width: 200, height: 300, scale: this._pdfState.scale, rotation: 0 } as PageViewport;
+    }
+
+    pageWrapperDiv.style.backgroundColor = '#fff';
+    pageWrapperDiv.classList.add('page-placeholder');
+    PageElement.createOrUpdatePageContainerDiv(pageNumber, placeholderViewport, this._pagePositions, pageWrapperDiv);
+    if (this._intersectionObserver) {
+      this._intersectionObserver.observe(pageWrapperDiv);
+    }
+
+    if (!pageWrapperDiv.parentElement) {
+      this._pagesParentDiv.appendChild(pageWrapperDiv);
+    }
+
+    pageInfo = {
+      pageNumber,
+      pdfPageProxy: null,
+      pageWrapperDiv,
+      isVisible: true,
+      isFullyRendered: false,
+      renderFailed: false,
+      isTransitioningToFullRender: false,
+    };
+    this._cachedPages.set(pageNumber, pageInfo);
+
+    if (this._pageIntersectionObserver) {
+      this._pageIntersectionObserver.observe(pageWrapperDiv);
+    }
+    return pageInfo;
+  }
+
+  /**
+   * Renders the page content.
+   * @param pageInfo The page information object.
+   * @param viewport The viewport for rendering.
+   * @returns {Promise<void>}
+   */
+  private async _renderPageContent(pageInfo: CachedPageInfo, viewport: PageViewport): Promise<void> {
+    Logger.info(`renderPageContent start`, {
+      page: pageInfo.pageNumber,
+      scale: this._pdfState.scale,
+      width: viewport.width,
+      height: viewport.height,
+    });
+    if (pageInfo.renderTask) {
+      Logger.warn(`cancelling in‐flight base render`, { page: pageInfo.pageNumber });
+      const oldTask = pageInfo.renderTask;
+      oldTask.cancel();
+      try {
+        await oldTask.promise;
+      } catch (err: any) {
+        // expected RenderingCancelledException—ignore, but log if it’s something else
+        if (err.name !== 'RenderingCancelledException') {
+          Logger.error(`unexpected error while cancelling`, { page: pageInfo.pageNumber, err });
+        }
+      }
+      pageInfo.renderTask = undefined;
+
+      // also put that canvas back into the pool if it hasn’t been already
+      if (pageInfo.canvasElement) {
+        PageElement.releaseCanvasToPool(pageInfo.canvasElement);
+        pageInfo.canvasElement = undefined;
+      }
+    }
+    if (!pageInfo.pdfPageProxy || !viewport || !pageInfo.isVisible || pageInfo.isFullyRendered) {
+      return;
+    }
+
+    // Clear any previous partial renderings or ensure clean state before drawing
+    // Passing 'false' to not destroy layer instances if they might be reused (though unlikely here)
+    this._clearPageRenderArtifacts(pageInfo, false);
+
+    const baseRenderScale = this._pdfState.scale > 1 ? Math.min(1.0, this._pdfState.scale / 2) : this._pdfState.scale;
+    const baseViewport = pageInfo.pdfPageProxy.getViewport({ scale: baseRenderScale });
+
+    const [canvas, context] = PageElement.getCanvasFromPool(baseViewport);
+    pageInfo.canvasElement = canvas;
+
+    const canvasPresentationDiv = this._ensureCanvasPresentationDiv(pageInfo);
+    if (this._pdfState.scale > 1) {
+      canvas.style.width = 'inherit';
+      canvas.style.height = 'inherit';
+    }
+    canvasPresentationDiv.appendChild(canvas);
+    this._ensureImageContainerDiv(pageInfo, viewport, canvasPresentationDiv);
+
+    try {
+      const renderParams: RenderParameters = {
+        canvasContext: context,
+        viewport: baseViewport,
+        annotationMode: 2,
+      };
+      pageInfo.renderTask = pageInfo.pdfPageProxy.render(renderParams);
+      await pageInfo.renderTask.promise;
+      Logger.info(`base render complete`, { page: pageInfo.pageNumber });
+    } catch (error: any) {
+      pageInfo.renderTask = undefined;
+      PageElement.releaseCanvasToPool(canvas);
+      if (error && error.name === 'RenderingCancelledException') {
+        // debugWarn(`rendering base canvas for page ${pageInfo.pageNumber}`, error);
+        Logger.warn(`base render cancelled for page ${pageInfo.pageNumber}`, error);
+      } else {
+        // console.error(`Error rendering base canvas for page ${pageInfo.pageNumber}:`, error);
+        Logger.error(`Base render failed for page ${pageInfo.pageNumber}`, {
+          page: pageInfo.pageNumber,
+          errName: error?.name,
+          errMessage: error?.message,
+          stack: error?.stack,
+          rawError: error, // Log the full error object
+        });
+        Logger.download();
+      }
+      pageInfo.renderFailed = true;
+      return;
+    } finally {
+      pageInfo.renderTask = undefined;
+    }
+
+    if (this._options && !this._options.disableTextSelection) {
+      if (!pageInfo.pdfPageProxy || !viewport || !pageInfo.isVisible) return;
+      try {
+        pageInfo.textLayer = new TextLayer(pageInfo.pageWrapperDiv, pageInfo.pdfPageProxy, viewport);
+        const [, annotationHostDiv] = await pageInfo.textLayer.createTextLayer();
+
+        pageInfo.annotationLayer = new AnnotationLayer(pageInfo.pageWrapperDiv, pageInfo.pdfPageProxy, viewport);
+        await pageInfo.annotationLayer.createAnnotationLayer(this._pdfViewer, this._pdfDocument, annotationHostDiv);
+
+        if (this._pdfState.isAnnotationEnabled && this._pdfState.isAnnotationConfigurationPropertiesEnabled) {
+          if (annotationHostDiv) {
+            (annotationHostDiv as HTMLElement).style.cursor = 'crosshair';
+            (annotationHostDiv as HTMLElement).style.pointerEvents = 'all';
+          }
+        }
+        this._searchHighlighter.registerPage(pageInfo.pageNumber);
+        if (!this._pdfViewer.annotation.isAnnotationManagerRegistered(pageInfo.pageNumber)) {
+          this._pdfViewer.annotation.registerAnnotationManager(pageInfo.pageNumber, new AnnotationManager(annotationHostDiv, this._pdfState, this._selectionManager));
+        }
+      } catch (error: any) {
+        if ((error.message || '').includes('was destroyed')) {
+          // console.warn(`Layer creation for page ${pageInfo.pageNumber} aborted due to concurrent destruction.`);
+          Logger.warn(`text/annotation layer destroyed mid-create for page ${pageInfo.pageNumber}`);
+        } else {
+          // console.warn(`Error creating text/annotation layer for page ${pageInfo.pageNumber}:`, error);
+          Logger.error(`text/annotation layer failed for page ${pageInfo.pageNumber}`, error);
+          pageInfo.renderFailed = true;
+        }
+      }
+    }
+  }
+
+  /**
+   * Ensures there’s a `<div id="canvasPresentation-<N>">` inside the
+   * page wrapper div, and clears it if it exists.
+   */
+  private _ensureCanvasPresentationDiv(pageInfo: CachedPageInfo): HTMLDivElement {
+    const canvasPresentationDivId = `canvasPresentation-${pageInfo.pageNumber}`;
+    let canvasPresentationDiv = pageInfo.pageWrapperDiv.querySelector<HTMLDivElement>(`#${canvasPresentationDivId}`);
+    if (!canvasPresentationDiv) {
+      canvasPresentationDiv = document.createElement('div');
+      canvasPresentationDiv.id = canvasPresentationDivId;
+      canvasPresentationDiv.style.position = 'relative';
+      pageInfo.pageWrapperDiv.appendChild(canvasPresentationDiv);
     } else {
-      for (const pageNumber of visiblePages) {
-        await this.appendHighResImageToPageContainer(pageNumber);
+      // Clear it if it exists from a previous placeholder state or partial render
+      while (canvasPresentationDiv.firstChild) canvasPresentationDiv.removeChild(canvasPresentationDiv.firstChild);
+    }
+    if (this._pdfState.scale > 1) {
+      canvasPresentationDiv.style.width = 'inherit';
+      canvasPresentationDiv.style.height = 'inherit';
+    }
+    return canvasPresentationDiv;
+  }
+
+  /**
+   * Ensure there’s a `<div id="zoomedImageContainer-<N>">` inside the
+   * canvasPresentation div, and size it to the full (high-res) viewport.
+   */
+  private _ensureImageContainerDiv(pageInfo: CachedPageInfo, viewport: PageViewport, canvasPresentationDiv: HTMLDivElement): HTMLDivElement {
+    const imageContainerId = `zoomedImageContainer-${pageInfo.pageNumber}`;
+    let imageContainer = canvasPresentationDiv.querySelector<HTMLDivElement>(`#${imageContainerId}`);
+    if (!imageContainer) {
+      imageContainer = document.createElement('div');
+      imageContainer.id = imageContainerId;
+      imageContainer.style.position = 'absolute';
+      imageContainer.style.left = '0';
+      imageContainer.style.top = '0';
+      imageContainer.style.overflow = 'hidden';
+      canvasPresentationDiv.appendChild(imageContainer);
+    }
+    imageContainer.style.width = `${viewport.width}px`;
+    imageContainer.style.height = `${viewport.height}px`;
+    return imageContainer;
+  }
+
+  /**
+   * Removes a page from the DOM and clears its resources.
+   * @param pageNumber The page number to remove.
+   */
+  private _removePageFromDom(pageNumber: number): void {
+    const pageInfo = this._cachedPages.get(pageNumber);
+    if (!pageInfo) return;
+
+    pageInfo.isVisible = false;
+    this._clearPageRenderArtifacts(pageInfo, true); // true to destroy layers fully
+
+    this._pageIntersectionObserver?.unobserve(pageInfo.pageWrapperDiv);
+    this._intersectionObserver?.unobserve(pageInfo.pageWrapperDiv);
+    this._releasePageWrapper(pageInfo.pageWrapperDiv);
+
+    if (pageInfo.pdfPageProxy) {
+      pageInfo.pdfPageProxy.cleanup();
+      pageInfo.pdfPageProxy = null;
+    }
+
+    this._cachedPages.delete(pageNumber);
+  }
+
+  /**
+   * Redraws all visible pages.
+   * @returns {Promise<void>}
+   */
+  async redrawAllVisiblePages(): Promise<void> {
+    if (this.isRenderingSpecificPageOnly != null) {
+      const pageNum = this.isRenderingSpecificPageOnly;
+      let pageInfo = this._cachedPages.get(pageNum);
+      if (!pageInfo || !pageInfo.pdfPageProxy) {
+        // If no proxy, it was likely placeholder or error
+        pageInfo = await this._addPageToDom(pageNum); // Re-add (will be placeholder)
+        if (pageInfo) {
+          pageInfo.isVisible = true;
+          await this._transitionToFullRender(pageInfo); // Then fully render
+        }
+      } else if (pageInfo.pdfPageProxy) {
+        await this._updatePageForNewScale(pageInfo);
+      }
+    } else {
+      for (const pageInfo of this._cachedPages.values()) {
+        if (pageInfo.isVisible) {
+          // Update all visible, even if they were placeholders
+          await this._updatePageForNewScale(pageInfo);
+        }
       }
     }
   }
 
   /**
-   * Updates the style and dimensions of all page buffers in the container.
-   * Iterates over every element with the class 'a-page-view' and adjusts its position,
-   * width, and height based on the corresponding PDF page's viewport.
-   *
-   * @returns A promise that resolves once all page buffers have been updated.
+   * Updates the page buffers for rendering.
+   * @param pageNumber The page number to update.
    */
   public async updatePageBuffers(pageNumber: number | null = null): Promise<void> {
-    if (!this._container) return;
+    if (!this._pagesParentDiv) return;
 
-    if (pageNumber !== null) {
-      const domPages = document.querySelector(`#${this._options?.containerId} #pageContainer-${pageNumber}`) as HTMLElement;
-      if (domPages) {
-        const page: PDFPageProxy = await this._pdf.getPage(pageNumber);
-        const scale: number = this._pdfState.scale;
-        const viewport = page.getViewport({ scale });
-        const pageTop = this._pagePosition.get(pageNumber) || 0;
+    // Helper to resize one page
+    const resizeOne = async (pageNum: number) => {
+      const pageInfo = this._cachedPages.get(pageNum);
+      if (!pageInfo || !pageInfo.pdfPageProxy) return;
+      // Get the wrapper div for this page
+      const wrapperDiv = pageInfo.pageWrapperDiv;
+      if (!wrapperDiv) return;
+      const container = wrapperDiv || document.querySelector<HTMLElement>(`#${this._options.containerId} #pageContainer-${pageNum}`);
+      if (!container) return;
 
-        domPages.style.top = `${pageTop}px`;
-        // Set the page container dimensions.
-        domPages.style.height = `${viewport.height}px`;
-        domPages.style.width = `${viewport.width}px`;
+      const page = await this._pdfDocument.getPage(pageNum);
+      const scale = this._pdfState.scale;
+      const viewport = page.getViewport({ scale });
+      const top = this._pagePositions.get(pageNum) || 0;
 
-        const canvas = domPages.querySelector('canvas');
-        if (canvas) {
-          canvas.style.width = `${viewport.width}px`;
-          canvas.style.height = `${viewport.height}px`;
+      // resize wrapper
+      container.style.top = `${top}px`;
+      container.style.width = `${viewport.width}px`;
+      container.style.height = `${viewport.height}px`;
+
+      // resize the base canvas
+      const canvas = container.querySelector<HTMLCanvasElement>('canvas');
+      if (canvas) {
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
+      }
+
+      // resize annotation layer
+      const anno = container.querySelector<HTMLElement>(`#${PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER}`);
+      if (anno) {
+        anno.style.width = `${viewport.width}px`;
+        anno.style.height = `${viewport.height}px`;
+      }
+
+      // clear out any old zoomed-in bitmap
+      const zoomDiv = canvas?.nextElementSibling as HTMLElement | null;
+      if (zoomDiv) {
+        zoomDiv.style.width = `${viewport.width}px`;
+        zoomDiv.style.height = `${viewport.height}px`;
+        zoomDiv.innerHTML = '';
+      }
+    };
+
+    if (pageNumber != null) {
+      await resizeOne(pageNumber);
+    } else {
+      // batch-resize all in-DOM pages
+      for (const info of this._cachedPages.values()) {
+        if (info.isVisible) {
+          await resizeOne(info.pageNumber);
         }
+      }
+    }
+  }
 
-        const annotationLayer = domPages.querySelector(`#${PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER}`);
-        if (annotationLayer) {
-          (annotationLayer as HTMLElement).style.width = `${viewport.width}px`;
-          (annotationLayer as HTMLElement).style.height = `${viewport.height}px`;
-        }
+  /**
+   * Updates the styles and dimensions of the pages.
+   * @param targetPageNumber The page number to update.
+   */
+  public async updatePageStylesAndDimensions(targetPageNumber: number | null = null): Promise<void> {
+    await this.calculatePagePositions();
 
-        const zoomContainer = canvas?.nextElementSibling;
-        if (zoomContainer) {
-          (zoomContainer as HTMLElement).style.width = `${viewport.width}px`;
-          (zoomContainer as HTMLElement).style.height = `${viewport.height}px`;
-          zoomContainer.innerHTML = '';
-        }
+    if (targetPageNumber !== null) {
+      const pageInfo = this._cachedPages.get(targetPageNumber);
+      if (pageInfo && pageInfo.isVisible) {
+        // No need for pdfPageProxy check here, _updatePageForNewScale handles it
+        await this._updatePageForNewScale(pageInfo);
       }
     } else {
-      const domPages = document.querySelectorAll(`#${this._options?.containerId} .a-page-view`);
-      if (!domPages) return;
-
-      for (let i = 0; i < domPages.length; i++) {
-        const pageNumber = parseInt(domPages[i].id.split('-')[1]);
-        // Retrieve the PDF page and its viewport.
-        const page: PDFPageProxy = await this._pdf.getPage(pageNumber);
-        const scale: number = this._pdfState.scale;
-        const viewport = page.getViewport({ scale });
-        const pageTop = this._pagePosition.get(pageNumber) || 0;
-
-        (domPages[i] as HTMLElement).style.top = `${pageTop}px`;
-        // Set the page container dimensions.
-        (domPages[i] as HTMLElement).style.height = `${viewport.height}px`;
-        (domPages[i] as HTMLElement).style.width = `${viewport.width}px`;
-
-        const canvas = domPages[i].querySelector('canvas');
-        if (canvas) {
-          canvas.style.width = `${viewport.width}px`;
-          canvas.style.height = `${viewport.height}px`;
-        }
-
-        const annotationLayer = domPages[i].querySelector(`#${PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER}`);
-        if (annotationLayer) {
-          (annotationLayer as HTMLElement).style.width = `${viewport.width}px`;
-          (annotationLayer as HTMLElement).style.height = `${viewport.height}px`;
-        }
-
-        const zoomContainer = canvas?.nextElementSibling;
-        if (zoomContainer) {
-          (zoomContainer as HTMLElement).style.width = `${viewport.width}px`;
-          (zoomContainer as HTMLElement).style.height = `${viewport.height}px`;
-          zoomContainer.innerHTML = '';
-        }
-      }
+      await this.redrawAllVisiblePages();
     }
   }
 
   /**
-   * Renders a high-resolution version of the specified PDF page as an image and appends it
-   * to the page container. The rendered image is wrapped inside a container div which is then
-   * appended to the element with the ID 'canva-presentation' within the corresponding page container.
-   *
-   * @param pageNumber - The number of the page to process.
-   * @returns A promise that resolves once the high-resolution image container has been appended.
+   * Appends a high-resolution image to the page.
+   * @param pageInfo The page information object.
+   * @param viewport The viewport for rendering.
    */
-  public async appendHighResImageToPageContainer(pageNumber: number): Promise<void> {
-    // Get the PDF page and its viewport using the current scale.
-    const page: PDFPageProxy = await this._pdf.getPage(pageNumber);
-    const scale: number = this._pdfState.scale;
-    const viewport = page.getViewport({ scale });
-
-    const img = document.createElement('img');
-    img.style.width = `${viewport.width}px`;
-    img.style.height = `${viewport.height}px`;
-
-    // Render the high-resolution image and obtain its data URL.
-    const [dataUrl, _] = await this._renderHighResImage(viewport, page);
-    img.src = dataUrl;
-
-    // if (scale <= 1) return;
-
-    // Append the image container into the appropriate page container.
-    const pageContainer = document.querySelector(`#${this._pdfState.containerId} #pageContainer-${pageNumber}`);
-    if (pageContainer) {
-      const canvasPresentation = pageContainer.querySelector('#canva-presentation');
-      if (canvasPresentation) {
-        const imgContainer = canvasPresentation.querySelector('#a-zoomed-page-image-container');
-        if (imgContainer) {
-          imgContainer.appendChild(img);
-        }
+  public async appendHighResImage(pageInfo: CachedPageInfo, viewport: PageViewport): Promise<void> {
+    if (!pageInfo.pdfPageProxy || !pageInfo.isVisible) {
+      if (pageInfo.highResImageBitmap) {
+        pageInfo.highResImageBitmap.close();
+        pageInfo.highResImageBitmap = undefined;
+        const imageContainer = pageInfo.pageWrapperDiv.querySelector(`#zoomedImageContainer-${pageInfo.pageNumber}`);
+        if (imageContainer) imageContainer.innerHTML = '';
       }
+      return;
     }
-  }
 
-  /**
-   * Renders a high-resolution image of a PDF page onto a canvas and returns the image as a data URL.
-   * The rendered image is generated using the provided viewport and PDF page. The method returns a tuple
-   * containing the data URL of the rendered image (in PNG format) along with the canvas element used for rendering.
-   *
-   * @param viewport - The PageViewport representing the dimensions and scale of the PDF page.
-   * @param page - The PDFPageProxy object representing the PDF page to render.
-   * @returns A promise that resolves with a tuple: [dataUrl: string, canvas: HTMLCanvasElement].
-   */
-  private async _renderHighResImage(viewport: PageViewport, page: PDFPageProxy): Promise<[string, HTMLCanvasElement]> {
-    // Create a canvas with dimensions based on the viewport.
-    const [canvas, context] = PageElement.createCanvas(viewport);
+    if (pageInfo.highResRenderTask) pageInfo.highResRenderTask.cancel();
+    if (pageInfo.highResImageBitmap) pageInfo.highResImageBitmap.close();
+    pageInfo.highResImageBitmap = undefined; // Clear previous before new render
 
-    // Render the PDF page onto the canvas.
-    const renderContext: RenderParameters = {
-      canvasContext: context,
-      viewport,
+    const imageContainer = pageInfo.pageWrapperDiv.querySelector(`#zoomedImageContainer-${pageInfo.pageNumber}`) as HTMLElement;
+    if (!imageContainer) {
+      return;
+    }
+    imageContainer.innerHTML = '';
+
+    const [offscreenCanvas, offscreenContext] = PageElement.getCanvasFromPool(viewport);
+
+    const renderParams: RenderParameters = {
+      canvasContext: offscreenContext,
+      viewport: viewport,
       annotationMode: 2,
     };
-    await page.render(renderContext).promise;
 
-    return [canvas.toDataURL('image/png'), canvas];
+    pageInfo.highResRenderTask = pageInfo.pdfPageProxy.render(renderParams);
+    try {
+      await pageInfo.highResRenderTask.promise;
+      Logger.info(`base render complete`, { page: pageInfo.pageNumber });
+      if (!pageInfo.isVisible) {
+        PageElement.releaseCanvasToPool(offscreenCanvas);
+        pageInfo.highResRenderTask = undefined;
+        return;
+      }
+      const bitmap = await createImageBitmap(offscreenCanvas);
+      pageInfo.highResImageBitmap = bitmap;
+
+      const displayCanvas = document.createElement('canvas');
+      const ratio = window.devicePixelRatio || 1;
+      displayCanvas.width = Math.floor(viewport.width * ratio);
+      displayCanvas.height = Math.floor(viewport.height * ratio);
+      displayCanvas.style.width = `${viewport.width}px`;
+      displayCanvas.style.height = `${viewport.height}px`;
+
+      const displayCtx = displayCanvas.getContext('2d');
+      if (displayCtx) {
+        displayCtx.drawImage(bitmap, 0, 0, displayCanvas.width, displayCanvas.height);
+        imageContainer.appendChild(displayCanvas);
+      } else {
+        bitmap.close();
+        pageInfo.highResImageBitmap = undefined;
+      }
+    } catch (error: any) {
+      if (error && error.name === 'RenderingCancelledException') {
+        // console.log(`High-res rendering cancelled for page ${pageInfo.pageNumber}`);
+      } else {
+        console.error(`Error rendering high-res image for page ${pageInfo.pageNumber}:`, error);
+      }
+      if (pageInfo.highResImageBitmap) {
+        pageInfo.highResImageBitmap.close();
+        pageInfo.highResImageBitmap = undefined;
+      }
+    } finally {
+      pageInfo.highResRenderTask = undefined;
+      PageElement.releaseCanvasToPool(offscreenCanvas);
+    }
   }
 
-  destroy() {
-    // remove its scroll listener
-    this._container?.removeEventListener('scroll', this._scrollHandler);
-    // unsubscribe its scale-change hook
-    this._pdfState.off('scaleChange', this._bindOnScaleChange);
+  /**
+   * Cleans up resources and removes event listeners.
+   */
+  destroy(): void {
+    this._thumbnailViewer?.destroy();
+    this._thumbnailViewer = null;
+    this._scrollableContainer.removeEventListener('scroll', this._scrollHandler);
+    this._pdfState.off('scaleChange', this._boundOnScaleChange);
+    this._debouncedEnsureVisiblePagesRendered.cancel(); // Cancel any pending debounced calls
+    this._throttledScrollHandler.cancel(); // Cancel any pending throttled calls
+    this._intersectionObserver?.disconnect();
+    this._intersectionObserver = null;
+
+    this._cachedPages.forEach((pageInfo, pageNumber) => {
+      Logger.info('destroying PageVirtualization');
+      this._removePageFromDom(pageNumber);
+    });
+    this._cachedPages.clear();
+
+    this._pageWrapperPool.forEach((wrapper) => wrapper.remove());
+    this._pageWrapperPool = [];
+
+    if (this._canvasPool) {
+      // Check if canvas pool was initialized
+      this._canvasPool.destroy();
+    }
+
+    this._pagePositions.clear();
+
+    if (this._pageIntersectionObserver) {
+      this._pageIntersectionObserver.disconnect();
+      this._pageIntersectionObserver = null;
+    }
   }
 }
 

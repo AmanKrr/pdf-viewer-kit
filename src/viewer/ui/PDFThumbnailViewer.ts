@@ -17,7 +17,7 @@
 import { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import { PDF_VIEWER_CLASSNAMES } from '../../constants/pdf-viewer-selectors';
 import { PDFThumbnailViewOptions } from '../../types/thumbnail.types';
-import { PDFLinkService } from '../services/LinkService';
+import { PDFLinkService } from '../services/LS';
 
 /**
  * Manages the creation, rendering, and interaction of PDF thumbnails in the sidebar.
@@ -27,7 +27,10 @@ class ThumbnailViewer {
   private _pdfDocument: PDFDocumentProxy;
   private _pageNumber: number;
   private _linkService: PDFLinkService | null;
+
   private _canvas: HTMLCanvasElement | null = null;
+  private _thumbnailDiv: HTMLElement | null = null;
+  private _clickHandler: ((e: MouseEvent) => void) | null = null;
 
   /**
    * Constructs a `ThumbnailViewer` instance.
@@ -39,7 +42,7 @@ class ThumbnailViewer {
     this._container = container;
     this._pdfDocument = pdfDocument;
     this._pageNumber = pageNumber;
-    this._linkService = linkService || null;
+    this._linkService = linkService ?? null;
   }
 
   /**
@@ -52,10 +55,9 @@ class ThumbnailViewer {
     const thumbnailContainer = document.createElement('div');
     thumbnailContainer.classList.add(PDF_VIEWER_CLASSNAMES.A_SIDEBAR_CONTAINER);
 
-    const innerThumbnailContent = document.createElement('div');
-    innerThumbnailContent.classList.add(PDF_VIEWER_CLASSNAMES.A_INNER_SIDEBAR_CONTAINER_CONTENT);
-
-    thumbnailContainer.appendChild(innerThumbnailContent);
+    const inner = document.createElement('div');
+    inner.classList.add(PDF_VIEWER_CLASSNAMES.A_INNER_SIDEBAR_CONTAINER_CONTENT);
+    thumbnailContainer.appendChild(inner);
 
     const pdfViewer = document.querySelector(`#${parentContainerId} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
     if (!pdfViewer) {
@@ -64,7 +66,7 @@ class ThumbnailViewer {
     }
 
     pdfViewer.prepend(thumbnailContainer);
-    return innerThumbnailContent;
+    return inner;
   }
 
   /**
@@ -80,12 +82,16 @@ class ThumbnailViewer {
    * Initializes and renders the thumbnail for the current page.
    */
   public async initThumbnail(): Promise<void> {
-    const thumbnailDiv = document.createElement('div');
-    thumbnailDiv.className = 'thumbnail';
-    thumbnailDiv.dataset.pageNumber = this._pageNumber.toString();
-    this._container.appendChild(thumbnailDiv);
+    const thumb = document.createElement('div');
+    thumb.className = 'thumbnail';
+    thumb.dataset.pageNumber = String(this._pageNumber);
+    this._container.appendChild(thumb);
 
-    await this._renderThumbnail(thumbnailDiv);
+    this._thumbnailDiv = thumb;
+    this._clickHandler = () => this._thumbnailDestination(thumb);
+
+    await this._renderThumbnail(thumb);
+    thumb.addEventListener('click', this._clickHandler);
   }
 
   /**
@@ -94,19 +100,18 @@ class ThumbnailViewer {
    * @param {number} pageNumber - The page number to be set as active.
    */
   set activeThumbnail(pageNumber: number) {
-    if (pageNumber < 0 || pageNumber > this.totalPages) {
-      console.error(`${pageNumber} is an invalid page number.`);
+    if (pageNumber < 1 || pageNumber > this.totalPages) {
+      console.error(`${pageNumber} is invalid.`);
       return;
     }
-
     if (!this._linkService) {
-      console.log(`this._linkService is ${this._linkService}`);
+      console.log(`no linkService`);
       return;
     }
-
-    const thumbnailToBeActive = this._container.querySelector(`[data-page-number="${pageNumber}"]`);
-    if (thumbnailToBeActive) {
-      this._thumbnailDestination(thumbnailToBeActive as HTMLElement, pageNumber);
+    const toActivate = this._container.querySelector<HTMLElement>(`[data-page-number="${pageNumber}"]`);
+    console.log(`toActivate`, toActivate);
+    if (toActivate) {
+      this._thumbnailDestination(toActivate, pageNumber);
     }
   }
 
@@ -133,7 +138,7 @@ class ThumbnailViewer {
 
     const ctx = this._canvas.getContext('2d', { alpha: false, willReadFrequently: true });
     if (!ctx) {
-      throw new Error('Canvas context is not available.');
+      throw new Error('Canvas context unavailable');
     }
 
     const transform = [upscaleFactor, 0, 0, upscaleFactor, 0, 0];
@@ -141,27 +146,20 @@ class ThumbnailViewer {
     // Render the page onto the canvas
     await page.render({ canvasContext: ctx, viewport, transform }).promise;
 
-    // Create an image and scale it down for display
+    // snapshot to an <img>
     const img = document.createElement('img');
-    img.src = this._canvas.toDataURL('image/png'); // Use PNG for better quality
+    img.src = this._canvas.toDataURL('image/png');
     img.className = 'thumbnail-image';
     img.style.width = `${viewport.width}px`;
     img.style.height = `${viewport.height}px`;
-
-    // Append the image to the thumbnail container
     thumbnailDiv.appendChild(img);
 
-    // Add page number label
     const label = document.createElement('div');
     label.classList.add('pagenumber-label');
-    label.textContent = `${this._pageNumber}`;
-    thumbnailDiv.append(label);
+    label.textContent = String(this._pageNumber);
+    thumbnailDiv.appendChild(label);
 
-    // Add click event for navigation
-    thumbnailDiv.addEventListener('click', () => this._thumbnailDestination(thumbnailDiv));
-
-    // Free up memory as soon as canvas work is done
-    this.destroy();
+    this.destroyCanvasOnly();
   }
 
   /**
@@ -172,7 +170,7 @@ class ThumbnailViewer {
    */
   private _thumbnailDestination(thumbnailDiv: HTMLElement, pageNumber: number = -1): void {
     if (!this._linkService) {
-      console.log(`this._linkService is ${this._linkService}`);
+      console.log(`no linkService`);
       return;
     }
 
@@ -185,11 +183,18 @@ class ThumbnailViewer {
       }
     }
 
+    console.log('thumbnailDiv', thumbnailDiv);
     if (thumbnailDiv) {
       thumbnailDiv.classList.add('thumbnail-active');
-      if (this._linkService.currentPageNumber !== pageNumber) {
-        this._linkService?.goToPage(pagenumber);
-      }
+      this._linkService?.goToPage(pagenumber);
+    }
+  }
+
+  /** only remove the canvas bit, keep thumbnail DIV & listener intact */
+  private destroyCanvasOnly(): void {
+    if (this._canvas) {
+      this._canvas.remove();
+      this._canvas = null;
     }
   }
 
@@ -197,8 +202,14 @@ class ThumbnailViewer {
    * Cleans up resources and removes the canvas to free memory.
    */
   public destroy(): void {
-    this._canvas?.remove();
-    this._canvas = null;
+    if (this._thumbnailDiv && this._clickHandler) {
+      this._thumbnailDiv.removeEventListener('click', this._clickHandler);
+    }
+    if (this._thumbnailDiv) {
+      this._thumbnailDiv.remove();
+      this._thumbnailDiv = null;
+    }
+    this.destroyCanvasOnly();
   }
 }
 

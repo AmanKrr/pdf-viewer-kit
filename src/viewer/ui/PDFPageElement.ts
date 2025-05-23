@@ -16,137 +16,149 @@
 
 import { PageViewport } from 'pdfjs-dist';
 import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
+import CanvasPool from './CanvasPool';
 
 /**
- * A utility class for managing and creating various elements related to rendering PDF pages in a viewer.
+ * Utility class for managing and creating elements related to rendering PDF pages.
  */
 class PageElement {
-  /** The gap between consecutive pages in the viewer. */
   public static gap = 15;
+  private static _canvasPool: CanvasPool | null = null;
 
   /**
-   * Creates a container `<div>` element for a PDF page.
-   *
-   * @param {number} pageNumber - The page number to create a container for.
-   * @param {PageViewport} viewport - The viewport object representing the page dimensions.
-   * @param {Map<number, number>} pagePositionInfo - A map storing page positions.
-   * @returns {HTMLDivElement} The created page container element.
+   * Initializes PageElement with a CanvasPool instance.
+   * Must be called once before using canvas-related methods.
+   * @param canvasPoolInstance The global CanvasPool instance.
    */
-  static createPageContainerDiv(pageNumber: number, viewport: PageViewport, pagePositionInfo: Map<number, number>): HTMLDivElement {
-    const div = document.createElement('div');
+  static init(canvasPoolInstance: CanvasPool): void {
+    this._canvasPool = canvasPoolInstance;
+  }
 
-    // Apply necessary styles
+  /**
+   * Creates or updates a container `<div>` element for a PDF page.
+   * Intended to be recycled by the PageVirtualization logic.
+   *
+   * @param pageNumber The page number.
+   * @param viewport The viewport of the page.
+   * @param pagePositionInfo Map of page numbers to their top positions.
+   * @param recycleDiv An optional existing div to reuse.
+   * @returns The configured page container element.
+   */
+  static createOrUpdatePageContainerDiv(pageNumber: number, viewport: PageViewport, pagePositionInfo: Map<number, number>, recycleDiv?: HTMLDivElement): HTMLDivElement {
+    const div = recycleDiv || document.createElement('div');
+
+    if (recycleDiv) {
+      while (div.firstChild) {
+        div.removeChild(div.firstChild);
+      }
+    }
+
     div.style.position = 'absolute';
-    div.style.top = `${pagePositionInfo.get(pageNumber)}px`;
-
+    div.style.top = `${pagePositionInfo.get(pageNumber) || 0}px`;
     div.id = `pageContainer-${pageNumber}`;
-    div.classList.add(PDF_VIEWER_CLASSNAMES.A_PAGE_VIEW);
-
-    // Set page container dimensions
+    div.className = PDF_VIEWER_CLASSNAMES.A_PAGE_VIEW;
     div.style.height = `${viewport.height}px`;
     div.style.width = `${viewport.width}px`;
+    div.style.backgroundColor = 'var(--web-pdf-viewer-page-background-color, white)';
+    div.setAttribute('data-page-number', pageNumber.toString());
 
     return div;
   }
 
   /**
-   * Creates a `<canvas>` element for rendering a PDF page.
+   * Retrieves a canvas and its context from the canvas pool for rendering.
    *
-   * @param {PageViewport} viewport - The viewport object representing the page dimensions.
-   * @returns {[HTMLCanvasElement, CanvasRenderingContext2D]} A tuple containing the created canvas and its rendering context.
+   * @param viewport The viewport object representing the page dimensions.
+   * @returns A tuple containing the canvas element and its 2D rendering context.
+   * @throws If the CanvasPool has not been initialized.
    */
-  static createCanvas(viewport: PageViewport): [HTMLCanvasElement, CanvasRenderingContext2D] {
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d')!;
-    const ratio = window.devicePixelRatio || 1;
+  static getCanvasFromPool(viewport: PageViewport): [HTMLCanvasElement, CanvasRenderingContext2D] {
+    if (!this._canvasPool) {
+      throw new Error('CanvasPool not initialized in PageElement. Call PageElement.init() first.');
+    }
+    return this._canvasPool.getCanvas(viewport.width, viewport.height);
+  }
 
-    // Set canvas dimensions considering device pixel ratio
-    canvas.width = viewport.width * ratio;
-    canvas.height = viewport.height * ratio;
-    canvas.style.width = `${viewport.width}px`;
-    canvas.style.height = `${viewport.height}px`;
-
-    // Scale the canvas to match pixel density for high-quality rendering
-    context.scale(ratio, ratio);
-
-    return [canvas, context];
+  /**
+   * Releases a canvas back to the CanvasPool for reuse.
+   *
+   * @param canvas The canvas element to release.
+   */
+  static releaseCanvasToPool(canvas: HTMLCanvasElement): void {
+    if (!this._canvasPool) return;
+    this._canvasPool.releaseCanvas(canvas);
   }
 
   /**
    * Creates the main container elements required for the PDF viewer.
+   * Called once during viewer setup.
    *
-   * @param {string} containerId - The ID of the parent container where the viewer will be appended.
-   * @param {number} scale - The scale factor to be applied to the viewer.
-   * @returns {object} An object containing references to the created container elements.
+   * @param containerId The ID of the parent container where the viewer will be appended.
+   * @param scale The initial scale factor.
+   * @returns An object with references to the created container elements.
    */
   static containerCreation(containerId: string, scale: number) {
-    // Create the parent container for the PDF viewer
     const pdfParentViewer = document.createElement('div');
-    pdfParentViewer.setAttribute('class', `${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} pdf-loading`);
+    pdfParentViewer.className = `${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} pdf-loading`;
 
-    // Create the toolbar container
     const toolbarParent = document.createElement('div');
     toolbarParent.classList.add(PDF_VIEWER_CLASSNAMES.A_TOOLBAR_ITEMS);
-    toolbarParent.setAttribute('id', PDF_VIEWER_IDS.TOOLBAR_CONTAINER);
+    toolbarParent.id = PDF_VIEWER_IDS.TOOLBAR_CONTAINER;
 
-    // Create and append toolbar groups
     const groupOneParent = document.createElement('div');
-    groupOneParent.setAttribute('id', PDF_VIEWER_IDS.TOOLBAR_GROUP_ONE);
+    groupOneParent.id = PDF_VIEWER_IDS.TOOLBAR_GROUP_ONE;
     groupOneParent.classList.add(PDF_VIEWER_CLASSNAMES.TOOLBAR_GROUP);
     toolbarParent.appendChild(groupOneParent);
 
     const groupTwoParent = document.createElement('div');
-    groupTwoParent.setAttribute('id', PDF_VIEWER_IDS.TOOLBAR_GROUP_TWO);
+    groupTwoParent.id = PDF_VIEWER_IDS.TOOLBAR_GROUP_TWO;
     groupTwoParent.classList.add(PDF_VIEWER_CLASSNAMES.TOOLBAR_GROUP);
     toolbarParent.appendChild(groupTwoParent);
 
-    // Create the main page viewer container
     const pageParentViewer = document.createElement('div');
     pageParentViewer.classList.add(PDF_VIEWER_CLASSNAMES.A_VIEWER_CONTAINER);
-    pageParentViewer.setAttribute('id', PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER);
+    pageParentViewer.id = PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER;
 
-    // Create an inner container that will hold all the pages
     const pageContainer = document.createElement('div');
     pageContainer.classList.add(PDF_VIEWER_CLASSNAMES.A_PAGE_CONTAINER);
-    pageContainer.setAttribute('id', PDF_VIEWER_IDS.MAIN_PAGE_VIEWER_CONTAINER);
+    pageContainer.id = PDF_VIEWER_IDS.MAIN_PAGE_VIEWER_CONTAINER;
     pageContainer.style.setProperty('--scale-factor', String(scale));
 
-    // Append page container to the page viewer
     pageParentViewer.appendChild(pageContainer);
     pdfParentViewer.appendChild(toolbarParent);
 
-    // Create a wrapper to hold the sidebar and page viewer
-    const sidebarAndPageViewerWrapper = document.createElement('div');
-    sidebarAndPageViewerWrapper.classList.add(PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER);
-    sidebarAndPageViewerWrapper.appendChild(pageParentViewer);
-    pdfParentViewer.appendChild(sidebarAndPageViewerWrapper);
+    const wrapper = document.createElement('div');
+    wrapper.classList.add(PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER);
+    wrapper.appendChild(pageParentViewer);
+    pdfParentViewer.appendChild(wrapper);
 
-    // Append the main PDF viewer container to the specified wrapper container
-    const wrapperContainer = document.getElementById(containerId)!;
-    wrapperContainer.appendChild(pdfParentViewer);
+    document.getElementById(containerId)!.appendChild(pdfParentViewer);
 
     return {
       parent: pdfParentViewer,
+      viewerContainer: pageParentViewer,
+      pagesContainer: pageContainer,
       injectElementId: PDF_VIEWER_IDS.MAIN_PAGE_VIEWER_CONTAINER,
     };
   }
 
   /**
-   * Creates layer elements (e.g., text, annotation layers) for a PDF page.
+   * Creates a layer `<div>` element (e.g., text or annotation layer) for a PDF page.
    *
-   * @param {string} classNames - The class names to be assigned to the layer.
-   * @param {string} ids - The ID to be assigned to the layer.
-   * @param {PageViewport} viewport - The viewport object representing the page dimensions.
-   * @returns {HTMLDivElement} The created layer `<div>` element.
+   * @param classNames CSS class names for the layer.
+   * @param ids The ID attribute for the layer.
+   * @param viewport The viewport defining layer size.
+   * @returns The created layer `<div>` element.
    */
   static createLayers(classNames: string, ids: string, viewport: PageViewport): HTMLDivElement {
     const layerDiv = document.createElement('div');
-
     layerDiv.className = classNames;
-    layerDiv.setAttribute('id', ids);
+    layerDiv.id = ids;
     layerDiv.style.width = `${viewport.width}px`;
     layerDiv.style.height = `${viewport.height}px`;
-
+    layerDiv.style.position = 'absolute';
+    layerDiv.style.left = '0';
+    layerDiv.style.top = '0';
     return layerDiv;
   }
 }

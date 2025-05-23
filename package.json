@@ -1,7 +1,8 @@
 {
   "name": "pdf-viewer-kit",
   "description": "PDF-Viewer-Kit is a versatile, framework-agnostic library designed to render, manipulate, and interact with PDF documents seamlessly. Whether you're building a React, Next.js, Angular, or any other frontend application, PDF-Kit provides you with a well-structured, modular, and feature-rich solution for embedding PDF viewers into your web applications.",
-  "main": "dist/index.js",
+  "main": "dist/pdfkit.cjs.js",
+  "module": "dist/pdfkit.es.js",
   "types": "dist/index.d.ts",
   "author": "Aman Kumar",
   "private": false,
@@ -41,18 +42,16 @@
     "@semantic-release/release-notes-generator": "14.0.3",
     "@semantic-release/exec": "^6.0.3",
     "@semantic-release/github": "^9.0.0",
-    "@types/lodash": "4.17.16",
     "@types/node": "20.11.6",
-    "@types/react": "19.1.2",
-    "copyfiles": "^2.4.1",
-    "rimraf": "6.0.1",
     "semantic-release": "24.2.3",
     "typedoc": "^0.28.3",
     "typedoc-github-theme": "^0.3.0",
     "typedoc-plugin-markdown": "^4.6.3",
-    "typescript": "5.8.3",
-    "uglify-js": "^3.17.4",
-    "uglifycss": "^0.0.29"
+    "@types/lodash": "^4.17.17",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "vite-plugin-css-injected-by-js": "^3.5.2",
+    "vite-plugin-dts": "^4.5.4"
   },
   "release": {
     "repositoryUrl": "https://github.com/AmanKrr/pdf-kit.git",

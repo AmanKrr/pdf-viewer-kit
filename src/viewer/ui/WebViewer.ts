@@ -44,7 +44,7 @@ class WebViewer {
   private _zoomHandler: ZoomHandler;
   private _annotationService: AnnotationService;
   private _toolbar: Toolbar | undefined;
-  private _bindScrollHandler = this._onScroll.bind(this);
+  private _boundScrollHandler;
   private _downloadManager;
 
   public ready!: Promise<void>;
@@ -77,7 +77,7 @@ class WebViewer {
     );
     this._pageVirtualization = new PageVirtualization(
       this._viewerOptions,
-      parentContainer,
+      parentContainer.querySelector(`#${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}`)!,
       pageParentContainer,
       this._pdfInstance.numPages,
       this,
@@ -94,6 +94,7 @@ class WebViewer {
       this._toolbar!.render(toolbarHost);
     }
 
+    this._boundScrollHandler = this._onScroll.bind(this);
     this._addEvents();
     this._zoomHandler = new ZoomHandler(this._pdfState, this._pageVirtualization);
     this._annotationService = new AnnotationService(this._pdfState, this);
@@ -132,6 +133,7 @@ class WebViewer {
         },
       );
       this._pageVirtualization.pageObserver = this._intersectionObserver;
+      this._pageVirtualization._forceObservePage();
     }
   }
 
@@ -140,14 +142,14 @@ class WebViewer {
    */
   private _addEvents() {
     const mainViewer = document.querySelector(`#${this._viewerOptions.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}`);
-    if (mainViewer) {
-      mainViewer.addEventListener('scroll', this._bindScrollHandler);
+    if (mainViewer && this._viewerOptions.toolbarOptions?.showThumbnail) {
+      mainViewer.addEventListener('scroll', this._boundScrollHandler);
     }
   }
 
-  private _onScroll(event: Event) {
-    debounce(() => this._syncThumbnailScrollWithMainPageContainer(), 600)();
-  }
+  private _onScroll = debounce((event: Event) => {
+    this._syncThumbnailScrollWithMainPageContainer();
+  }, 120);
 
   /**
    * Synchronizes the thumbnail sidebar scroll position with the currently viewed page.
@@ -158,7 +160,7 @@ class WebViewer {
     if (previousActiveThumbnail) {
       previousActiveThumbnail.classList.remove(`thumbnail-active`);
     }
-    const thumbnailToBeActive = document.querySelector(`#${this._viewerOptions.containerId} [data-page-number="${pageNumber}"]`);
+    const thumbnailToBeActive = document.querySelector(`#${this._viewerOptions.containerId} .thumbnail[data-page-number="${pageNumber}"]`);
     if (thumbnailToBeActive) {
       thumbnailToBeActive.classList.add('thumbnail-active');
       thumbnailToBeActive.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -166,10 +168,18 @@ class WebViewer {
   }
 
   /**
+   * @returns {AnnotationService} The annotation service instance.
+   * This service is responsible for managing annotations in the PDF viewer.
+   */
+  get annotation() {
+    return this._annotationService;
+  }
+
+  /**
    * @returnss visible page numbers in the PDF viewer.
    */
   get visiblePageNumbers() {
-    return this._pageVirtualization.visiblePages;
+    return this._pageVirtualization.currentlyVisiblePages;
   }
 
   /** @returns {number} The currently active page number. */
@@ -182,8 +192,9 @@ class WebViewer {
     return this._pdfState.pdfInstance?.numPages;
   }
 
-  get annotation() {
-    return this._annotationService;
+  /** @returns {number} The current zoom scale of the PDF viewer. */
+  get currentScale(): number {
+    return this._pdfState.scale;
   }
 
   /**
@@ -306,7 +317,7 @@ class WebViewer {
    */
   public goToPage(pageNumber: number) {
     if (pageNumber >= 1 && pageNumber <= this.totalPages!) {
-      const pagePosition = this._pageVirtualization.cachedPagePosition.get(pageNumber);
+      const pagePosition = this._pageVirtualization.pagePositions.get(pageNumber);
       if (pagePosition != undefined) {
         const scrollElement = document.querySelector(`#${this._viewerOptions.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}`);
         if (scrollElement) {
@@ -369,7 +380,8 @@ class WebViewer {
 
   public destroy(): void {
     const main = document.querySelector(`#${this._viewerOptions.containerId} #${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}`);
-    main?.removeEventListener('scroll', this._bindScrollHandler);
+    this._boundScrollHandler.cancel();
+    main?.removeEventListener('scroll', this._boundScrollHandler);
 
     this._intersectionObserver?.disconnect();
     this._annotationService.destroy();

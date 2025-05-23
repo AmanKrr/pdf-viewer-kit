@@ -22,14 +22,6 @@ import PdfState from '../viewer/ui/PDFState';
 import PageElement from '../viewer/ui/PDFPageElement';
 import PasswordManager from '../viewer/manager/PDFPasswordManager';
 
-// Import stylesheets for different PDF UI layers.
-import '../style/toolbar.css';
-import '../style/global.css';
-import '../style/text-layer.css';
-import '../style/thumbnail.css';
-import '../style/annotation-layer.css';
-import '../style/annotation-drawer-layer.css';
-
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist';
 import { LoadOptions } from '../types/webpdf.types';
 import { getPdfWorkerSrc } from '../utils/worker-factory';
