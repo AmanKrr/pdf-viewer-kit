@@ -25,6 +25,7 @@ import { Resizer } from './Resizer';
  * selection, deletion, and automatic zoom synchronization.
  */
 export class RectangleAnnotation extends Annotation {
+  private _interactive = true;
   private _fillColor: string;
   private _strokeColor: string;
   private _strokeWidth: number;
@@ -86,15 +87,16 @@ export class RectangleAnnotation extends Annotation {
    * @param y1         Height of the rectangle
    * @param pageNumber PDF page index
    */
-  public draw(x0: number, x1: number, y0: number, y1: number, pageNumber: number): void {
+  public draw(x0: number, x1: number, y0: number, y1: number, pageNumber: number, interactive: boolean): void {
+    this._interactive = interactive;
     this.__startX = x0;
     this.__startY = y0;
     this.isDrawing = false;
 
     this.__svg.style.left = `${x0}px`;
     this.__svg.style.top = `${y0}px`;
-    this.__svg.setAttribute('width', `${x1 + INNER_PADDING_PX * 2}`);
-    this.__svg.setAttribute('height', `${y1 + INNER_PADDING_PX * 2}`);
+    this.__svg.setAttribute('width', `${x1}`);
+    this.__svg.setAttribute('height', `${y1}`);
     this._pageNumber = pageNumber;
 
     this._createSvgRect(INNER_PADDING_PX.toString(), y1, x1);
@@ -146,12 +148,12 @@ export class RectangleAnnotation extends Annotation {
    * @param opts.select       Auto-select after drawing
    * @param opts.shapeUpdate  Emit ANNOTATION_CREATED event
    */
-  public stopDrawing(opts: { select?: boolean; shapeUpdate?: boolean } = { select: true, shapeUpdate: true }): void {
+  public stopDrawing(): void {
     super.stopDrawing();
     this._maintainOriginalBounding();
     this._setRectInfo();
-    if (opts.select) this.select();
-    if (opts.shapeUpdate) this._onShapeUpdate();
+    this.select();
+    this._onShapeUpdate();
   }
 
   /**
@@ -373,6 +375,7 @@ export class RectangleAnnotation extends Annotation {
       strokeStyle: this._strokeStyle,
       opacity: this._opacity,
       type: 'rectangle',
+      interactive: this._interactive,
     };
   }
 

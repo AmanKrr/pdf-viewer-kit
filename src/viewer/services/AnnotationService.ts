@@ -73,8 +73,7 @@ export class AnnotationService {
     const pageAnnotations = this._annotations.get(page);
     if (pageAnnotations) {
       for (const annotation of pageAnnotations) {
-        // interactive=false renders without user drag
-        manager.addAnnotation(annotation, false, (annotation as any).interactive === false);
+        manager.addAnnotation(annotation);
       }
     }
   }
@@ -287,11 +286,9 @@ export class AnnotationService {
     const annotation = {
       ...annotationInput,
       id: this._generateUniqueId(),
-      interactive: false,
-    } as ShapeConfig & { interactive: boolean };
+    } as ShapeConfig;
 
     const page = annotation.pageNumber;
-    this._goTo(page);
 
     const pageAnnotations = this._annotations.get(page) ?? [];
     pageAnnotations.push(annotation);
@@ -299,7 +296,7 @@ export class AnnotationService {
 
     const manager = this._annotationManagers.get(page);
     if (manager) {
-      manager.addAnnotation(annotation, true, true);
+      manager.addAnnotation(annotation);
     }
 
     return annotation.id;

@@ -9,6 +9,7 @@ export interface DrawConfig {
 interface BaseConfig extends DrawConfig {
   id: string;
   pageNumber: number;
+  interactive: boolean;
 }
 
 export interface RectangleConfig extends BaseConfig {
@@ -34,12 +35,6 @@ export interface LineConfig extends BaseConfig {
   y2: number;
 }
 
-// export interface PolygonConfig extends BaseConfig {
-//   type: 'polygon';
-//   points: { x: number; y: number }[];
-// }
-
-// Now, the union type:
 export type ShapeConfig = RectangleConfig | EllipseConfig | LineConfig;
 
 export type ShapeType = 'rectangle' | 'ellipse' | 'line';

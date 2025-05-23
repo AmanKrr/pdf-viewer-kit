@@ -30,11 +30,8 @@ export interface IAnnotation {
 
   /**
    * Complete the drawing operation.
-   *
-   * @param opts.select - If true, select the annotation after drawing.
-   * @param opts.shapeUpdate - If true, emit a shape‐update event.
    */
-  stopDrawing(opts?: { select?: boolean; shapeUpdate?: boolean }): void;
+  stopDrawing(): void;
 
   /** Show selection UI (handles, outline, etc.). */
   select(): void;

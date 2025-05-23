@@ -34,6 +34,7 @@ export class LineAnnotation extends Annotation {
     return this.annotationId;
   }
 
+  private _interactive = true;
   private _opacity: number;
   private _strokeColor: string;
   private _strokeWidth: number;
@@ -87,7 +88,8 @@ export class LineAnnotation extends Annotation {
    * @param y2         Page‐space Y of the second endpoint
    * @param pageNumber Index of the PDF page
    */
-  public draw(x1: number, y1: number, x2: number, y2: number, pageNumber: number): void {
+  public draw(x1: number, y1: number, x2: number, y2: number, pageNumber: number, interactive: boolean): void {
+    this._interactive = interactive;
     const pad = INNER_PADDING_PX;
     const minX = Math.min(x1, x2),
       minY = Math.min(y1, y2);
@@ -165,12 +167,12 @@ export class LineAnnotation extends Annotation {
    * @param opts.select       Automatically select the shape
    * @param opts.shapeUpdate  Emit ANNOTATION_CREATED event
    */
-  public stopDrawing(opts = { select: true, shapeUpdate: true }): void {
+  public stopDrawing(): void {
     super.stopDrawing();
     this._captureOriginal();
     this._setLineInfo();
-    if (opts.select) this.select();
-    if (opts.shapeUpdate) this._onShapeUpdate();
+    this.select();
+    this._onShapeUpdate();
   }
 
   /**
@@ -374,6 +376,7 @@ export class LineAnnotation extends Annotation {
       strokeStyle: this._strokeStyle,
       opacity: this._opacity,
       type: 'line',
+      interactive: this._interactive,
     };
   }
 

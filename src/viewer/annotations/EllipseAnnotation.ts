@@ -33,6 +33,7 @@ export class EllipseAnnotation extends Annotation {
     return this.annotationId;
   }
 
+  private _interactive = true;
   private _fillColor: string;
   private _strokeColor: string;
   private _strokeWidth: number;
@@ -85,7 +86,8 @@ export class EllipseAnnotation extends Annotation {
    * @param ry         Logical vertical radius
    * @param pageNumber Page index for this annotation
    */
-  public draw(cx: number, cy: number, rx: number, ry: number, pageNumber: number): void {
+  public draw(cx: number, cy: number, rx: number, ry: number, pageNumber: number, interactive: boolean): void {
+    this._interactive = interactive;
     const pad = INNER_PADDING_PX;
     const left = cx - rx - pad;
     const top = cy - ry - pad;
@@ -150,12 +152,12 @@ export class EllipseAnnotation extends Annotation {
    * @param opts.select      If true, the ellipse is auto-selected
    * @param opts.shapeUpdate If true, fires ANNOTATION_CREATED
    */
-  public stopDrawing(opts = { select: true, shapeUpdate: true }): void {
+  public stopDrawing(): void {
     super.stopDrawing();
     this._captureOriginal();
     this._setEllipseInfo();
-    if (opts.select) this.select();
-    if (opts.shapeUpdate) this._onShapeUpdate();
+    this.select();
+    this._onShapeUpdate();
   }
 
   /** Adds resizers and listens for Delete/Backspace. */
@@ -336,6 +338,7 @@ export class EllipseAnnotation extends Annotation {
       strokeStyle: this._strokeStyle,
       opacity: this._opacity,
       type: 'ellipse',
+      interactive: this._interactive,
     };
   }
 

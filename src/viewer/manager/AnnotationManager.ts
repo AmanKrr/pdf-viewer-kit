@@ -269,14 +269,14 @@ export class AnnotationManager {
     });
 
     if (shapeConfig.type === 'rectangle') {
-      (shape as any).draw(shapeConfig.x0 ?? 0, shapeConfig.x1 ?? 0, shapeConfig.y0 ?? 0, shapeConfig.y1 ?? 0, shapeConfig.pageNumber);
+      (shape as any).draw(shapeConfig.x0 ?? 0, shapeConfig.x1 ?? 0, shapeConfig.y0 ?? 0, shapeConfig.y1 ?? 0, shapeConfig.pageNumber, shapeConfig.interactive);
     } else if (shapeConfig.type === 'ellipse') {
-      (shape as any).draw(shapeConfig.cx ?? 0, shapeConfig.cy ?? 0, shapeConfig.rx ?? 0, shapeConfig.ry ?? 0, shapeConfig.pageNumber);
+      (shape as any).draw(shapeConfig.cx ?? 0, shapeConfig.cy ?? 0, shapeConfig.rx ?? 0, shapeConfig.ry ?? 0, shapeConfig.pageNumber, shapeConfig.interactive);
     } else if (shapeConfig.type === 'line') {
-      (shape as any).draw(shapeConfig.x1 ?? 0, shapeConfig.y1 ?? 0, shapeConfig.x2 ?? 0, shapeConfig.y2 ?? 0, shapeConfig.pageNumber);
+      (shape as any).draw(shapeConfig.x1 ?? 0, shapeConfig.y1 ?? 0, shapeConfig.x2 ?? 0, shapeConfig.y2 ?? 0, shapeConfig.pageNumber, shapeConfig.interactive);
     }
 
-    if (revokeSelection) {
+    if (!revokeSelection) {
       (shape as any).revokeSelection();
     }
 
@@ -291,16 +291,12 @@ export class AnnotationManager {
    * @param shapeConfig The configuration for the shape.
    * @param scrollIntoView Whether to scroll the annotation into view.
    */
-  public addAnnotation(shapeConfig: ShapeConfig, scrollIntoView = false, revokeSelection = false): void {
+  public addAnnotation(shapeConfig: ShapeConfig): void {
     if (this._annotations.some((a) => a.annotationId === shapeConfig.id)) return;
-    const shape = this._drawShape(shapeConfig, revokeSelection);
+    const shape = this._drawShape(shapeConfig, shapeConfig.interactive);
     if (!shape) {
       console.error('Failed to create annotation');
       return;
-    }
-
-    if (scrollIntoView && shape.scrollToView) {
-      shape.scrollToView();
     }
     shape.deselect();
   }
