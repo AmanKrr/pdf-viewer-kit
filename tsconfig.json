@@ -14,7 +14,7 @@
     "sourceMap": true,
     "downlevelIteration": true,
     "forceConsistentCasingInFileNames": true,
-    "declarationMap": true,
+    // "declarationMap": true,
     "stripInternal": false,
     "useDefineForClassFields": true,
     "allowImportingTsExtensions": true,

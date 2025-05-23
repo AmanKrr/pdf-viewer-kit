@@ -2,10 +2,10 @@
  * Entry point for the PDF viewer module.
  * This module exports the `WebPdf` class, which is responsible for loading and managing PDF documents.
  */
+import './index.css';
+import PdfViewerKit from './base/web-pdf-viewer';
 
-import WebPdf from './base/web-pdf-viewer';
-
-export default WebPdf;
+export { PdfViewerKit };
 export * from './types/events.types';
 export * from './types/geometry.types';
 export * from './types/pagevirtualization.types';

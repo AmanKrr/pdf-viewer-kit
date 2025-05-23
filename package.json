@@ -18,15 +18,17 @@
     "url": "git+https://github.com/AmanKrr/pdf-kit.git"
   },
   "scripts": {
-    "clean": "rimraf dist/ ts-build/",
-    "copy-files": "copyfiles -u 1 src/**/*.css src/assets/**/* src/**/*.d.ts ts-build/",
-    "build": "npm run clean && tsc && npm run copy-files && node minifyBuild.js",
     "semantic-release": "semantic-release",
     "doc": "jsdoc -r -d docs src",
-    "doc-1": "jsdoc -c jsdoc.json"
+    "doc-1": "jsdoc -c jsdoc.json",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "dependencies": {
     "@popperjs/core": "^2.11.8",

@@ -31,7 +31,7 @@ GlobalWorkerOptions.workerSrc = getPdfWorkerSrc();
  * Class responsible for loading and managing PDF documents within a web viewer.
  * Extends functionalities from `WebViewer` and integrates PDF.js for rendering.
  */
-class PdfKit {
+class PdfViewerKit {
   private static _loadingTasks = new Map<string, any>();
   private static _viewers = new Map<string, WebViewer>();
 
@@ -87,7 +87,7 @@ class PdfKit {
         // disableRange: true,
         // disableStream: true,
       });
-      PdfKit._loadingTasks.set(options.containerId, initiateLoadPdf);
+      PdfViewerKit._loadingTasks.set(options.containerId, initiateLoadPdf);
 
       // Track progress while fetching the PDF (Commented out but can be enabled for debugging)
       /*
@@ -131,7 +131,7 @@ class PdfKit {
       const viewer = new WebViewer(pdf, loadOptions, internalContainers['parent'], container);
       await viewer.ready;
       WebUiUtils.hideLoading(uiLoading, options.containerId);
-      PdfKit._viewers.set(options.containerId, viewer);
+      PdfViewerKit._viewers.set(options.containerId, viewer);
       return viewer;
     } catch (err: any) {
       // swallow the “Worker was destroyed” cancellation:
@@ -155,11 +155,11 @@ class PdfKit {
    *  • clears out any injected DOM
    */
   static unload(containerId: string): void {
-    const task = PdfKit._loadingTasks.get(containerId);
+    const task = PdfViewerKit._loadingTasks.get(containerId);
     if (task) {
       task.destroy();
       task.worker?.terminate();
-      PdfKit._loadingTasks.delete(containerId);
+      PdfViewerKit._loadingTasks.delete(containerId);
     }
 
     const pdfState = PdfState.getInstance(containerId);
@@ -168,9 +168,9 @@ class PdfKit {
     (pdfState.uiLoading?.parentNode as HTMLElement)?.remove();
 
     // 5) destroy the viewer and its children
-    const viewer = PdfKit._viewers.get(containerId);
+    const viewer = PdfViewerKit._viewers.get(containerId);
     viewer?.destroy();
-    PdfKit._viewers.delete(containerId);
+    PdfViewerKit._viewers.delete(containerId);
 
     const root = document.getElementById(containerId);
     if (root) {
@@ -180,10 +180,10 @@ class PdfKit {
 
   static unloadAll(): void {
     // unload every containerId
-    for (const id of PdfKit._loadingTasks.keys()) {
-      PdfKit.unload(id);
+    for (const id of PdfViewerKit._loadingTasks.keys()) {
+      PdfViewerKit.unload(id);
     }
   }
 }
 
-export default PdfKit;
+export default PdfViewerKit;

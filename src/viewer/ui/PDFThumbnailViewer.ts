@@ -109,7 +109,6 @@ class ThumbnailViewer {
       return;
     }
     const toActivate = this._container.querySelector<HTMLElement>(`[data-page-number="${pageNumber}"]`);
-    console.log(`toActivate`, toActivate);
     if (toActivate) {
       this._thumbnailDestination(toActivate, pageNumber);
     }
@@ -183,7 +182,6 @@ class ThumbnailViewer {
       }
     }
 
-    console.log('thumbnailDiv', thumbnailDiv);
     if (thumbnailDiv) {
       thumbnailDiv.classList.add('thumbnail-active');
       this._linkService?.goToPage(pagenumber);
