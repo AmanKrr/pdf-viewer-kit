@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "author": "Aman Kumar",
   "private": false,
-  "version": "0.1.2",
+  "version": "0.2.0-canvas-pooling.1",
   "keywords": [
     "pdf",
     "react",
@@ -96,10 +96,9 @@
             "package-lock.json"
           ]
         }
-      ],
-      "@semantic-release/github"
+      ]
     ],
-    "ci": true,
+    "ci": false,
     "dryRun": false
   }
 }
