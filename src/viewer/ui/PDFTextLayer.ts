@@ -18,6 +18,8 @@ import PageElement from './PDFPageElement';
 import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
 import { PageViewport, PDFPageProxy, TextLayer as PdfJsTextLayerInternal } from 'pdfjs-dist';
 import { debugWarn, reportError } from '../../utils/debug-utils';
+import { TextSelectionHandler } from '../annotations/TextSelectionHandler';
+import { TextContent } from 'pdfjs-dist/types/src/display/api';
 
 /**
  * Manages the rendering of the PDF.js text layer and a matching annotation layer.
@@ -29,20 +31,23 @@ class TextLayer {
   private _textLayerDiv: HTMLDivElement | null = null;
   private _annotationHostDiv: HTMLDivElement | null = null;
   private _pdfJsInternalTextLayerInstance: PdfJsTextLayerInternal | null = null;
+  private _selectionHandler: TextSelectionHandler | null = null;
   private _isDestroyed = false;
+  private _containerId: string;
 
   /**
    * @param pageWrapper - Container element for this page's layers.
    * @param page - PDFPageProxy for accessing text content.
    * @param viewport - Viewport for coordinate mapping.
    */
-  constructor(pageWrapper: HTMLElement, page: PDFPageProxy, viewport: PageViewport) {
+  constructor(containerId: string, pageWrapper: HTMLElement, page: PDFPageProxy, viewport: PageViewport) {
     if (!viewport) {
       reportError('TextLayer init: viewport is null or undefined', { pageNumber: page?.pageNumber });
     }
     this._pageWrapper = pageWrapper;
     this._page = page;
     this._viewport = viewport;
+    this._containerId = containerId;
   }
 
   /**
@@ -87,13 +92,67 @@ class TextLayer {
     });
     await this._pdfJsInternalTextLayerInstance.render();
     this._wrapTextLayerIntoPTag();
+    this._putActualFonts(textContent, this._pdfJsInternalTextLayerInstance.textDivs ?? []);
 
     if (this._isDestroyed) {
       debugWarn(`TextLayer-${this._page?.pageNumber}: destroyed during render`);
       throw new Error(`TextLayer for page ${this._page?.pageNumber} was destroyed.`);
     }
 
+    // this._pdfJsInternalTextLayerInstance.textDivs.forEach((ele) => {
+    //   ele.onclick = (e) => console.log('Coming soon'); // Placeholder for future interaction
+    // });
+
+    this._selectionHandler = new TextSelectionHandler(
+      this._containerId,
+      this._pageWrapper!,
+      this._textLayerDiv!,
+      this._annotationHostDiv!,
+      this._pdfJsInternalTextLayerInstance.textDivs,
+      this._viewport!,
+    );
+
     return [this._textLayerDiv, this._annotationHostDiv];
+  }
+
+  private _putActualFonts(textContent: TextContent, textDivs: HTMLElement[] = []) {
+    textContent.items.forEach((item: any, index: number) => {
+      const div = textDivs[index];
+      if (!div) return;
+
+      const targetPx = div.getBoundingClientRect().width;
+
+      div.style.transform = 'none';
+
+      const fontId = item.fontName;
+      this._page!.commonObjs.get(fontId, (font: any) => {
+        if (font && font.name) {
+          const clean = this._getCleanFontName(font.name) || '';
+          if (clean) {
+            const [family, weight] = clean.split('-');
+            if (family) div.style.fontFamily = `'${family}', serif`;
+            if (weight) div.style.fontWeight = weight;
+            const measuredPx = div.getBoundingClientRect().width;
+            const newScaleX = targetPx / measuredPx;
+            div.style.transformOrigin = '0 0';
+            div.style.transform = `scaleX(${newScaleX})`;
+          }
+        }
+      });
+    });
+  }
+
+  private _getCleanFontName(pdfFontName: string) {
+    if (!pdfFontName) {
+      return null;
+    }
+    const plusIndex = pdfFontName.indexOf('+');
+    if (plusIndex !== -1) {
+      return pdfFontName.substring(plusIndex + 1);
+    }
+    // If no '+' is found, it might be a standard name already,
+    // or a name without a typical subset prefix.
+    return pdfFontName;
   }
 
   /**
@@ -131,6 +190,9 @@ class TextLayer {
   public destroy(): void {
     if (this._isDestroyed) return;
     this._isDestroyed = true;
+
+    this._selectionHandler?.destroy();
+    this._selectionHandler = null;
 
     this._textLayerDiv?.remove();
     this._textLayerDiv = null;

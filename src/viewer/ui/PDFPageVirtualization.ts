@@ -937,7 +937,7 @@ class PageVirtualization {
     if (this._options && !this._options.disableTextSelection) {
       if (!pageInfo.pdfPageProxy || !viewport || !pageInfo.isVisible) return;
       try {
-        pageInfo.textLayer = new TextLayer(pageInfo.pageWrapperDiv, pageInfo.pdfPageProxy, viewport);
+        pageInfo.textLayer = new TextLayer(this._pdfState.containerId, pageInfo.pageWrapperDiv, pageInfo.pdfPageProxy, viewport);
         const [, annotationHostDiv] = await pageInfo.textLayer.createTextLayer();
 
         pageInfo.annotationLayer = new AnnotationLayer(pageInfo.pageWrapperDiv, pageInfo.pdfPageProxy, viewport);

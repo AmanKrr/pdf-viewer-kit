@@ -5,13 +5,10 @@ import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 export default defineConfig(({ command }) => {
   console.log('command', command);
   if (command === 'serve') {
-    // DEV: serve your demo
     return {
       root: 'examples',
-      // If you want a different port:
-      // server: { port: 5174 },
       server: {
-        open: '/', // auto-open http://localhost:5173/
+        open: '/',
       },
     };
   } else {

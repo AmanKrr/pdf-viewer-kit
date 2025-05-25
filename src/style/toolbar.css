@@ -694,3 +694,61 @@
 .a-toolbar-items .a-toolbar-item .a-toolbar-button.active .a-toolbar-icon::before {
   color: #d5d5d5;
 }
+
+.text-annotation-toolbar {
+  position: absolute;
+  /* positioned by JS */
+  display: flex;
+  /* horizontal row */
+  align-items: center;
+  gap: 0.25rem;
+  /* space between buttons */
+  padding: 0.25rem;
+  /* inner padding */
+  background-color: rgba(0, 0, 0, 0.8);
+  border-radius: 0.25rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  z-index: 4;
+  user-select: none;
+  /* prevent text-select */
+}
+
+.tool-button {
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  margin: 0;
+  cursor: pointer;
+  color: #fff;
+  border-radius: 0.25rem;
+  transition: background-color 0.15s;
+}
+
+.tool-button:hover,
+.tool-button:focus {
+  background-color: rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+/* ─── Optional: Annotation Overlays ─── */
+.annot-highlight {
+  background-color: rgba(255, 255, 0, 0.4);
+  mix-blend-mode: multiply;
+}
+
+.annot-underline {
+  /* draw a 2px yellow underline at bottom of each rect */
+  box-shadow: inset 0 -2px 0 rgba(255, 255, 0, 0.8);
+}
+
+.annot-strike {
+  /* semi-transparent red strike */
+  background-color: rgba(255, 0, 0, 0.4);
+}
+
+.annot-squiggle {
+  /* wavy green underline */
+  background-image: url("data:image/svg+xml,%3Csvg width='8' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 2 Q2 0 4 2 T8 2' stroke='%2300FF00' fill='transparent'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-position: bottom left;
+}
