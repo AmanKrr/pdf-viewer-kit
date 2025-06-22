@@ -16,6 +16,7 @@
 
 import { IAnnotation } from '../../interface/IAnnotation';
 import { DrawConfig, ShapeConfig, ShapeType } from '../../types/geometry.types';
+import { normalizeRect } from '../../utils/annotation-utils';
 import { AnnotationFactory } from '../annotations/PDFAnnotationFactory';
 import PdfState from '../ui/PDFState';
 import { ISelectable, SelectionManager } from './SelectionManager';
@@ -269,7 +270,8 @@ export class AnnotationManager {
     });
 
     if (shapeConfig.type === 'rectangle') {
-      (shape as any).draw(shapeConfig.x0 ?? 0, shapeConfig.x1 ?? 0, shapeConfig.y0 ?? 0, shapeConfig.y1 ?? 0, shapeConfig.pageNumber, shapeConfig.interactive);
+      const { top, left, width, height } = normalizeRect(shapeConfig.x0 ?? 0, shapeConfig.y0 ?? 0, shapeConfig.x1 ?? 0, shapeConfig.y1 ?? 0);
+      (shape as any).draw(left, top, width, height, shapeConfig.pageNumber, shapeConfig.interactive);
     } else if (shapeConfig.type === 'ellipse') {
       (shape as any).draw(shapeConfig.cx ?? 0, shapeConfig.cy ?? 0, shapeConfig.rx ?? 0, shapeConfig.ry ?? 0, shapeConfig.pageNumber, shapeConfig.interactive);
     } else if (shapeConfig.type === 'line') {

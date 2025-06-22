@@ -87,7 +87,7 @@ export class RectangleAnnotation extends Annotation {
    * @param y1         Height of the rectangle
    * @param pageNumber PDF page index
    */
-  public draw(x0: number, x1: number, y0: number, y1: number, pageNumber: number, interactive: boolean): void {
+  public draw(x0: number, y0: number, width: number, height: number, pageNumber: number, interactive: boolean): void {
     this._interactive = interactive;
     this.__startX = x0;
     this.__startY = y0;
@@ -95,11 +95,11 @@ export class RectangleAnnotation extends Annotation {
 
     this.__svg.style.left = `${x0}px`;
     this.__svg.style.top = `${y0}px`;
-    this.__svg.setAttribute('width', `${x1}`);
-    this.__svg.setAttribute('height', `${y1}`);
+    this.__svg.setAttribute('width', `${width}`);
+    this.__svg.setAttribute('height', `${height}`);
     this._pageNumber = pageNumber;
 
-    this._createSvgRect(INNER_PADDING_PX.toString(), y1, x1);
+    this._createSvgRect(INNER_PADDING_PX.toString(), height, width);
     this._maintainOriginalBounding(1);
     this._updateZoom(this.__pdfState!.scale);
     this._setRectInfo();
@@ -356,17 +356,27 @@ export class RectangleAnnotation extends Annotation {
   private _getLogicalCoordinates(): { x0: number; y0: number; x1: number; y1: number } {
     const scale = this.__pdfState?.scale || 1;
     if (this._originalWidth) {
+      const left = this._originalLeft;
+      const top = this._originalTop;
+      const w = this._originalWidth;
+      const h = this._originalHeight;
+
       return {
-        x0: this._originalLeft,
-        y0: this._originalTop,
-        x1: this._originalWidth,
-        y1: this._originalHeight,
+        x0: left,
+        y0: top,
+        x1: left + w,
+        y1: top + h,
       };
     }
     const bbox = (this.__svg as SVGGraphicsElement).getBBox();
     const left = parseFloat(this.__svg.style.left) / scale;
     const top = parseFloat(this.__svg.style.top) / scale;
-    return { x0: left, y0: top, x1: bbox.width / scale, y1: bbox.height / scale };
+    return {
+      x0: left,
+      y0: top,
+      x1: left + bbox.width / scale,
+      y1: top + bbox.height / scale,
+    };
   }
 
   /** Updates internal shape info for serialization or events. */
