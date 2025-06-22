@@ -176,3 +176,19 @@ export function normalizeColor(colorInput: string | undefined): string | undefin
   console.warn(`Unsupported color format: "${colorInput}". Treating as transparent/default.`);
   return undefined;
 }
+
+/**
+ * Normalize two corner points into a { left, top, width, height } rect.
+ *
+ * @param x0  X of first corner
+ * @param y0  Y of first corner
+ * @param x1  X of opposite corner
+ * @param y1  Y of opposite corner
+ */
+export function normalizeRect(x0: number, y0: number, x1: number, y1: number): { left: number; top: number; width: number; height: number } {
+  const left = Math.min(x0, x1);
+  const top = Math.min(y0, y1);
+  const width = Math.abs(x1 - x0);
+  const height = Math.abs(y1 - y0);
+  return { left, top, width, height };
+}

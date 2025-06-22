@@ -303,6 +303,21 @@ export class AnnotationService {
   }
 
   /**
+   * Return annotation shape configuration.
+   *
+   * @param annotationId - ID of an existing shape
+   */
+  public getAnnotationShapeConfig(annotationId: string) {
+    for (const annotations of this._annotations.values()) {
+      const annotation = annotations.find((anno) => anno.id === annotationId);
+      if (annotation) {
+        return { ...annotation } as ShapeConfig;
+      }
+    }
+    throw new Error(`Annotation with id "${annotationId}" not found`);
+  }
+
+  /**
    * Updates an existing annotation's properties.
    *
    * @param annotationId  ID of the annotation to update.

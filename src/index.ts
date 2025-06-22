@@ -4,8 +4,9 @@
  */
 import './index.css';
 import PdfViewerKit from './base/web-pdf-viewer';
+import { normalizeRect } from './utils/annotation-utils';
 
-export { PdfViewerKit };
+export { PdfViewerKit, normalizeRect };
 export * from './types/events.types';
 export * from './types/geometry.types';
 export * from './types/pagevirtualization.types';
