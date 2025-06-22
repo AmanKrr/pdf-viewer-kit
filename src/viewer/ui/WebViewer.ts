@@ -380,7 +380,7 @@ class WebViewer {
 
   public destroy(): void {
     const main = document.querySelector(`#${this._viewerOptions.containerId} #${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}`);
-    this._boundScrollHandler.cancel();
+    this._boundScrollHandler?.cancel();
     main?.removeEventListener('scroll', this._boundScrollHandler);
 
     this._intersectionObserver?.disconnect();
