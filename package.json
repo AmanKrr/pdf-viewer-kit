@@ -1,8 +1,8 @@
 {
   "name": "pdf-viewer-kit",
   "description": "PDF-Viewer-Kit is a versatile, framework-agnostic library designed to render, manipulate, and interact with PDF documents seamlessly. Whether you're building a React, Next.js, Angular, or any other frontend application, PDF-Kit provides you with a well-structured, modular, and feature-rich solution for embedding PDF viewers into your web applications.",
-  "main": "dist/pdfkit.cjs.js",
-  "module": "dist/pdfkit.es.js",
+  "main": "dist/pdfkitviewer.cjs.js",
+  "module": "dist/pdfkitviewer.es.js",
   "types": "dist/index.d.ts",
   "author": "Aman Kumar",
   "private": false,
