@@ -295,6 +295,17 @@ export class RectangleAnnotation extends Annotation {
     const top = this._originalTop * zoomFactor;
     const width = this._originalWidth * zoomFactor;
     const height = this._originalHeight * zoomFactor;
+    const defaultPad = INNER_PADDING_PX * zoomFactor;
+    let pad: number;
+
+    // only use padding when both dimensions are big enough
+    if (width > defaultPad * 2 && height > defaultPad * 2) {
+      pad = defaultPad;
+    } else {
+      pad = 0;
+    }
+    const innerW = width - pad * 2;
+    const innerH = height - pad * 2;
 
     this.__svg.style.left = `${left}px`;
     this.__svg.style.top = `${top}px`;
@@ -302,19 +313,18 @@ export class RectangleAnnotation extends Annotation {
     this.__svg.setAttribute('height', `${height}`);
 
     if (this.__element) {
-      const pad = INNER_PADDING_PX * zoomFactor;
       this.__element.setAttribute('x', `${pad}`);
       this.__element.setAttribute('y', `${pad}`);
-      this.__element.setAttribute('width', `${width - pad * 2}`);
-      this.__element.setAttribute('height', `${height - pad * 2}`);
+      this.__element.setAttribute('width', `${innerW}`);
+      this.__element.setAttribute('height', `${innerH}`);
     }
 
     if (this.__hitElementRect) {
       const pad = INNER_PADDING_PX * zoomFactor;
       this.__hitElementRect.setAttribute('x', `${pad}`);
       this.__hitElementRect.setAttribute('y', `${pad}`);
-      this.__hitElementRect.setAttribute('width', `${width - pad * 2}`);
-      this.__hitElementRect.setAttribute('height', `${height - pad * 2}`);
+      this.__hitElementRect.setAttribute('width', `${innerW}`);
+      this.__hitElementRect.setAttribute('height', `${innerH}`);
     }
 
     if (this._resizer) {
