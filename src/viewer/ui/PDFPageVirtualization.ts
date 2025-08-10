@@ -135,6 +135,7 @@ class PageVirtualization {
     if (this._totalPages === 0) this._maxPooledWrappers = 5; // Fallback for empty PDF
 
     this._canvasPool = new CanvasPool(this._maxPooledWrappers > 0 ? this._maxPooledWrappers + 2 : 5);
+    this._canvasPool.setupMemoryPressureHandling();
     PageElement.init(this._canvasPool);
     if (this._maxPooledWrappers > 0) {
       this._initializePageWrapperPool();
@@ -1215,6 +1216,43 @@ class PageVirtualization {
     } finally {
       pageInfo.highResRenderTask = undefined;
       PageElement.releaseCanvasToPool(offscreenCanvas);
+    }
+  }
+
+  private _shouldUseWebGL(): boolean {
+    try {
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl') || (canvas.getContext('experimental-webgl') as WebGLRenderingContext);
+
+      if (!gl) return false;
+
+      // Check for basic WebGL support
+      const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+      if (debugInfo) {
+        const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+
+        // Avoid WebGL on known problematic configurations
+        if (renderer.includes('Intel') && renderer.includes('HD Graphics')) {
+          // Intel integrated graphics often perform worse with WebGL
+          return false;
+        }
+
+        if (renderer.includes('Mali') || renderer.includes('PowerVR')) {
+          // Mobile GPUs often have WebGL performance issues
+          return false;
+        }
+      }
+
+      // Check for reasonable texture size support
+      const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+      if (maxTextureSize < 4096) {
+        // Very low texture size limit indicates weak GPU
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      return false;
     }
   }
 
