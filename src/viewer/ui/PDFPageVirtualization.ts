@@ -69,7 +69,6 @@ class PageVirtualization {
   private _maxPooledWrappers!: number;
   private _cachedPages: Map<number, CachedPageInfo> = new Map();
 
-  private _lastScrollTop: number = 0;
   private _thumbnailViewer: ThumbnailViewer | null = null;
   private _pagePositions: Map<number, number> = new Map();
   private _pdfState: PdfState;
@@ -84,6 +83,19 @@ class PageVirtualization {
   private _resolveReadyPromise!: () => void;
   private _pageIntersectionObserver: IntersectionObserver | null = null;
   private _intersectionObserver: IntersectionObserver | null = null;
+
+  // Render Priority Queue properties
+  private _renderQueue: Array<{ pageInfo: CachedPageInfo; priority: number; timestamp: number }> = [];
+  private _isProcessingQueue = false;
+  private _currentRenderPromise: Promise<void> | null = null;
+
+  // Aggressive Cancellation properties
+  private _lastCancelCheck = 0;
+  private _cancelCheckInterval = 100; // ms
+  private _aggressiveCancelDistance = 8; // Pages beyond this distance get cancelled immediately
+  private _isRapidScrolling = false;
+  private _rapidScrollThreshold = 500; // ms between scroll events to detect rapid scrolling
+  private _lastScrollTime = 0;
 
   /**
    * @param options            Viewer configuration & container IDs.
@@ -133,7 +145,7 @@ class PageVirtualization {
     const calculatedWrappers = initialPagesToFillViewport * 2 + 5;
     this._maxPooledWrappers = Math.min(this._totalPages > 0 ? this._totalPages : calculatedWrappers, calculatedWrappers);
     if (this._totalPages === 0) this._maxPooledWrappers = 5; // Fallback for empty PDF
-
+    this._setupPeriodicCancellation();
     this._canvasPool = new CanvasPool(this._maxPooledWrappers > 0 ? this._maxPooledWrappers + 2 : 5);
     this._canvasPool.setupMemoryPressureHandling();
     PageElement.init(this._canvasPool);
@@ -156,9 +168,9 @@ class PageVirtualization {
               const wrapper = entry.target as HTMLDivElement;
               const pageNum = Number(wrapper.dataset.pageNumber);
 
-              // **only** fully render the page the app thinks is "current"
+              // Only fully render the page the app thinks is "current"
               if (pageNum !== this._pdfState.currentPage) {
-                // optionally unobserve so we don't even get called again for this page
+                // Optionally unobserve so we don't even get called again for this page
                 this._intersectionObserver?.unobserve(wrapper);
                 continue;
               }
@@ -193,6 +205,390 @@ class PageVirtualization {
         this._pageIntersectionObserver?.observe(pageInfo.pageWrapperDiv);
       }
     });
+  }
+
+  /**
+   * Enhanced scroll handler with request coalescing.
+   */
+  private _scrollHandler = (event: Event) => {
+    if (this.isRenderingSpecificPageOnly != null) return;
+
+    // Update rapid scrolling state (keep this for aggressive cancellation)
+    this._updateRapidScrollingState();
+
+    // Aggressive cancellation during scroll (keep this optimization)
+    this._aggressiveCancelRenders();
+
+    Logger.info('scroll event', {
+      scrollTop: this._scrollableContainer.scrollTop,
+      isRapidScrolling: this._isRapidScrolling,
+    });
+
+    // Direct throttled handling - simple and effective
+    this._throttledScrollHandler(this._isScaleChangeInProgress);
+  };
+
+  /**
+   * Adds a page to the render queue with specified priority.
+   * Lower priority numbers = higher priority (0 = highest)
+   * @param pageInfo The page information to render
+   * @param priority Priority level (0 = current page, higher = lower priority)
+   */
+  private _queuePageForRender(pageInfo: CachedPageInfo, priority: number = 1): void {
+    // Remove any existing queue entry for this page
+    this._renderQueue = this._renderQueue.filter((item) => item.pageInfo.pageNumber !== pageInfo.pageNumber);
+
+    // Add to queue with timestamp for tie-breaking
+    this._renderQueue.push({
+      pageInfo,
+      priority,
+      timestamp: Date.now(),
+    });
+
+    // Sort by priority (ascending), then by timestamp for same priority
+    this._renderQueue.sort((a, b) => {
+      if (a.priority !== b.priority) {
+        return a.priority - b.priority;
+      }
+      return a.timestamp - b.timestamp; // Earlier timestamp = higher priority
+    });
+
+    // Start processing queue
+    this._processRenderQueue();
+  }
+
+  /**
+   * Processes the render queue, rendering one page at a time in priority order.
+   */
+  private async _processRenderQueue(): Promise<void> {
+    if (this._isProcessingQueue || this._renderQueue.length === 0) {
+      return;
+    }
+
+    this._isProcessingQueue = true;
+
+    try {
+      while (this._renderQueue.length > 0) {
+        // Check for aggressive cancellation before processing each item
+        this._aggressiveCancelRenders();
+
+        const queueItem = this._renderQueue.shift()!;
+        const { pageInfo } = queueItem;
+
+        // Additional checks after aggressive cancellation
+        const distance = Math.abs(pageInfo.pageNumber - this._pdfState.currentPage);
+        if (distance > this._aggressiveCancelDistance) {
+          continue; // Skip if now too far away
+        }
+
+        // Skip if page is no longer visible, already rendered, or failed
+        if (!pageInfo.isVisible || pageInfo.isFullyRendered || pageInfo.isTransitioningToFullRender || pageInfo.renderFailed) {
+          continue;
+        }
+
+        // Check if page is still in DOM (might have been removed during queue wait)
+        if (!pageInfo.pageWrapperDiv.parentElement) {
+          continue;
+        }
+
+        Logger.info(`Processing render queue for page ${pageInfo.pageNumber}`, {
+          priority: queueItem.priority,
+          queueLength: this._renderQueue.length,
+        });
+
+        // Render this page
+        this._currentRenderPromise = this._transitionToFullRender(pageInfo);
+        await this._currentRenderPromise;
+        this._currentRenderPromise = null;
+
+        // Small delay to prevent blocking the main thread
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+    } catch (error) {
+      Logger.error('Error processing render queue', error);
+    } finally {
+      this._isProcessingQueue = false;
+      this._currentRenderPromise = null;
+    }
+  }
+
+  /**
+   * Detects rapid scrolling to enable more aggressive cancellation.
+   */
+  private _updateRapidScrollingState(): void {
+    const now = Date.now();
+    const timeSinceLastScroll = now - this._lastScrollTime;
+
+    // Consider it rapid scrolling if scrolling frequently
+    this._isRapidScrolling = timeSinceLastScroll < this._rapidScrollThreshold;
+    this._lastScrollTime = now;
+
+    // Auto-reset rapid scrolling state after inactivity
+    setTimeout(() => {
+      const timeSinceUpdate = Date.now() - this._lastScrollTime;
+      if (timeSinceUpdate >= this._rapidScrollThreshold * 2) {
+        this._isRapidScrolling = false;
+      }
+    }, this._rapidScrollThreshold * 2);
+  }
+
+  /**
+   * Aggressively cancels renders based on visibility, distance, and memory pressure.
+   */
+  private _aggressiveCancelRenders(): void {
+    const now = Date.now();
+
+    // Throttle cancellation checks to avoid excessive processing
+    if (now - this._lastCancelCheck < this._cancelCheckInterval) {
+      return;
+    }
+    this._lastCancelCheck = now;
+
+    const currentPage = this._pdfState.currentPage;
+    const isMemoryPressure = this._checkMemoryPressure();
+    const cancelledCount = { base: 0, highRes: 0, queued: 0 };
+
+    this._cachedPages.forEach((pageInfo) => {
+      const distance = Math.abs(pageInfo.pageNumber - currentPage);
+      const shouldCancel = this._shouldCancelPageRender(pageInfo, distance, isMemoryPressure);
+
+      if (shouldCancel.cancelBase && pageInfo.renderTask) {
+        this._cancelBaseRender(pageInfo);
+        cancelledCount.base++;
+      }
+
+      if (shouldCancel.cancelHighRes && pageInfo.highResRenderTask) {
+        this._cancelHighResRender(pageInfo);
+        cancelledCount.highRes++;
+      }
+
+      if (shouldCancel.removeFromQueue) {
+        const wasInQueue = this._removeFromRenderQueue(pageInfo.pageNumber);
+        if (wasInQueue) cancelledCount.queued++;
+      }
+    });
+
+    // Also remove from queue pages that are too far away
+    this._renderQueue = this._renderQueue.filter((item) => {
+      const distance = Math.abs(item.pageInfo.pageNumber - currentPage);
+      const tooFar = distance > this._aggressiveCancelDistance;
+      if (tooFar) cancelledCount.queued++;
+      return !tooFar;
+    });
+
+    if (cancelledCount.base > 0 || cancelledCount.highRes > 0 || cancelledCount.queued > 0) {
+      Logger.info('Aggressive render cancellation completed', {
+        cancelledBase: cancelledCount.base,
+        cancelledHighRes: cancelledCount.highRes,
+        removedFromQueue: cancelledCount.queued,
+        currentPage,
+        isMemoryPressure,
+        isRapidScrolling: this._isRapidScrolling,
+      });
+    }
+  }
+
+  /**
+   * Determines if a page's renders should be cancelled based on various criteria.
+   */
+  private _shouldCancelPageRender(
+    pageInfo: CachedPageInfo,
+    distance: number,
+    isMemoryPressure: boolean,
+  ): { cancelBase: boolean; cancelHighRes: boolean; removeFromQueue: boolean } {
+    const currentPage = this._pdfState.currentPage;
+
+    // Never cancel current page
+    if (pageInfo.pageNumber === currentPage) {
+      return { cancelBase: false, cancelHighRes: false, removeFromQueue: false };
+    }
+
+    // Basic visibility check
+    const isNotVisible = !pageInfo.isVisible;
+
+    // Distance-based cancellation
+    const isTooFar = distance > this._aggressiveCancelDistance;
+
+    // Cancel if beyond buffer during rapid scrolling
+    const beyondBufferDuringRapidScroll = this._isRapidScrolling && distance > this._pageBuffer;
+
+    // More aggressive high-res cancellation
+    const shouldCancelHighRes = isNotVisible || isTooFar || (isMemoryPressure && distance > 2) || (this._isRapidScrolling && distance > Math.floor(this._pageBuffer / 2));
+
+    // Base render cancellation (more conservative)
+    const shouldCancelBase = isNotVisible || isTooFar || beyondBufferDuringRapidScroll || (isMemoryPressure && distance > this._pageBuffer);
+
+    // Queue removal (most aggressive)
+    const shouldRemoveFromQueue = isNotVisible || isTooFar || (this._isRapidScrolling && distance > this._pageBuffer) || (isMemoryPressure && distance > 1);
+
+    return {
+      cancelBase: shouldCancelBase,
+      cancelHighRes: shouldCancelHighRes,
+      removeFromQueue: shouldRemoveFromQueue,
+    };
+  }
+
+  /**
+   * Cancels base render task and cleans up resources.
+   */
+  private _cancelBaseRender(pageInfo: CachedPageInfo): void {
+    if (pageInfo.renderTask) {
+      Logger.info(`Aggressively cancelling base render for page ${pageInfo.pageNumber}`);
+
+      pageInfo.renderTask.cancel();
+      pageInfo.renderTask = undefined;
+
+      // Release canvas back to pool if it exists
+      if (pageInfo.canvasElement) {
+        PageElement.releaseCanvasToPool(pageInfo.canvasElement);
+        pageInfo.canvasElement = undefined;
+      }
+
+      // Remove canvas from DOM
+      const canvasPresentation = pageInfo.pageWrapperDiv.querySelector(`#canvasPresentation-${pageInfo.pageNumber}`);
+      if (canvasPresentation) {
+        canvasPresentation.innerHTML = '';
+      }
+    }
+  }
+
+  /**
+   * Cancels high-resolution render task and cleans up ImageBitmap.
+   */
+  private _cancelHighResRender(pageInfo: CachedPageInfo): void {
+    if (pageInfo.highResRenderTask) {
+      Logger.info(`Aggressively cancelling high-res render for page ${pageInfo.pageNumber}`);
+
+      pageInfo.highResRenderTask.cancel();
+      pageInfo.highResRenderTask = undefined;
+
+      // Clean up ImageBitmap
+      if (pageInfo.highResImageBitmap) {
+        pageInfo.highResImageBitmap.close();
+        pageInfo.highResImageBitmap = undefined;
+      }
+
+      // Clear high-res image container
+      const imageContainer = pageInfo.pageWrapperDiv.querySelector(`#zoomedImageContainer-${pageInfo.pageNumber}`);
+      if (imageContainer) {
+        imageContainer.innerHTML = '';
+      }
+    }
+  }
+
+  /**
+   * Removes a page from the render queue.
+   */
+  private _removeFromRenderQueue(pageNumber: number): boolean {
+    const initialLength = this._renderQueue.length;
+    this._renderQueue = this._renderQueue.filter((item) => item.pageInfo.pageNumber !== pageNumber);
+    return this._renderQueue.length < initialLength;
+  }
+
+  /**
+   * Basic memory pressure detection.
+   */
+  private _checkMemoryPressure(): boolean {
+    // Use browser memory API if available
+    if ('memory' in performance) {
+      const memory = (performance as any).memory;
+      if (memory.usedJSHeapSize && memory.jsHeapSizeLimit) {
+        const usedPercent = memory.usedJSHeapSize / memory.jsHeapSizeLimit;
+        return usedPercent > 0.75; // 75% threshold
+      }
+    }
+
+    // Fallback: check pool stats
+    const poolStats = this._canvasPool.getPoolStats();
+    const estimatedMemoryMB = parseFloat(poolStats.memoryUsage.replace(/[^\d.]/g, ''));
+    return estimatedMemoryMB > 50; // 50MB threshold
+  }
+
+  /**
+   * Emergency cancellation for extreme memory pressure or performance issues.
+   */
+  private _emergencyCancelAll(): void {
+    Logger.warn('Emergency render cancellation triggered');
+
+    let cancelledCount = 0;
+    const currentPage = this._pdfState.currentPage;
+
+    this._cachedPages.forEach((pageInfo) => {
+      // Keep only current page and immediate neighbors
+      if (Math.abs(pageInfo.pageNumber - currentPage) <= 1) {
+        return;
+      }
+
+      if (pageInfo.renderTask || pageInfo.highResRenderTask) {
+        this._cancelBaseRender(pageInfo);
+        this._cancelHighResRender(pageInfo);
+        cancelledCount++;
+      }
+    });
+
+    // Clear most of the render queue, keeping only high-priority items
+    this._renderQueue = this._renderQueue.filter((item) => item.priority <= 1);
+
+    // Force memory cleanup
+    this._canvasPool.handleMemoryPressure();
+
+    Logger.warn(`Emergency cancellation completed: ${cancelledCount} renders cancelled`);
+  }
+
+  /**
+   * Cancels renders for pages that are no longer visible and removes them from queue.
+   */
+  private _cancelOffscreenRenders(): void {
+    // Remove invisible pages from queue
+    this._renderQueue = this._renderQueue.filter((item) => item.pageInfo.isVisible);
+
+    // Cancel active renders for invisible pages
+    this._cachedPages.forEach((pageInfo) => {
+      if (!pageInfo.isVisible && (pageInfo.renderTask || pageInfo.highResRenderTask)) {
+        if (pageInfo.renderTask) {
+          pageInfo.renderTask.cancel();
+          pageInfo.renderTask = undefined;
+        }
+        if (pageInfo.highResRenderTask) {
+          pageInfo.highResRenderTask.cancel();
+          pageInfo.highResRenderTask = undefined;
+        }
+
+        // Release canvas back to pool
+        if (pageInfo.canvasElement) {
+          PageElement.releaseCanvasToPool(pageInfo.canvasElement);
+          pageInfo.canvasElement = undefined;
+        }
+
+        Logger.info(`Cancelled offscreen render for page ${pageInfo.pageNumber}`);
+      }
+    });
+  }
+
+  /**
+   * Clears the entire render queue (useful during scale changes or navigation).
+   */
+  private _clearRenderQueue(): void {
+    this._renderQueue = [];
+    Logger.info('Render queue cleared');
+  }
+
+  private _setupPeriodicCancellation(): void {
+    // Run aggressive cancellation periodically
+    setInterval(() => {
+      if (!this._isScaleChangeInProgress && !this.isRenderingSpecificPageOnly) {
+        this._aggressiveCancelRenders();
+      }
+    }, 2000); // Every 2 seconds
+
+    // Emergency cleanup on memory pressure
+    if ('memory' in performance) {
+      setInterval(() => {
+        if (this._checkMemoryPressure()) {
+          this._emergencyCancelAll();
+        }
+      }, 5000); // Every 5 seconds
+    }
   }
 
   /**
@@ -323,6 +719,9 @@ class PageVirtualization {
   private async _onScaleChange(): Promise<void> {
     Logger.info('scale change start', { newScale: this._pdfState.scale });
     this._isScaleChangeInProgress = true;
+    // Emergency cancel all non-essential renders during scale change
+    this._emergencyCancelAll();
+    this._clearRenderQueue();
     await this.updateVisiblePageBuffers();
     await this.refreshHighResForVisiblePages();
     await this._updateRenderedPagesOnScroll(this._scrollableContainer.scrollTop, false);
@@ -442,16 +841,6 @@ class PageVirtualization {
   }
 
   /**
-   * Handles scroll events to update rendered pages.
-   * @param event The scroll event.
-   */
-  private _scrollHandler = (event: Event) => {
-    if (this.isRenderingSpecificPageOnly != null) return;
-    Logger.info('scroll event', { scrollTop: this._scrollableContainer.scrollTop });
-    this._throttledScrollHandler(this._isScaleChangeInProgress);
-  };
-
-  /**
    * Throttled scroll handler to update rendered pages.
    * @param isScaling Indicates if a scale change is in progress.
    */
@@ -459,7 +848,6 @@ class PageVirtualization {
     if (isScaling) return;
 
     const scrollTop = this._scrollableContainer.scrollTop;
-    this._lastScrollTop = scrollTop;
     await this._updateRenderedPagesOnScroll(scrollTop);
     this._debouncedEnsureVisiblePagesRendered();
   }, 100);
@@ -473,45 +861,53 @@ class PageVirtualization {
   }, 100);
 
   /**
-   * Ensures that visible pages are fully rendered.
-   * @returns {Promise<void>}
+   * Ensures that visible pages are queued for rendering with appropriate priorities.
    */
   private async _ensureVisiblePagesRendered(): Promise<void> {
     if (this._isScaleChangeInProgress) return;
 
-    const pagesToRenderFully: CachedPageInfo[] = [];
     const currentPage = this._pdfState.currentPage;
+    const pagesToQueue: Array<{ pageInfo: CachedPageInfo; priority: number }> = [];
 
-    // Prioritize current page
-    const centerPageInfo = this._cachedPages.get(currentPage);
-    if (centerPageInfo && centerPageInfo.isVisible && !centerPageInfo.isFullyRendered) {
-      pagesToRenderFully.push(centerPageInfo);
+    // **Highest Priority (0)**: Current page
+    const currentPageInfo = this._cachedPages.get(currentPage);
+    if (currentPageInfo && currentPageInfo.isVisible && !currentPageInfo.isFullyRendered) {
+      pagesToQueue.push({ pageInfo: currentPageInfo, priority: 0 });
     }
 
-    // Then pages in buffer around current page
+    // **High Priority (1-N)**: Pages in buffer around current page
     for (let i = 1; i <= this._pageBuffer; i++) {
+      // Next pages (priority increases with distance)
       const nextPage = this._cachedPages.get(currentPage + i);
-      if (nextPage && nextPage.isVisible && !nextPage.isFullyRendered && !pagesToRenderFully.includes(nextPage)) {
-        pagesToRenderFully.push(nextPage);
+      if (nextPage && nextPage.isVisible && !nextPage.isFullyRendered) {
+        pagesToQueue.push({ pageInfo: nextPage, priority: i });
       }
+
+      // Previous pages (same priority as corresponding next pages)
       const prevPage = this._cachedPages.get(currentPage - i);
-      if (prevPage && prevPage.isVisible && !prevPage.isFullyRendered && !pagesToRenderFully.includes(prevPage)) {
-        pagesToRenderFully.push(prevPage);
+      if (prevPage && prevPage.isVisible && !prevPage.isFullyRendered) {
+        pagesToQueue.push({ pageInfo: prevPage, priority: i });
       }
     }
 
-    // Add any other visible but not fully rendered pages that weren't caught by buffer logic
-    this._cachedPages.forEach((pInfo) => {
-      if (pInfo.isVisible && !pInfo.isFullyRendered && !pagesToRenderFully.includes(pInfo)) {
-        pagesToRenderFully.push(pInfo);
+    // **Lower Priority**: Any other visible but not fully rendered pages
+    this._cachedPages.forEach((pageInfo) => {
+      if (pageInfo.isVisible && !pageInfo.isFullyRendered && !pagesToQueue.some((item) => item.pageInfo.pageNumber === pageInfo.pageNumber)) {
+        const distance = Math.abs(pageInfo.pageNumber - currentPage);
+        const priority = Math.max(this._pageBuffer + 1, distance);
+        pagesToQueue.push({ pageInfo: pageInfo, priority });
       }
     });
 
-    for (const pInfo of pagesToRenderFully) {
-      if (this._cachedPages.has(pInfo.pageNumber) && pInfo.isVisible && (!pInfo.isFullyRendered || pInfo.renderFailed)) {
-        await this._transitionToFullRender(pInfo);
-      }
-    }
+    // Queue all pages for rendering
+    pagesToQueue.forEach(({ pageInfo, priority }) => {
+      this._queuePageForRender(pageInfo, priority);
+    });
+
+    Logger.info(`Queued ${pagesToQueue.length} pages for rendering`, {
+      currentPage,
+      queueLength: this._renderQueue.length,
+    });
   }
 
   /**
@@ -744,6 +1140,8 @@ class PageVirtualization {
     for (const pageNum of pagesToRemoveFromDom) {
       this._removePageFromDom(pageNum);
     }
+
+    this._cancelOffscreenRenders();
 
     for (const pageNum of pagesToKeepInDom) {
       let pageInfo = this._cachedPages.get(pageNum);
@@ -1260,6 +1658,10 @@ class PageVirtualization {
    * Cleans up resources and removes event listeners.
    */
   destroy(): void {
+    // Clear render queue
+    this._clearRenderQueue();
+    this._isProcessingQueue = false;
+    this._currentRenderPromise = null;
     this._thumbnailViewer?.destroy();
     this._thumbnailViewer = null;
     this._scrollableContainer.removeEventListener('scroll', this._scrollHandler);
