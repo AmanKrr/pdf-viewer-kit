@@ -79,24 +79,28 @@ class PdfViewerKit {
        * Supports fetching from URLs, local files, and encrypted PDFs.
        */
       const initiateLoadPdf = getDocument({
-        url: options.document, // PDF source URL
-        password: password, // Password (if required)
-        withCredentials: options.withCredentials, // Send credentials if needed
-        data: options.data, // Raw binary PDF data
-        httpHeaders: options.httpHeaders, // Custom HTTP headers
-        // disableRange: true,
-        // disableStream: true,
+        url: options.document || options.url,
+        password: password,
+        withCredentials: options.withCredentials,
+        data: options.data,
+        httpHeaders: options.httpHeaders,
+        // Enable streaming for faster rendering
+        disableRange: false,
+        disableStream: false,
+        // For better performance
+        cMapUrl: 'https://unpkg.com/pdfjs-dist@5.2.133/cmaps/',
+        cMapPacked: true,
+        standardFontDataUrl: 'https://unpkg.com/pdfjs-dist@5.2.133/standard_fonts/',
       });
       PdfViewerKit._loadingTasks.set(options.containerId, initiateLoadPdf);
 
       // Track progress while fetching the PDF (Commented out but can be enabled for debugging)
-      /*
       initiateLoadPdf.onProgress = function (data: any) {
-        console.log('Data:', data);
-        console.log('Loaded:', data.loaded);
-        console.log('Total:', data.total);
+        const percent = Math.round((data.loaded / data.total) * 100);
+        // Update your loading UI with progress
+        // console.log(`Loading: ${percent}%`);
+        WebUiUtils.updateLoadingProgress(uiLoading, options.containerId, percent);
       };
-      */
 
       let passwordManager: PasswordManager | null = null;
 

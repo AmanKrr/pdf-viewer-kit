@@ -48,6 +48,36 @@ class WebUiUtils {
   }
 
   /**
+   * Updates the loading spinner to show real-time progress percentage.
+   * @param loadingElement The loading element returned by showLoading().
+   * @param containerId The container id where the loading is shown.
+   * @param percent The progress percentage (number or string).
+   */
+  static updateLoadingProgress(loadingElement: HTMLElement, containerId: string, percent: number | string) {
+    if (!loadingElement) return;
+
+    // Try to find or create a progress text element inside the loading element
+    let progressText = loadingElement.querySelector(`#${containerId} .loading-progress-per`) as HTMLElement;
+    if (!progressText) {
+      progressText = document.createElement('div');
+      progressText.className = 'loading-progress-per';
+      // Style for visibility (optional, can be moved to CSS)
+      progressText.style.marginTop = '20px';
+      progressText.style.fontSize = '16px';
+      progressText.style.fontWeight = '600';
+      progressText.style.color = '#555';
+      progressText.style.textAlign = 'center';
+      loadingElement.appendChild(progressText);
+    }
+
+    // Clamp percent to [0, 100] and format
+    let percentValue = typeof percent === 'string' ? parseFloat(percent) : percent;
+    if (isNaN(percentValue)) percentValue = 0;
+    percentValue = Math.max(0, Math.min(100, percentValue));
+    progressText.textContent = `Loading ${percentValue}%`;
+  }
+
+  /**
    * Helper function to parse query string (e.g. ?param1=value&param2=...).
    * @param {string} query
    * @returns {Map}
