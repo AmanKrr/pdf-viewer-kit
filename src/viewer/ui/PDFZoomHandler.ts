@@ -37,7 +37,7 @@ export default class ZoomHandler {
   private _pageVirtualization: PageVirtualization;
   private _options: ZoomOptions;
   private _scrollableContainerElement: HTMLElement | null;
-  private _onWindowResize;
+  // private _onWindowResize;
 
   /**
    * @param pdfState           Shared PDF state (scale, currentPage, etc.).
@@ -57,8 +57,8 @@ export default class ZoomHandler {
     this._scrollableContainerElement = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} #${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}`);
 
     // On window resize, refit width (debounced)
-    this._onWindowResize = debounce(() => this.fitWidth(), 100);
-    window.addEventListener('resize', this._onWindowResize);
+    // this._onWindowResize = debounce(() => this.fitWidth(), 100);
+    // window.addEventListener('resize', this._onWindowResize);
   }
 
   private _snapToStep(scale: number): number {
@@ -166,8 +166,8 @@ export default class ZoomHandler {
    * Clean up resources and event listeners.
    */
   public destroy(): void {
-    this._onWindowResize.cancel();
-    window.removeEventListener('resize', this._onWindowResize);
+    // this._onWindowResize.cancel();
+    // window.removeEventListener('resize', this._onWindowResize);
     this._scrollableContainerElement = null;
   }
 

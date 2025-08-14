@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Multi-Instance PDF Architecture</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .test-section {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      .success {
+        border-color: #28a745;
+        background-color: #d4edda;
+      }
+      .error {
+        border-color: #dc3545;
+        background-color: #f8d7da;
+      }
+      .info {
+        border-color: #17a2b8;
+        background-color: #d1ecf1;
+      }
+      button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      .log {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 15px;
+        max-height: 300px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🧪 Test Multi-Instance PDF Architecture</h1>
+      <p>This page tests the new multi-instance PDF viewer architecture to ensure it works correctly.</p>
+
+      <div class="test-section info">
+        <h3>Test Controls</h3>
+        <button onclick="testBasicImport()">Test Basic Import</button>
+        <button onclick="testInstanceCreation()">Test Instance Creation</button>
+        <button onclick="testMultipleInstances()">Test Multiple Instances</button>
+        <button onclick="testCleanup()">Test Cleanup</button>
+        <button onclick="clearLog()">Clear Log</button>
+      </div>
+
+      <div class="test-section">
+        <h3>Test Results</h3>
+        <div id="test-results"></div>
+      </div>
+
+      <div class="log">
+        <h4>Test Log</h4>
+        <div id="log-content"></div>
+      </div>
+    </div>
+
+    <script type="module">
+      // Test the new architecture
+      let testInstances = [];
+
+      function log(message, type = 'info') {
+        const logContent = document.getElementById('log-content');
+        const timestamp = new Date().toLocaleTimeString();
+        const entry = document.createElement('div');
+        entry.style.color = type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : type === 'warning' ? '#ffc107' : '#007bff';
+        entry.textContent = `[${timestamp}] ${message}`;
+        logContent.appendChild(entry);
+        logContent.scrollTop = logContent.scrollHeight;
+      }
+
+      function updateTestResults(message, type = 'info') {
+        const resultsDiv = document.getElementById('test-results');
+        const resultEntry = document.createElement('div');
+        resultEntry.className = `test-result ${type}`;
+        resultEntry.textContent = message;
+        resultsDiv.appendChild(resultEntry);
+      }
+
+      // Test 1: Basic Import
+      window.testBasicImport = async function () {
+        try {
+          log('Testing basic import...', 'info');
+
+          // Test importing the main PdfViewerKit class
+          const { PdfViewerKit, MultiInstancePDFViewer, PDFViewerInstance, InstanceState } = await import('../src/index.js');
+
+          log('✅ Successfully imported PdfViewerKit', 'success');
+          log('✅ Successfully imported MultiInstancePDFViewer', 'success');
+          log('✅ Successfully imported PDFViewerInstance', 'success');
+          log('✅ Successfully imported InstanceState', 'success');
+
+          updateTestResults('✅ Basic import test passed', 'success');
+        } catch (error) {
+          log(`❌ Import test failed: ${error.message}`, 'error');
+          updateTestResults(`❌ Import test failed: ${error.message}`, 'error');
+        }
+      };
+
+      // Test 2: Instance Creation with PdfViewerKit
+      window.testInstanceCreation = async function () {
+        try {
+          log('Testing instance creation with PdfViewerKit...', 'info');
+
+          const { PdfViewerKit } = await import('../src/index.js');
+
+          // Create a test instance using the familiar PdfViewerKit API
+          const viewer = await PdfViewerKit.load({
+            containerId: 'test-container-1',
+            document: 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf',
+          });
+
+          log(`✅ Successfully created PDF viewer with PdfViewerKit`, 'success');
+          log(`✅ Container: test-container-1`, 'success');
+          log(`✅ Viewer object: ${viewer ? 'Created' : 'Failed'}`, 'success');
+          log(`✅ Active instances: ${PdfViewerKit.getInstanceCount()}`, 'success');
+
+          updateTestResults('✅ Instance creation test passed', 'success');
+        } catch (error) {
+          log(`❌ Instance creation test failed: ${error.message}`, 'error');
+          updateTestResults(`❌ Instance creation test failed: ${error.message}`, 'error');
+        }
+      };
+
+      // Test 3: Multiple Instances with PdfViewerKit
+      window.testMultipleInstances = async function () {
+        try {
+          log('Testing multiple instances with PdfViewerKit...', 'info');
+
+          const { PdfViewerKit } = await import('../src/index.js');
+
+          // Create multiple instances using PdfViewerKit
+          const viewer1 = await PdfViewerKit.load({
+            containerId: 'test-container-2',
+            document: 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf',
+          });
+
+          const viewer2 = await PdfViewerKit.load({
+            containerId: 'test-container-3',
+            document: 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf',
+          });
+
+          log(`✅ Successfully created viewer 1 for container: test-container-2`, 'success');
+          log(`✅ Successfully created viewer 2 for container: test-container-3`, 'success');
+          log(`✅ Total active instances: ${PdfViewerKit.getInstanceCount()}`, 'success');
+          log(`✅ Active containers: ${PdfViewerKit.getActiveContainers().join(', ')}`, 'success');
+
+          updateTestResults('✅ Multiple instances test passed', 'success');
+        } catch (error) {
+          log(`❌ Multiple instances test failed: ${error.message}`, 'error');
+          updateTestResults(`❌ Multiple instances test failed: ${error.message}`, 'error');
+        }
+      };
+
+      // Test 4: Cleanup with PdfViewerKit
+      window.testCleanup = async function () {
+        try {
+          log('Testing cleanup with PdfViewerKit...', 'info');
+
+          const { PdfViewerKit } = await import('../src/index.js');
+
+          // Get stats before cleanup
+          const instancesBefore = PdfViewerKit.getInstanceCount();
+          log(`Instances before cleanup: ${instancesBefore}`, 'info');
+
+          // Clean up all instances
+          PdfViewerKit.unloadAll();
+
+          // Get stats after cleanup
+          const instancesAfter = PdfViewerKit.getInstanceCount();
+          log(`Instances after cleanup: ${instancesAfter}`, 'info');
+
+          if (instancesAfter === 0) {
+            log('✅ Cleanup successful - all instances removed', 'success');
+            updateTestResults('✅ Cleanup test passed', 'success');
+          } else {
+            log(`❌ Cleanup failed - ${instancesAfter} instances remaining`, 'error');
+            updateTestResults(`❌ Cleanup test failed`, 'error');
+          }
+        } catch (error) {
+          log(`❌ Cleanup test failed: ${error.message}`, 'error');
+          updateTestResults(`❌ Cleanup test failed: ${error.message}`, 'error');
+        }
+      };
+
+      // Clear log
+      window.clearLog = function () {
+        document.getElementById('log-content').innerHTML = '';
+        document.getElementById('test-results').innerHTML = '';
+      };
+
+      // Initialize
+      log('🧪 Multi-Instance PDF Architecture Test Suite Ready', 'info');
+      log('Click the test buttons above to run tests', 'info');
+    </script>
+  </body>
+</html>
