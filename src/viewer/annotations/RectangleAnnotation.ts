@@ -105,13 +105,20 @@ export class RectangleAnnotation extends Annotation {
     this._setRectInfo();
   }
 
-  /** @inheritdoc */
+  /**
+   * Begins the drawing process for the annotation.
+   * @param x - The starting X-coordinate.
+   * @param y - The starting Y-coordinate.
+   */
   public startDrawing(x: number, y: number, pageNumber: number): void {
     super.startDrawing(x, y, pageNumber);
     this.__svg.style.left = `${x}px`;
     this.__svg.style.top = `${y}px`;
     this._createSvgRect();
     this._pageNumber = pageNumber;
+
+    // Temporarily disable text selection during drawing
+    this._disableTextSelection();
   }
 
   /** @inheritdoc */
@@ -154,6 +161,9 @@ export class RectangleAnnotation extends Annotation {
     this._setRectInfo();
     this.select();
     this._onShapeUpdate();
+
+    // Re-enable text selection after drawing
+    this._enableTextSelection();
   }
 
   /**
@@ -238,6 +248,11 @@ export class RectangleAnnotation extends Annotation {
     this.__element.setAttribute('stroke-width', this._strokeWidth.toString());
     this.__element.setAttribute('stroke-dasharray', this._getStrokeDashArray());
     this.__element.setAttribute('opacity', this._opacity.toString());
+
+    // Improve text clarity with better blending
+    this.__element.style.mixBlendMode = this._fillColor === 'transparent' ? 'normal' : 'multiply';
+    this.__element.style.isolation = 'isolate';
+
     this.__svg.appendChild(this.__element);
 
     this.__hitElementRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -404,5 +419,27 @@ export class RectangleAnnotation extends Annotation {
     this._maintainOriginalBounding();
     this._setRectInfo();
     this.__pdfState?.emit('ANNOTATION_CREATED', this.getConfig());
+  }
+
+  /**
+   * Temporarily disables text selection to improve drawing experience.
+   */
+  private _disableTextSelection(): void {
+    const textLayer = this.__annotationDrawerContainer.parentElement?.querySelector('.a-text-layer') as HTMLElement;
+    if (textLayer) {
+      textLayer.style.userSelect = 'none';
+      textLayer.style.webkitUserSelect = 'none';
+    }
+  }
+
+  /**
+   * Re-enables text selection after drawing is complete.
+   */
+  private _enableTextSelection(): void {
+    const textLayer = this.__annotationDrawerContainer.parentElement?.querySelector('.a-text-layer') as HTMLElement;
+    if (textLayer) {
+      textLayer.style.userSelect = 'text';
+      textLayer.style.webkitUserSelect = 'text';
+    }
   }
 }

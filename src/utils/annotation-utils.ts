@@ -15,8 +15,68 @@
 */
 
 import { INNER_PADDING_PX } from '../constants/geometry-constants';
-import { EllipseConfig, LineConfig, RectangleConfig } from '../types/geometry.types';
+import { RectangleConfig, EllipseConfig, LineConfig } from '../types/geometry.types';
 import { ShapeAnno } from '../viewer/services/AnnotationExportService';
+
+/**
+ * Normalizes rectangle coordinates to ensure proper positioning.
+ * @param x0 - First X coordinate
+ * @param y0 - First Y coordinate
+ * @param x1 - Second X coordinate
+ * @param y1 - Second Y coordinate
+ * @returns Normalized rectangle with top, left, width, height
+ */
+export function normalizeRect(x0: number, y0: number, x1: number, y1: number) {
+  const left = Math.min(x0, x1);
+  const top = Math.min(y0, y1);
+  const width = Math.abs(x1 - x0);
+  const height = Math.abs(y1 - y0);
+  return { top, left, width, height };
+}
+
+/**
+ * Converts PDF coordinates to viewport coordinates for proper annotation positioning.
+ * @param pdfCoords - PDF coordinates {x0, y0, x1, y1}
+ * @param pageHeight - Page height in PDF points
+ * @param viewport - PDF.js viewport object
+ * @returns Viewport coordinates ready for annotation
+ */
+export function convertPdfToViewportCoords(pdfCoords: { x0: number; y0: number; x1: number; y1: number }, pageHeight: number, viewport: any) {
+  // Flip Y coordinates (PDF uses bottom-left origin, viewport uses top-left)
+  const pdfBL = { x: pdfCoords.x0, y: pageHeight - pdfCoords.y1 };
+  const pdfTR = { x: pdfCoords.x1, y: pageHeight - pdfCoords.y0 };
+
+  // Convert PDF space to viewport space
+  const [vx0, vy0, vx1, vy1] = viewport.convertToViewportRectangle([pdfBL.x, pdfBL.y, pdfTR.x, pdfTR.y]);
+
+  const left = Math.min(vx0, vx1);
+  const top = Math.min(vy0, vy1);
+  const width = Math.abs(vx1 - vx0);
+  const height = Math.abs(vy1 - vy0);
+
+  return { left, top, width, height };
+}
+
+/**
+ * Converts viewport coordinates back to PDF coordinates.
+ * @param viewportCoords - Viewport coordinates {left, top, width, height}
+ * @param pageHeight - Page height in PDF points
+ * @param viewport - PDF.js viewport object
+ * @returns PDF coordinates
+ */
+export function convertViewportToPdfCoords(viewportCoords: { left: number; top: number; width: number; height: number }, pageHeight: number, viewport: any) {
+  const right = viewportCoords.left + viewportCoords.width;
+  const bottom = viewportCoords.top + viewportCoords.height;
+
+  // Convert viewport space to PDF space
+  const [px0, py0, px1, py1] = viewport.convertToPdfPointRectangle([viewportCoords.left, viewportCoords.top, right, bottom]);
+
+  // Flip Y coordinates back
+  const y0 = pageHeight - py1;
+  const y1 = pageHeight - py0;
+
+  return { x0: px0, y0, x1: px1, y1 };
+}
 
 /**
  * Convert an array of shape configurations into ShapeAnno objects
@@ -175,20 +235,4 @@ export function normalizeColor(colorInput: string | undefined): string | undefin
 
   console.warn(`Unsupported color format: "${colorInput}". Treating as transparent/default.`);
   return undefined;
-}
-
-/**
- * Normalize two corner points into a { left, top, width, height } rect.
- *
- * @param x0  X of first corner
- * @param y0  Y of first corner
- * @param x1  X of opposite corner
- * @param y1  Y of opposite corner
- */
-export function normalizeRect(x0: number, y0: number, x1: number, y1: number): { left: number; top: number; width: number; height: number } {
-  const left = Math.min(x0, x1);
-  const top = Math.min(y0, y1);
-  const width = Math.abs(x1 - x0);
-  const height = Math.abs(y1 - y0);
-  return { left, top, width, height };
 }

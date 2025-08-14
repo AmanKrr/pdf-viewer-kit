@@ -197,6 +197,11 @@ class WebViewer {
     return this._pdfState.scale;
   }
 
+  /** @returns {PDFDocumentProxy} The PDF.js document instance. */
+  get pdfInstance(): PDFDocumentProxy {
+    return this._pdfInstance;
+  }
+
   /**
    * Toggles the visibility of the thumbnail viewer sidebar.
    */
