@@ -243,10 +243,11 @@ export class RectangleAnnotation extends Annotation {
     this.__element.setAttribute('y', '0');
     this.__element.setAttribute('width', Math.abs(width).toString());
     this.__element.setAttribute('height', Math.abs(height).toString());
-    this.__element.setAttribute('fill', 'transparent');
-    this.__element.setAttribute('stroke', 'black');
-    this.__element.setAttribute('stroke-width', '2');
-    this.__element.setAttribute('stroke-dasharray', '5,5');
+    this.__element.setAttribute('fill', this._fillColor);
+    this.__element.setAttribute('stroke', this._strokeColor);
+    this.__element.setAttribute('stroke-width', `${this._strokeWidth}`);
+    this.__element.setAttribute('stroke-dasharray', this._getStrokeDashArray());
+    this.__element.setAttribute('opacity', this._opacity.toString());
     this.__element.style.pointerEvents = 'none';
 
     this.__hitElementRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -256,6 +257,7 @@ export class RectangleAnnotation extends Annotation {
     this.__hitElementRect.setAttribute('height', Math.abs(height).toString());
     this.__hitElementRect.setAttribute('fill', 'transparent');
     this.__hitElementRect.setAttribute('stroke', 'transparent');
+    this.__hitElementRect.style.strokeWidth = `${this._strokeWidth + 10}`;
     this.__hitElementRect.style.pointerEvents = 'auto';
     this.__hitElementRect.style.cursor = 'pointer';
     this.__svg.appendChild(this.__element);
