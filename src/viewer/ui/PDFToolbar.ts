@@ -207,8 +207,14 @@ export class Toolbar implements IToolbar {
       buttons.push({
         id: 'download',
         iconClass: 'download-icon',
-        tooltip: 'Download',
-        onClick: (viewer) => viewer.downloadPdf(),
+        tooltip: 'Download PDF with Annotations',
+        onClick: async (viewer) => {
+          try {
+            await viewer.downloadPdf();
+          } catch (error) {
+            console.error('Download failed:', error);
+          }
+        },
         breakBefore: !this._opts.showSearch || !this._opts.showAnnotation,
       });
     }

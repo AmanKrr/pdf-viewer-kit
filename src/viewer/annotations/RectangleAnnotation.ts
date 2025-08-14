@@ -14,11 +14,11 @@
   limitations under the License.
 */
 
-import { INNER_PADDING_PX } from '../../constants/geometry-constants';
+import { IAnnotation } from '../../interface/IAnnotation';
 import { RectangleConfig } from '../../types/geometry.types';
 import PdfState from '../ui/PDFState';
-import { Annotation } from './Annotation';
 import { Resizer } from './Resizer';
+import { Annotation } from './Annotation';
 
 /**
  * Rectangle annotation supporting interactive drawing, programmatic creation,
@@ -99,7 +99,7 @@ export class RectangleAnnotation extends Annotation {
     this.__svg.setAttribute('height', `${height}`);
     this._pageNumber = pageNumber;
 
-    this._createSvgRect(INNER_PADDING_PX.toString(), height, width);
+    this._createSvgRect(width, height);
     this._maintainOriginalBounding(1);
     this._updateZoom(this.__pdfState!.scale);
     this._setRectInfo();
@@ -125,28 +125,28 @@ export class RectangleAnnotation extends Annotation {
   public updateDrawing(x: number, y: number): void {
     if (!this.isDrawing || !this.__element || !this.__hitElementRect) return;
 
-    const maxX = this._constraints.width - INNER_PADDING_PX;
-    const maxY = this._constraints.height - INNER_PADDING_PX;
+    const maxX = this._constraints.width;
+    const maxY = this._constraints.height;
     const clampedX = Math.min(Math.max(x, 0), maxX);
     const clampedY = Math.min(Math.max(y, 0), maxY);
     const width = clampedX - this.__startX;
     const height = clampedY - this.__startY;
 
-    this.__svg.setAttribute('width', `${Math.abs(width) + INNER_PADDING_PX * 2}`);
-    this.__svg.setAttribute('height', `${Math.abs(height) + INNER_PADDING_PX * 2}`);
+    this.__svg.setAttribute('width', `${Math.abs(width)}`);
+    this.__svg.setAttribute('height', `${Math.abs(height)}`);
 
-    this.__element.setAttribute('x', `${INNER_PADDING_PX}`);
-    this.__element.setAttribute('y', `${INNER_PADDING_PX}`);
+    this.__element.setAttribute('x', '0');
+    this.__element.setAttribute('y', '0');
     this.__element.setAttribute('width', `${Math.abs(width)}`);
     this.__element.setAttribute('height', `${Math.abs(height)}`);
 
-    this.__hitElementRect.setAttribute('x', `${INNER_PADDING_PX}`);
-    this.__hitElementRect.setAttribute('y', `${INNER_PADDING_PX}`);
+    this.__hitElementRect.setAttribute('x', '0');
+    this.__hitElementRect.setAttribute('y', '0');
     this.__hitElementRect.setAttribute('width', `${Math.abs(width)}`);
     this.__hitElementRect.setAttribute('height', `${Math.abs(height)}`);
 
-    if (width < 0) this.__svg.style.left = `${clampedX - INNER_PADDING_PX}px`;
-    if (height < 0) this.__svg.style.top = `${clampedY - INNER_PADDING_PX}px`;
+    if (width < 0) this.__svg.style.left = `${clampedX}px`;
+    if (height < 0) this.__svg.style.top = `${clampedY}px`;
   }
 
   /**
@@ -236,35 +236,30 @@ export class RectangleAnnotation extends Annotation {
    * @param height   Rectangle height
    * @param width    Rectangle width
    */
-  private _createSvgRect(padding: string = '0', height: number = 0, width: number = 0): void {
+  private _createSvgRect(width: number = 0, height: number = 0): void {
     this.__element = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     this.__element.id = this.annotationId;
-    this.__element.setAttribute('x', padding);
-    this.__element.setAttribute('y', padding);
+    this.__element.setAttribute('x', '0');
+    this.__element.setAttribute('y', '0');
     this.__element.setAttribute('width', Math.abs(width).toString());
     this.__element.setAttribute('height', Math.abs(height).toString());
-    this.__element.setAttribute('fill', this._fillColor);
-    this.__element.setAttribute('stroke', this._strokeColor);
-    this.__element.setAttribute('stroke-width', this._strokeWidth.toString());
-    this.__element.setAttribute('stroke-dasharray', this._getStrokeDashArray());
-    this.__element.setAttribute('opacity', this._opacity.toString());
-
-    // Improve text clarity with better blending
-    this.__element.style.mixBlendMode = this._fillColor === 'transparent' ? 'normal' : 'multiply';
-    this.__element.style.isolation = 'isolate';
-
-    this.__svg.appendChild(this.__element);
+    this.__element.setAttribute('fill', 'transparent');
+    this.__element.setAttribute('stroke', 'black');
+    this.__element.setAttribute('stroke-width', '2');
+    this.__element.setAttribute('stroke-dasharray', '5,5');
+    this.__element.style.pointerEvents = 'none';
 
     this.__hitElementRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    this.__hitElementRect.setAttribute('x', padding);
-    this.__hitElementRect.setAttribute('y', padding);
+    this.__hitElementRect.setAttribute('x', '0');
+    this.__hitElementRect.setAttribute('y', '0');
     this.__hitElementRect.setAttribute('width', Math.abs(width).toString());
     this.__hitElementRect.setAttribute('height', Math.abs(height).toString());
-    this.__hitElementRect.setAttribute('fill', 'none');
+    this.__hitElementRect.setAttribute('fill', 'transparent');
     this.__hitElementRect.setAttribute('stroke', 'transparent');
-    this.__hitElementRect.style.strokeWidth = (this._strokeWidth + 10).toString();
-    this.__hitElementRect.style.cursor = 'pointer';
     this.__hitElementRect.style.pointerEvents = 'auto';
+    this.__hitElementRect.style.cursor = 'pointer';
+    this.__svg.appendChild(this.__element);
+
     this.__hitElementRect.onclick = (event) => {
       event.stopPropagation();
       event.preventDefault();
@@ -293,12 +288,21 @@ export class RectangleAnnotation extends Annotation {
   }
 
   /** Captures current un-scaled position and size for zoom adjustments. */
-  private _maintainOriginalBounding(zoomLevel = 0): void {
-    const scale = zoomLevel || this.__pdfState?.scale || 1;
-    this._originalLeft = (parseFloat(this.__svg.style.left) || 0) / scale;
-    this._originalTop = (parseFloat(this.__svg.style.top) || 0) / scale;
-    this._originalWidth = parseFloat(this.__svg.getAttribute('width') || '0') / scale;
-    this._originalHeight = parseFloat(this.__svg.getAttribute('height') || '0') / scale;
+  private _maintainOriginalBounding(zoomLevel = 1): void {
+    // Always normalize to scale=1 for consistency, regardless of current zoom
+    const currentScale = this.__pdfState?.scale || 1;
+
+    // Extract actual shape coordinates (not SVG container coordinates)
+    const svgLeft = parseFloat(this.__svg.style.left) || 0;
+    const svgTop = parseFloat(this.__svg.style.top) || 0;
+    const shapeWidth = parseFloat(this.__element?.getAttribute('width') || '0');
+    const shapeHeight = parseFloat(this.__element?.getAttribute('height') || '0');
+
+    // Store actual shape coordinates at scale=1 (shape is inset by padding from SVG)
+    this._originalLeft = (svgLeft + 0) / currentScale;
+    this._originalTop = (svgTop + 0) / currentScale;
+    this._originalWidth = shapeWidth / currentScale;
+    this._originalHeight = shapeHeight / currentScale;
   }
 
   /**
@@ -306,40 +310,37 @@ export class RectangleAnnotation extends Annotation {
    * @param zoomFactor Current viewer scale
    */
   private _updateZoom(zoomFactor: number): void {
-    const left = this._originalLeft * zoomFactor;
-    const top = this._originalTop * zoomFactor;
-    const width = this._originalWidth * zoomFactor;
-    const height = this._originalHeight * zoomFactor;
-    const defaultPad = INNER_PADDING_PX * zoomFactor;
-    let pad: number;
+    // Original coordinates represent actual shape position/size at scale=1
+    const shapeLeft = this._originalLeft * zoomFactor;
+    const shapeTop = this._originalTop * zoomFactor;
+    const shapeWidth = this._originalWidth * zoomFactor;
+    const shapeHeight = this._originalHeight * zoomFactor;
+    const pad = 0 * zoomFactor;
 
-    // only use padding when both dimensions are big enough
-    if (width > defaultPad * 2 && height > defaultPad * 2) {
-      pad = defaultPad;
-    } else {
-      pad = 0;
-    }
-    const innerW = width - pad * 2;
-    const innerH = height - pad * 2;
+    // Always use consistent padding (no size checks)
+    const svgWidth = shapeWidth + pad * 2;
+    const svgHeight = shapeHeight + pad * 2;
 
-    this.__svg.style.left = `${left}px`;
-    this.__svg.style.top = `${top}px`;
-    this.__svg.setAttribute('width', `${width}`);
-    this.__svg.setAttribute('height', `${height}`);
+    // SVG container positioned to accommodate padding
+    this.__svg.style.left = `${shapeLeft - pad}px`;
+    this.__svg.style.top = `${shapeTop - pad}px`;
+    this.__svg.setAttribute('width', `${svgWidth}`);
+    this.__svg.setAttribute('height', `${svgHeight}`);
 
     if (this.__element) {
+      // Shape element positioned at padding offset within SVG
       this.__element.setAttribute('x', `${pad}`);
       this.__element.setAttribute('y', `${pad}`);
-      this.__element.setAttribute('width', `${innerW}`);
-      this.__element.setAttribute('height', `${innerH}`);
+      this.__element.setAttribute('width', `${shapeWidth}`);
+      this.__element.setAttribute('height', `${shapeHeight}`);
     }
 
     if (this.__hitElementRect) {
-      const pad = INNER_PADDING_PX * zoomFactor;
+      // Hit element matches shape element exactly
       this.__hitElementRect.setAttribute('x', `${pad}`);
       this.__hitElementRect.setAttribute('y', `${pad}`);
-      this.__hitElementRect.setAttribute('width', `${innerW}`);
-      this.__hitElementRect.setAttribute('height', `${innerH}`);
+      this.__hitElementRect.setAttribute('width', `${shapeWidth}`);
+      this.__hitElementRect.setAttribute('height', `${shapeHeight}`);
     }
 
     if (this._resizer) {
@@ -366,31 +367,34 @@ export class RectangleAnnotation extends Annotation {
   }
 
   /**
-   * Computes logical (un-scaled) coordinates, preferring captured originals.
+   * Computes logical (un-scaled) coordinates of the actual shape (not SVG container).
+   * Returns coordinates of the visible shape at scale=1.
    */
   private _getLogicalCoordinates(): { x0: number; y0: number; x1: number; y1: number } {
     const scale = this.__pdfState?.scale || 1;
-    if (this._originalWidth) {
-      const left = this._originalLeft;
-      const top = this._originalTop;
-      const w = this._originalWidth;
-      const h = this._originalHeight;
 
+    if (this._originalWidth) {
+      // Use captured original shape coordinates (already at scale=1)
       return {
-        x0: left,
-        y0: top,
-        x1: left + w,
-        y1: top + h,
+        x0: this._originalLeft,
+        y0: this._originalTop,
+        x1: this._originalLeft + this._originalWidth,
+        y1: this._originalTop + this._originalHeight,
       };
     }
-    const bbox = (this.__svg as SVGGraphicsElement).getBBox();
-    const left = parseFloat(this.__svg.style.left) / scale;
-    const top = parseFloat(this.__svg.style.top) / scale;
+
+    // Fallback: Extract shape coordinates from current SVG state
+    const svgLeft = parseFloat(this.__svg.style.left) / scale;
+    const svgTop = parseFloat(this.__svg.style.top) / scale;
+    const shapeWidth = parseFloat(this.__element?.getAttribute('width') || '0') / scale;
+    const shapeHeight = parseFloat(this.__element?.getAttribute('height') || '0') / scale;
+    const pad = 0 / scale;
+
     return {
-      x0: left,
-      y0: top,
-      x1: left + bbox.width / scale,
-      y1: top + bbox.height / scale,
+      x0: svgLeft + pad, // Shape left = SVG left + padding
+      y0: svgTop + pad, // Shape top = SVG top + padding
+      x1: svgLeft + pad + shapeWidth, // Shape right
+      y1: svgTop + pad + shapeHeight, // Shape bottom
     };
   }
 

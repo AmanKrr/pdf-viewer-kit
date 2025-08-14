@@ -14,9 +14,8 @@
   limitations under the License.
 */
 
-import { INNER_PADDING_PX } from '../constants/geometry-constants';
 import { RectangleConfig, EllipseConfig, LineConfig } from '../types/geometry.types';
-import { ShapeAnno } from '../viewer/services/AnnotationExportService';
+import { RectangleAnno, EllipseAnno, LineAnno, ShapeAnno } from '../viewer/services/AnnotationExportService';
 
 /**
  * Normalizes rectangle coordinates to ensure proper positioning.
@@ -80,14 +79,16 @@ export function convertViewportToPdfCoords(viewportCoords: { left: number; top: 
 
 /**
  * Convert an array of shape configurations into ShapeAnno objects
- * scaled to CSS pixels.
+ * ready for PDF export. Coordinates are used as-is since they're already
+ * at the correct scale from the annotation system.
  *
  * @param configs - Array of RectangleConfig, EllipseConfig, or LineConfig
- * @param scale - Current zoom scale factor
+ * @param scale - Current zoom scale factor (unused, kept for API compatibility)
  * @returns Array of ShapeAnno for export
  */
 export function toShapeAnnos(configs: Array<RectangleConfig | EllipseConfig | LineConfig>, scale: number): ShapeAnno[] {
-  return configs.map((cfg) => _convertOne(cfg, scale));
+  // Note: We don't use scale here because coordinates are already at the correct scale
+  return configs.map((cfg) => _convertOne(cfg, 1)); // Use scale=1 to avoid double scaling
 }
 
 /**
@@ -95,7 +96,7 @@ export function toShapeAnnos(configs: Array<RectangleConfig | EllipseConfig | Li
  * Convert a single shape configuration into a ShapeAnno.
  *
  * @param cfg - The shape configuration
- * @param scale - Zoom scale factor
+ * @param scale - Scale factor (should be 1 to avoid double scaling)
  * @throws Error if cfg.type is unrecognized
  */
 function _convertOne(cfg: RectangleConfig | EllipseConfig | LineConfig, scale: number): ShapeAnno {
@@ -117,27 +118,39 @@ function _convertOne(cfg: RectangleConfig | EllipseConfig | LineConfig, scale: n
  * @internal
  * Transform a RectangleConfig into a RectangleAnno.
  *
- * @param r - RectangleConfig with logical coordinates
- * @param scale - Zoom scale factor
+ * @param r - RectangleConfig with corner coordinates (x0,y0) to (x1,y1)
+ * @param scale - Scale factor (should be 1 to avoid double scaling)
  */
-function _rectToShape(r: RectangleConfig, scale: number): ShapeAnno {
-  const x0 = r.x0 * scale;
-  const y0 = r.y0 * scale;
-  const width0 = r.x1 * scale; // x1 is logical width
-  const height0 = r.y1 * scale; // y1 is logical height
-  const pad = INNER_PADDING_PX * scale;
+function _rectToShape(r: any, scale: number): ShapeAnno {
+  // Handle both modern and legacy formats
+  let coords;
+  if (isModernFormat(r)) {
+    coords = modernToLegacy(r);
+  } else {
+    coords = r;
+  }
 
+  // Calculate actual width and height from corner coordinates
+  const actualWidth = Math.abs(coords.x1 - coords.x0);
+  const actualHeight = Math.abs(coords.y1 - coords.y0);
+
+  // Use the top-left corner as origin
+  const x0 = Math.min(coords.x0, coords.x1);
+  const y0 = Math.min(coords.y0, coords.y1);
+
+  // NEW SYSTEM: Stored coordinates now represent actual shape coordinates
+  // (not SVG container), so we can use them directly without padding adjustments
   return {
-    page: r.pageNumber,
+    page: coords.pageNumber,
     kind: 'rectangle',
-    x: x0 + pad,
-    y: y0 + pad,
-    width: width0 - pad * 2,
-    height: height0 - pad * 2,
-    stroke: r.strokeColor ?? '#000000',
-    fill: r.fillColor,
-    strokeWidth: r.strokeWidth ?? 1,
-    opacity: r.opacity,
+    x: x0, // Direct shape coordinates (no padding adjustment needed)
+    y: y0,
+    width: actualWidth, // Direct shape dimensions (no padding adjustment needed)
+    height: actualHeight,
+    stroke: coords.strokeColor ?? '#000000',
+    fill: coords.fillColor,
+    strokeWidth: coords.strokeWidth ?? 1,
+    opacity: coords.opacity,
   };
 }
 
@@ -146,22 +159,22 @@ function _rectToShape(r: RectangleConfig, scale: number): ShapeAnno {
  * Transform an EllipseConfig into an EllipseAnno.
  *
  * @param e - EllipseConfig with center and radii
- * @param scale - Zoom scale factor
+ * @param scale - Scale factor (should be 1 to avoid double scaling)
  */
-function _ellipseToShape(e: EllipseConfig, scale: number): ShapeAnno {
-  const cx = e.cx * scale;
-  const cy = e.cy * scale;
-  const rx = e.rx * scale;
-  const ry = e.ry * scale;
-  const pad = INNER_PADDING_PX * scale;
+function _ellipseToShape(e: any, scale: number): ShapeAnno {
+  // Ellipse coordinates are already actual shape coordinates (consistent with new system)
+  const cx = e.cx;
+  const cy = e.cy;
+  const rx = e.rx;
+  const ry = e.ry;
 
   return {
     page: e.pageNumber,
     kind: 'ellipse',
-    x: cx - rx,
-    y: cy - ry,
-    width: rx * 2,
-    height: ry * 2,
+    x: cx - rx, // Bounding box left
+    y: cy - ry, // Bounding box top
+    width: rx * 2, // Bounding box width
+    height: ry * 2, // Bounding box height
     stroke: e.strokeColor ?? '#000000',
     fill: e.fillColor,
     strokeWidth: e.strokeWidth ?? 1,
@@ -174,16 +187,16 @@ function _ellipseToShape(e: EllipseConfig, scale: number): ShapeAnno {
  * Transform a LineConfig into a LineAnno.
  *
  * @param l - LineConfig with endpoint coordinates
- * @param scale - Zoom scale factor
+ * @param scale - Scale factor (should be 1 to avoid double scaling)
  */
 function _lineToShape(l: LineConfig, scale: number): ShapeAnno {
   return {
     page: l.pageNumber,
     kind: 'line',
-    x1: l.x1 * scale,
-    y1: l.y1 * scale,
-    x2: l.x2 * scale,
-    y2: l.y2 * scale,
+    x1: l.x1, // Line coordinates are already actual shape coordinates (consistent with new system)
+    y1: l.y1,
+    x2: l.x2,
+    y2: l.y2,
     stroke: l.strokeColor ?? '#000000',
     strokeWidth: l.strokeWidth ?? 1,
     opacity: l.opacity,
@@ -235,4 +248,78 @@ export function normalizeColor(colorInput: string | undefined): string | undefin
 
   console.warn(`Unsupported color format: "${colorInput}". Treating as transparent/default.`);
   return undefined;
+}
+
+// ===== MODERN COORDINATE SYSTEM UTILITIES =====
+
+/**
+ * Detects if coordinates are in modern format (left, top, width, height)
+ */
+export function isModernFormat(coords: any): boolean {
+  return coords.left !== undefined && coords.top !== undefined && coords.width !== undefined && coords.height !== undefined;
+}
+
+/**
+ * Detects if coordinates are in legacy format (x0, y0, x1, y1)
+ */
+export function isLegacyFormat(coords: any): boolean {
+  return coords.x0 !== undefined && coords.y0 !== undefined && coords.x1 !== undefined && coords.y1 !== undefined;
+}
+
+/**
+ * Converts modern format to legacy format for backward compatibility
+ */
+export function modernToLegacy(modern: { left: number; top: number; width: number; height: number }) {
+  return {
+    x0: modern.left,
+    y0: modern.top,
+    x1: modern.left + modern.width,
+    y1: modern.top + modern.height,
+  };
+}
+
+/**
+ * Converts legacy format to modern format
+ */
+export function legacyToModern(legacy: { x0: number; y0: number; x1: number; y1: number }) {
+  return {
+    left: legacy.x0,
+    top: legacy.y0,
+    width: legacy.x1 - legacy.x0,
+    height: legacy.y1 - legacy.y0,
+  };
+}
+
+/**
+ * Normalizes coordinates to modern format, regardless of input format
+ */
+export function normalizeToModern(coords: any) {
+  if (isModernFormat(coords)) {
+    return coords;
+  } else if (isLegacyFormat(coords)) {
+    return legacyToModern(coords);
+  } else {
+    throw new Error('Invalid coordinate format. Expected either {left, top, width, height} or {x0, y0, x1, y1}');
+  }
+}
+
+/**
+ * Converts PSPDFKit coordinate format to our viewer's corner coordinate format.
+ * PSPDFKit uses {left, top, width, height} while our viewer uses {x0, y0, x1, y1}.
+ * @param pspdfkitCoords - PSPDFKit coordinates {left, top, width, height}
+ * @returns Corner coordinates {x0, y0, x1, y1} for our viewer
+ * @deprecated Use modernToLegacy instead
+ */
+export function convertPSPDFKitToViewerCoords(pspdfkitCoords: { left: number; top: number; width: number; height: number }) {
+  return modernToLegacy(pspdfkitCoords);
+}
+
+/**
+ * Converts our viewer's corner coordinates to PSPDFKit format.
+ * @param viewerCoords - Our viewer coordinates {x0, y0, x1, y1}
+ * @returns PSPDFKit coordinates {left, top, width, height}
+ * @deprecated Use legacyToModern instead
+ */
+export function convertViewerToPSPDFKitCoords(viewerCoords: { x0: number; y0: number; x1: number; y1: number }) {
+  return legacyToModern(viewerCoords);
 }

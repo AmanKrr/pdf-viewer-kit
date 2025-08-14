@@ -1,2 +1,1 @@
-export const INNER_PADDING_PX = 10; // distance between SVG edge and shape
-export const MIN_SHAPE_SIZE = 20;
+export const MIN_SHAPE_SIZE = 5; // minimum size for shapes in pixels

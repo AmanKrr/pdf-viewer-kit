@@ -277,8 +277,128 @@ class WebViewer {
     }
   }
 
-  public downloadPdf(): void {
-    this._downloadManager.download();
+  /**
+   * Downloads the PDF with embedded annotations.
+   * Shows progress indication during the download process.
+   *
+   * @param filename Optional filename for the download
+   */
+  public async downloadPdf(filename?: string): Promise<void> {
+    // Create a simple progress indicator
+    const progressElement = this._createProgressIndicator();
+
+    try {
+      await this._downloadManager.download(filename, (progress) => {
+        this._updateProgressIndicator(progressElement, progress);
+      });
+    } catch (error) {
+      console.error('Download failed:', error);
+      this._showDownloadError(progressElement, error as Error);
+    } finally {
+      // Clean up progress indicator after a short delay
+      setTimeout(() => {
+        progressElement?.remove();
+      }, 2000);
+    }
+  }
+
+  /**
+   * Creates a progress indicator for download operations.
+   */
+  private _createProgressIndicator(): HTMLElement {
+    const existing = document.getElementById('pdf-download-progress');
+    if (existing) {
+      existing.remove();
+    }
+
+    const progressContainer = document.createElement('div');
+    progressContainer.id = 'pdf-download-progress';
+    progressContainer.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      z-index: 10000;
+      min-width: 200px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    `;
+
+    const statusText = document.createElement('div');
+    statusText.id = 'download-status';
+    statusText.textContent = 'Preparing download...';
+    statusText.style.marginBottom = '8px';
+
+    const progressBar = document.createElement('div');
+    progressBar.style.cssText = `
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 2px;
+      overflow: hidden;
+    `;
+
+    const progressFill = document.createElement('div');
+    progressFill.id = 'progress-fill';
+    progressFill.style.cssText = `
+      width: 0%;
+      height: 100%;
+      background: #4CAF50;
+      transition: width 0.3s ease;
+    `;
+
+    progressBar.appendChild(progressFill);
+    progressContainer.appendChild(statusText);
+    progressContainer.appendChild(progressBar);
+    document.body.appendChild(progressContainer);
+
+    return progressContainer;
+  }
+
+  /**
+   * Updates the progress indicator with current progress.
+   */
+  private _updateProgressIndicator(progressElement: HTMLElement, progress: number): void {
+    const statusText = progressElement.querySelector('#download-status');
+    const progressFill = progressElement.querySelector('#progress-fill') as HTMLElement;
+
+    if (statusText && progressFill) {
+      const percentage = Math.round(progress * 100);
+      progressFill.style.width = `${percentage}%`;
+
+      if (progress < 0.1) {
+        statusText.textContent = 'Preparing download...';
+      } else if (progress < 0.4) {
+        statusText.textContent = 'Loading PDF data...';
+      } else if (progress < 0.6) {
+        statusText.textContent = 'Processing annotations...';
+      } else if (progress < 0.9) {
+        statusText.textContent = 'Building PDF...';
+      } else if (progress < 1.0) {
+        statusText.textContent = 'Finalizing download...';
+      } else {
+        statusText.textContent = 'Download complete!';
+        progressFill.style.background = '#4CAF50';
+      }
+    }
+  }
+
+  /**
+   * Shows an error message in the progress indicator.
+   */
+  private _showDownloadError(progressElement: HTMLElement, error: Error): void {
+    const statusText = progressElement.querySelector('#download-status');
+    const progressFill = progressElement.querySelector('#progress-fill') as HTMLElement;
+
+    if (statusText && progressFill) {
+      statusText.textContent = `Download failed: ${error.message}`;
+      progressFill.style.background = '#f44336';
+      progressFill.style.width = '100%';
+    }
   }
 
   /**

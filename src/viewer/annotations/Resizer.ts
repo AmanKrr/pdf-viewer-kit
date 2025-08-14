@@ -14,7 +14,9 @@
   limitations under the License.
 */
 
-import { INNER_PADDING_PX, MIN_SHAPE_SIZE } from '../../constants/geometry-constants';
+import { IAnnotation } from '../../interface/IAnnotation';
+import { MIN_SHAPE_SIZE } from '../../constants/geometry-constants';
+import PdfState from '../ui/PDFState';
 
 type Kind = 'rect' | 'ellipse' | 'line';
 
@@ -82,7 +84,7 @@ export class Resizer {
       this._origCY = +el.getAttribute('cy')!;
       this._origRX = +el.getAttribute('rx')!;
       this._origRY = +el.getAttribute('ry')!;
-      this._marginLeft = this._marginTop = this._marginRight = this._marginBottom = INNER_PADDING_PX;
+      this._marginLeft = this._marginTop = this._marginRight = this._marginBottom = 0;
     }
 
     this._createOverlay();
@@ -620,10 +622,10 @@ export class Resizer {
    */
   private _updateEllipse(newWidth: number, newHeight: number) {
     const minR = MIN_SHAPE_SIZE / 2;
-    const rx = Math.max((newWidth - INNER_PADDING_PX * 2) / 2, minR);
-    const ry = Math.max((newHeight - INNER_PADDING_PX * 2) / 2, minR);
-    const cx = rx + INNER_PADDING_PX;
-    const cy = ry + INNER_PADDING_PX;
+    const rx = Math.max(newWidth / 2, minR);
+    const ry = Math.max(newHeight / 2, minR);
+    const cx = rx;
+    const cy = ry;
 
     const ell = this._element as SVGEllipseElement;
     ell.setAttribute('cx', `${cx}`);

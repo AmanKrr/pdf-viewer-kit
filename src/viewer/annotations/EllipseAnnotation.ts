@@ -14,11 +14,11 @@
   limitations under the License.
 */
 
-import { INNER_PADDING_PX } from '../../constants/geometry-constants';
+import { IAnnotation } from '../../interface/IAnnotation';
 import { EllipseConfig } from '../../types/geometry.types';
 import PdfState from '../ui/PDFState';
-import { Annotation } from './Annotation';
 import { Resizer } from './Resizer';
+import { Annotation } from './Annotation';
 
 /**
  * An SVG ellipse annotation. Supports interactive drawing, programmatic creation,
@@ -88,11 +88,10 @@ export class EllipseAnnotation extends Annotation {
    */
   public draw(cx: number, cy: number, rx: number, ry: number, pageNumber: number, interactive: boolean): void {
     this._interactive = interactive;
-    const pad = INNER_PADDING_PX;
-    const left = cx - rx - pad;
-    const top = cy - ry - pad;
-    const width = rx * 2 + pad * 2;
-    const height = ry * 2 + pad * 2;
+    const left = cx - rx;
+    const top = cy - ry;
+    const width = rx * 2;
+    const height = ry * 2;
 
     this.isDrawing = false;
     this.__svg.style.left = `${left}px`;
@@ -101,7 +100,7 @@ export class EllipseAnnotation extends Annotation {
     this.__svg.setAttribute('height', `${height}`);
     this._pageNumber = pageNumber;
 
-    this.createSvgEllipse(rx + pad, ry + pad, rx, ry);
+    this.createSvgEllipse(rx, ry, rx, ry);
     this._captureOriginal(1);
     this._updateZoom(this.__pdfState?.scale!);
     this._setEllipseInfo();
@@ -121,20 +120,20 @@ export class EllipseAnnotation extends Annotation {
     if (!this.isDrawing || !this.__element) return;
     const dx = x - this.__startX;
     const dy = y - this.__startY;
-    const left = Math.min(this.__startX, this.__startX + dx) - INNER_PADDING_PX;
-    const top = Math.min(this.__startY, this.__startY + dy) - INNER_PADDING_PX;
+    const left = Math.min(this.__startX, this.__startX + dx);
+    const top = Math.min(this.__startY, this.__startY + dy);
     const w = Math.abs(dx);
     const h = Math.abs(dy);
 
     this.__svg.style.left = `${left}px`;
     this.__svg.style.top = `${top}px`;
-    this.__svg.setAttribute('width', `${w + INNER_PADDING_PX * 2}`);
-    this.__svg.setAttribute('height', `${h + INNER_PADDING_PX * 2}`);
+    this.__svg.setAttribute('width', `${w}`);
+    this.__svg.setAttribute('height', `${h}`);
 
     const rx = w / 2;
     const ry = h / 2;
-    const cx = INNER_PADDING_PX + rx;
-    const cy = INNER_PADDING_PX + ry;
+    const cx = rx;
+    const cy = ry;
 
     (this.__element as SVGEllipseElement).setAttribute('cx', `${cx}`);
     (this.__element as SVGEllipseElement).setAttribute('cy', `${cy}`);
@@ -275,23 +274,22 @@ export class EllipseAnnotation extends Annotation {
     const cy = this._origCY * scale;
     const rx = this._origRX * scale;
     const ry = this._origRY * scale;
-    const PAD = INNER_PADDING_PX;
 
-    this.__svg.style.left = `${cx - rx - PAD}px`;
-    this.__svg.style.top = `${cy - ry - PAD}px`;
-    this.__svg.setAttribute('width', `${rx * 2 + PAD * 2}`);
-    this.__svg.setAttribute('height', `${ry * 2 + PAD * 2}`);
+    this.__svg.style.left = `${cx - rx}px`;
+    this.__svg.style.top = `${cy - ry}px`;
+    this.__svg.setAttribute('width', `${rx * 2}`);
+    this.__svg.setAttribute('height', `${ry * 2}`);
 
     const e = this.__element as SVGEllipseElement;
     const hit = this.__hitElementRect as SVGEllipseElement;
 
-    e.setAttribute('cx', `${PAD + rx}`);
-    e.setAttribute('cy', `${PAD + ry}`);
+    e.setAttribute('cx', `${rx}`);
+    e.setAttribute('cy', `${ry}`);
     e.setAttribute('rx', `${rx}`);
     e.setAttribute('ry', `${ry}`);
 
-    hit.setAttribute('cx', `${PAD + rx}`);
-    hit.setAttribute('cy', `${PAD + ry}`);
+    hit.setAttribute('cx', `${rx}`);
+    hit.setAttribute('cy', `${ry}`);
     hit.setAttribute('rx', `${rx}`);
     hit.setAttribute('ry', `${ry}`);
 

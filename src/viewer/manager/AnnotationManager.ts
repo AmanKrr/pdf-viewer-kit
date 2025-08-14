@@ -3,7 +3,7 @@
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
+  you may obtain a copy of the License at
 
       http://www.apache.org/licenses/LICENSE-2.0
 
@@ -16,7 +16,7 @@
 
 import { IAnnotation } from '../../interface/IAnnotation';
 import { DrawConfig, ShapeConfig, ShapeType } from '../../types/geometry.types';
-import { normalizeRect } from '../../utils/annotation-utils';
+import { normalizeRect, isModernFormat } from '../../utils/annotation-utils';
 import { AnnotationFactory } from '../annotations/PDFAnnotationFactory';
 import PdfState from '../ui/PDFState';
 import { ISelectable, SelectionManager } from './SelectionManager';
@@ -270,12 +270,45 @@ export class AnnotationManager {
     });
 
     if (shapeConfig.type === 'rectangle') {
-      const { top, left, width, height } = normalizeRect(shapeConfig.x0 ?? 0, shapeConfig.y0 ?? 0, shapeConfig.x1 ?? 0, shapeConfig.y1 ?? 0);
+      // For modern format, x0,y0 are position, x1,y1 are width,height
+      // For legacy format, x0,y0,x1,y1 are corner coordinates
+      let x0, y0, x1, y1;
+
+      if (isModernFormat(shapeConfig)) {
+        // Modern format: left,top are position, width,height are dimensions
+        x0 = (shapeConfig as any).left;
+        y0 = (shapeConfig as any).top;
+        x1 = (shapeConfig as any).left + (shapeConfig as any).width;
+        y1 = (shapeConfig as any).top + (shapeConfig as any).height;
+      } else {
+        // Legacy format: x0,y0,x1,y1 are corner coordinates
+        x0 = (shapeConfig as any).x0;
+        y0 = (shapeConfig as any).y0;
+        x1 = (shapeConfig as any).x1;
+        y1 = (shapeConfig as any).y1;
+      }
+
+      // Now normalize to get top-left position and dimensions
+      const { top, left, width, height } = normalizeRect(x0, y0, x1, y1);
       (shape as any).draw(left, top, width, height, shapeConfig.pageNumber, shapeConfig.interactive);
     } else if (shapeConfig.type === 'ellipse') {
-      (shape as any).draw(shapeConfig.cx ?? 0, shapeConfig.cy ?? 0, shapeConfig.rx ?? 0, shapeConfig.ry ?? 0, shapeConfig.pageNumber, shapeConfig.interactive);
+      (shape as any).draw(
+        (shapeConfig as any).cx ?? 0,
+        (shapeConfig as any).cy ?? 0,
+        (shapeConfig as any).rx ?? 0,
+        (shapeConfig as any).ry ?? 0,
+        shapeConfig.pageNumber,
+        shapeConfig.interactive,
+      );
     } else if (shapeConfig.type === 'line') {
-      (shape as any).draw(shapeConfig.x1 ?? 0, shapeConfig.y1 ?? 0, shapeConfig.x2 ?? 0, shapeConfig.y2 ?? 0, shapeConfig.pageNumber, shapeConfig.interactive);
+      (shape as any).draw(
+        (shapeConfig as any).x1 ?? 0,
+        (shapeConfig as any).y1 ?? 0,
+        (shapeConfig as any).x2 ?? 0,
+        (shapeConfig as any).y2 ?? 0,
+        shapeConfig.pageNumber,
+        shapeConfig.interactive,
+      );
     }
 
     if (!revokeSelection) {
@@ -289,13 +322,47 @@ export class AnnotationManager {
   }
 
   /**
-   * Add an annotation to the viewer. This is a wrapper around drawShape.
-   * @param shapeConfig The configuration for the shape.
-   * @param scrollIntoView Whether to scroll the annotation into view.
+   * Add an annotation to the viewer. Supports both modern and legacy coordinate formats.
+   * @param shapeConfig The configuration for the shape (modern or legacy format).
    */
-  public addAnnotation(shapeConfig: ShapeConfig): void {
-    if (this._annotations.some((a) => a.annotationId === shapeConfig.id)) return;
-    const shape = this._drawShape(shapeConfig, shapeConfig.interactive);
+  public addAnnotation(shapeConfig: any): void {
+    // Normalize coordinates to legacy format for internal compatibility
+    let normalizedConfig = { ...shapeConfig };
+
+    // Handle modern coordinate format for rectangles
+    if (shapeConfig.type === 'rectangle' && isModernFormat(shapeConfig)) {
+      // Convert modern format to legacy format (viewport coordinates)
+      const legacyCoords = {
+        x0: shapeConfig.left,
+        y0: shapeConfig.top,
+        x1: shapeConfig.left + shapeConfig.width,
+        y1: shapeConfig.top + shapeConfig.height,
+      };
+
+      normalizedConfig = {
+        ...shapeConfig,
+        x0: legacyCoords.x0,
+        y0: legacyCoords.y0,
+        x1: legacyCoords.x1,
+        y1: legacyCoords.y1,
+        // Remove modern format properties
+        left: undefined,
+        top: undefined,
+        width: undefined,
+        height: undefined,
+      };
+    }
+
+    // Process the annotation
+    this._processAnnotation(normalizedConfig);
+  }
+
+  /**
+   * Process annotation after coordinate conversion
+   */
+  private _processAnnotation(normalizedConfig: any): void {
+    if (this._annotations.some((a) => a.annotationId === normalizedConfig.id)) return;
+    const shape = this._drawShape(normalizedConfig as ShapeConfig, normalizedConfig.interactive);
     if (!shape) {
       console.error('Failed to create annotation');
       return;

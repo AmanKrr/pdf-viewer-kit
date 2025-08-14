@@ -81,74 +81,116 @@ export class PdfExportService {
    * @param originalBytes Raw bytes of the source PDF.
    * @param annotations   Array of annotations to draw.
    * @param viewports     Map from page number to its PDF.js viewport (at annotation scale).
+   * @param onProgress    Optional progress callback for tracking build progress.
    * @returns Uint8Array of the annotated PDF.
    */
-  public async buildAnnotatedPdf(originalBytes: ArrayBuffer, annotations: ShapeAnno[], viewports: Map<number, PageViewport>): Promise<Uint8Array> {
+  public async buildAnnotatedPdf(
+    originalBytes: ArrayBuffer,
+    annotations: ShapeAnno[],
+    viewports: Map<number, PageViewport>,
+    onProgress?: (progress: number) => void,
+  ): Promise<Uint8Array> {
     const pdf = await PDFDocument.load(originalBytes);
+    onProgress?.(0.7); // PDF loaded
 
-    for (const a of annotations) {
-      const page = pdf.getPage(a.page - 1);
-      const vp = viewports.get(a.page);
+    // Group annotations by page for better performance
+    const annotationsByPage = new Map<number, ShapeAnno[]>();
+    for (const annotation of annotations) {
+      if (!annotationsByPage.has(annotation.page)) {
+        annotationsByPage.set(annotation.page, []);
+      }
+      annotationsByPage.get(annotation.page)!.push(annotation);
+    }
+
+    const totalAnnotations = annotations.length;
+    let processedAnnotations = 0;
+
+    // Process annotations page by page
+    for (const [pageNum, pageAnnotations] of annotationsByPage) {
+      const page = pdf.getPage(pageNum - 1);
+      const vp = viewports.get(pageNum);
+
       if (!vp) {
-        console.warn(`Skipping annotation on page ${a.page}: Viewport not found.`);
+        console.warn(`Skipping annotations on page ${pageNum}: Viewport not found.`);
+        processedAnnotations += pageAnnotations.length;
         continue;
       }
 
-      const [r, g, b] = PdfExportService._hexToRgb(a.stroke);
-      const fillHex = normalizeColor(a.fill);
-      const fillRgb = fillHex ? PdfExportService._hexToRgb(fillHex) : undefined;
-      const linePt = this._cssPxToPt(a.strokeWidth);
-      const opacity = a.opacity ?? 1;
+      // Process all annotations for this page
+      for (const a of pageAnnotations) {
+        try {
+          const [r, g, b] = PdfExportService._hexToRgb(a.stroke);
+          const fillHex = normalizeColor(a.fill);
+          const fillRgb = fillHex ? PdfExportService._hexToRgb(fillHex) : undefined;
+          const linePt = this._cssPxToPt(a.strokeWidth);
+          const opacity = a.opacity ?? 1;
 
-      switch (a.kind) {
-        case 'rectangle': {
-          const pdfRect = PdfExportService._toPdfRect(vp, a);
-          page.drawRectangle({
-            x: pdfRect.x,
-            y: pdfRect.y,
-            width: pdfRect.width,
-            height: pdfRect.height,
-            borderColor: rgb(r, g, b),
-            borderWidth: linePt,
-            color: fillRgb ? rgb(...fillRgb) : undefined,
-            opacity,
-            borderOpacity: opacity,
-          });
-          break;
+          switch (a.kind) {
+            case 'rectangle': {
+              const pdfRect = PdfExportService._toPdfRect(vp, a);
+              page.drawRectangle({
+                x: pdfRect.x,
+                y: pdfRect.y,
+                width: pdfRect.width,
+                height: pdfRect.height,
+                borderColor: rgb(r, g, b),
+                borderWidth: linePt,
+                color: fillRgb ? rgb(...fillRgb) : undefined,
+                opacity,
+                borderOpacity: opacity,
+              });
+              break;
+            }
+            case 'ellipse': {
+              const pdfRect = PdfExportService._toPdfRect(vp, a);
+              page.drawEllipse({
+                x: pdfRect.x + pdfRect.width / 2,
+                y: pdfRect.y + pdfRect.height / 2,
+                xScale: pdfRect.width / 2,
+                yScale: pdfRect.height / 2,
+                borderColor: rgb(r, g, b),
+                borderWidth: linePt,
+                color: fillRgb ? rgb(...fillRgb) : undefined,
+                opacity,
+                borderOpacity: opacity,
+              });
+              break;
+            }
+            case 'line': {
+              const [sx, sy] = PdfExportService._toPdfPoint(vp, a.x1, a.y1);
+              const [ex, ey] = PdfExportService._toPdfPoint(vp, a.x2, a.y2);
+              page.drawLine({
+                start: { x: sx, y: sy },
+                end: { x: ex, y: ey },
+                thickness: linePt,
+                color: rgb(r, g, b),
+                opacity,
+              });
+              break;
+            }
+            default:
+              console.warn('Unsupported annotation kind:', (a as any).kind);
+          }
+        } catch (error) {
+          console.error(`Error processing annotation on page ${pageNum}:`, error);
         }
-        case 'ellipse': {
-          const pdfRect = PdfExportService._toPdfRect(vp, a);
-          page.drawEllipse({
-            x: pdfRect.x + pdfRect.width / 2,
-            y: pdfRect.y + pdfRect.height / 2,
-            xScale: pdfRect.width / 2,
-            yScale: pdfRect.height / 2,
-            borderColor: rgb(r, g, b),
-            borderWidth: linePt,
-            color: fillRgb ? rgb(...fillRgb) : undefined,
-            opacity,
-            borderOpacity: opacity,
-          });
-          break;
-        }
-        case 'line': {
-          const [sx, sy] = PdfExportService._toPdfPoint(vp, a.x1, a.y1);
-          const [ex, ey] = PdfExportService._toPdfPoint(vp, a.x2, a.y2);
-          page.drawLine({
-            start: { x: sx, y: sy },
-            end: { x: ex, y: ey },
-            thickness: linePt,
-            color: rgb(r, g, b),
-            opacity,
-          });
-          break;
-        }
-        default:
-          console.warn('Unsupported annotation kind:', (a as any).kind);
+
+        processedAnnotations++;
+        // Update progress for annotation processing (70% to 85%)
+        const annotationProgress = 0.7 + (processedAnnotations / totalAnnotations) * 0.15;
+        onProgress?.(annotationProgress);
       }
     }
 
-    return pdf.save({ useObjectStreams: false });
+    // Save with optimized settings for better performance and smaller file size
+    onProgress?.(0.85); // Starting save
+    const pdfBytes = await pdf.save({
+      useObjectStreams: true, // Enable for smaller file size
+      addDefaultPage: false,
+      objectsPerTick: 50, // Process in smaller batches to avoid blocking
+    });
+
+    return pdfBytes;
   }
 
   /**

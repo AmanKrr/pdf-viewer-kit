@@ -14,11 +14,11 @@
   limitations under the License.
 */
 
-import { INNER_PADDING_PX } from '../../constants/geometry-constants';
+import { IAnnotation } from '../../interface/IAnnotation';
 import { LineConfig } from '../../types/geometry.types';
 import PdfState from '../ui/PDFState';
-import { Annotation } from './Annotation';
 import { Resizer } from './Resizer';
+import { Annotation } from './Annotation';
 
 /**
  * Annotation that renders and manages a line (<line> SVG element) on the PDF.
@@ -90,20 +90,19 @@ export class LineAnnotation extends Annotation {
    */
   public draw(x1: number, y1: number, x2: number, y2: number, pageNumber: number, interactive: boolean): void {
     this._interactive = interactive;
-    const pad = INNER_PADDING_PX;
     const minX = Math.min(x1, x2),
       minY = Math.min(y1, y2);
     const dx = Math.abs(x2 - x1),
       dy = Math.abs(y2 - y1);
 
     this.isDrawing = false;
-    this.__svg.style.left = `${minX - pad}px`;
-    this.__svg.style.top = `${minY - pad}px`;
-    this.__svg.setAttribute('width', `${dx + pad * 2}`);
-    this.__svg.setAttribute('height', `${dy + pad * 2}`);
+    this.__svg.style.left = `${minX}px`;
+    this.__svg.style.top = `${minY}px`;
+    this.__svg.setAttribute('width', `${dx}`);
+    this.__svg.setAttribute('height', `${dy}`);
     this._pageNumber = pageNumber;
 
-    this.createSvgLine(x1 - minX + pad, y1 - minY + pad, x2 - minX + pad, y2 - minY + pad);
+    this.createSvgLine(x1 - minX, y1 - minY, x2 - minX, y2 - minY);
 
     this._captureOriginal();
     this._updateZoom(this._pdfState.scale);
@@ -131,7 +130,6 @@ export class LineAnnotation extends Annotation {
    */
   public updateDrawing(x: number, y: number): void {
     if (!this.isDrawing || !this.__element) return;
-    const pad = INNER_PADDING_PX;
     const dx = x - this.__startX,
       dy = y - this.__startY;
     const minX = Math.min(this.__startX, this.__startX + dx);
@@ -139,15 +137,15 @@ export class LineAnnotation extends Annotation {
     const w = Math.abs(dx),
       h = Math.abs(dy);
 
-    this.__svg.style.left = `${minX - pad}px`;
-    this.__svg.style.top = `${minY - pad}px`;
-    this.__svg.setAttribute('width', `${w + pad * 2}`);
-    this.__svg.setAttribute('height', `${h + pad * 2}`);
+    this.__svg.style.left = `${minX}px`;
+    this.__svg.style.top = `${minY}px`;
+    this.__svg.setAttribute('width', `${w}`);
+    this.__svg.setAttribute('height', `${h}`);
 
-    const x1r = dx >= 0 ? pad : pad + w;
-    const y1r = dy >= 0 ? pad : pad + h;
-    const x2r = dx >= 0 ? pad + w : pad;
-    const y2r = dy >= 0 ? pad + h : pad;
+    const x1r = dx >= 0 ? 0 : w;
+    const y1r = dy >= 0 ? 0 : h;
+    const x2r = dx >= 0 ? w : 0;
+    const y2r = dy >= 0 ? h : 0;
 
     const el = this.__element as SVGLineElement;
     el.setAttribute('x1', x1r.toString());
@@ -295,7 +293,6 @@ export class LineAnnotation extends Annotation {
    */
   private _updateZoom(scale: number): void {
     if (!this.__element) return;
-    const pad = INNER_PADDING_PX * scale;
     const x1a = this._origX1 * scale;
     const y1a = this._origY1 * scale;
     const x2a = this._origX2 * scale;
@@ -305,15 +302,15 @@ export class LineAnnotation extends Annotation {
     const w = Math.abs(x2a - x1a);
     const h = Math.abs(y2a - y1a);
 
-    this.__svg.style.left = `${minX - pad}px`;
-    this.__svg.style.top = `${minY - pad}px`;
-    this.__svg.setAttribute('width', `${w + pad * 2}`);
-    this.__svg.setAttribute('height', `${h + pad * 2}`);
+    this.__svg.style.left = `${minX}px`;
+    this.__svg.style.top = `${minY}px`;
+    this.__svg.setAttribute('width', `${w}`);
+    this.__svg.setAttribute('height', `${h}`);
 
-    const r1x = x1a - minX + pad;
-    const r1y = y1a - minY + pad;
-    const r2x = x2a - minX + pad;
-    const r2y = y2a - minY + pad;
+    const r1x = x1a - minX;
+    const r1y = y1a - minY;
+    const r2x = x2a - minX;
+    const r2y = y2a - minY;
 
     const el = this.__element as SVGLineElement;
     el.setAttribute('x1', r1x.toString());

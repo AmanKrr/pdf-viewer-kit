@@ -39,8 +39,8 @@ export class AnnotationToolbar {
 
   private _shapeOptions = {
     rectangle: 'Rectangle',
-    // circle: 'Ellipse',
-    // pen_size_1: 'Line',
+    circle: 'Ellipse',
+    pen_size_1: 'Line',
   };
   private _selectedShape: ShapeType | 'none' = 'none';
   private _selectedShapeIcon = 'none';
