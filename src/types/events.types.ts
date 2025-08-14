@@ -10,4 +10,7 @@ export type Events =
   | 'ANNOTATION_SELECTED'
   | 'ANNOTATION_CREATED'
   | 'ANNOTATION_DELETED'
-  | 'ANNOTATION_UPDATED';
+  | 'ANNOTATION_UPDATED'
+  | 'DRAWING_STARTED'
+  | 'DRAWING_FINISHED'
+  | 'interactiveModeChanged';

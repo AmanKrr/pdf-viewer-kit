@@ -149,7 +149,6 @@ export class TextSelectionHandler {
   };
 
   private static onScroll = () => {
-    console.log('Scroll event detected, updating toolbar position');
     TextSelectionHandler.popperInstance?.update();
   };
 

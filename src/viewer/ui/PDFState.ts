@@ -33,6 +33,7 @@ class PdfState extends EventEmitter {
   private _uiLoading!: HTMLElement;
   private _isAnnotationEnabled: boolean = false;
   private _isAnnotationConfigurationPropertiesEnabled: boolean = false;
+  private _isInteractiveModeDisabled: boolean = false;
 
   /** Private constructor to enforce singleton pattern per container ID */
   private constructor() {
@@ -143,6 +144,27 @@ class PdfState extends EventEmitter {
   }
 
   /**
+   * Checks if interactive mode is disabled (during drawing or text selection).
+   *
+   * @returns {boolean} `true` if interactive mode is disabled, `false` otherwise.
+   */
+  get isInteractiveModeDisabled(): boolean {
+    return this._isInteractiveModeDisabled;
+  }
+
+  /**
+   * Sets the interactive mode state.
+   *
+   * @param {boolean} value - `true` to disable interactive effects, `false` to enable.
+   */
+  set isInteractiveModeDisabled(value: boolean) {
+    if (this._isInteractiveModeDisabled !== value) {
+      this._isInteractiveModeDisabled = value;
+      this.emit('interactiveModeChanged', value);
+    }
+  }
+
+  /**
    * Gets the PDF.js document instance.
    *
    * @returns {PDFDocumentProxy} The current PDF document instance.
@@ -202,7 +224,6 @@ class PdfState extends EventEmitter {
   set currentPage(pageNumber: number) {
     if (this._currentPage !== pageNumber) {
       this._currentPage = pageNumber;
-      // this.emit('pageChange', pageNumber);
     }
   }
 

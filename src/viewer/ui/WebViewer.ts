@@ -27,6 +27,7 @@ import SearchBar from './PDFSearchBar';
 import SearchHighlighter from '../manager/SearchHighlighter';
 import { Toolbar } from './PDFToolbar';
 import { DownloadManager } from '../manager/PDFDownloadManager';
+import { IToolbar } from '../../interface/IToolbar';
 
 /**
  * Manages the PDF viewer instance and provides various functionalities, including:
@@ -36,19 +37,20 @@ import { DownloadManager } from '../manager/PDFDownloadManager';
  * - Toolbar interactions
  */
 class WebViewer {
-  private _pageVirtualization!: PageVirtualization;
-  private _viewerOptions!: ViewerLoadOptions;
-  private _pdfInstance!: PDFDocumentProxy;
-  private _pdfState!: PdfState;
-  private _cachedSideBarElement: HTMLElement | undefined;
-  private _zoomHandler: ZoomHandler;
+  // Private properties
+  private _pdfInstance: PDFDocumentProxy;
+  private _viewerOptions: ViewerLoadOptions;
+  private _pdfState: PdfState;
+  private _pageVirtualization: PageVirtualization;
+  private _toolbar?: IToolbar;
   private _annotationService: AnnotationService;
-  private _toolbar: Toolbar | undefined;
-  private _boundScrollHandler;
-  private _downloadManager;
+  private _downloadManager: DownloadManager;
+  private _zoomHandler: ZoomHandler;
+  private _boundScrollHandler: (event: Event) => void;
+  private _intersectionObserver?: IntersectionObserver;
+  private _globalClickHandler?: (event: Event) => void;
 
   public ready!: Promise<void>;
-  private _intersectionObserver?: IntersectionObserver;
 
   /**
    * Initializes the WebViewer instance.
@@ -63,7 +65,6 @@ class WebViewer {
     this._viewerOptions = viewerOptions;
 
     this._pdfState = PdfState.getInstance(viewerOptions.containerId);
-
     const selectionManager = new SelectionManager();
     const searchHighlighter = new SearchHighlighter(this._pdfState, this);
     new SearchBar(
@@ -98,6 +99,22 @@ class WebViewer {
     this._addEvents();
     this._zoomHandler = new ZoomHandler(this._pdfState, this._pageVirtualization);
     this._annotationService = new AnnotationService(this._pdfState, this);
+
+    // Subscribe to drawing events to manage interactive effects through SelectionManager
+    this._pdfState.on('DRAWING_STARTED', () => {
+      selectionManager.setDrawingState(true);
+    });
+
+    this._pdfState.on('DRAWING_FINISHED', () => {
+      // Small delay to ensure selection is fully registered
+      setTimeout(() => {
+        selectionManager.setDrawingState(false);
+      }, 50);
+    });
+
+    // Add global click handler for deselection
+    this._addGlobalClickHandler(selectionManager);
+
     this.ready.then(() => {
       this.observer((pageNum) => {
         this._pdfState.currentPage = pageNum;
@@ -145,6 +162,42 @@ class WebViewer {
     if (mainViewer && this._viewerOptions.toolbarOptions?.showThumbnail) {
       mainViewer.addEventListener('scroll', this._boundScrollHandler);
     }
+  }
+
+  /**
+   * Adds global click handler to detect clicks outside of annotations for deselection.
+   */
+  private _addGlobalClickHandler(selectionManager: SelectionManager) {
+    const container = document.querySelector(`#${this._viewerOptions.containerId}`);
+    if (!container) return;
+
+    const handleGlobalClick = (event: Event) => {
+      // Check if the click target is part of an annotation
+      const target = event.target as HTMLElement;
+      const isAnnotationClick =
+        target.closest('[annotation-id]') ||
+        target.closest('.a-annotation-layer') ||
+        target.closest('.a-annotation-toolbar-container') ||
+        target.closest('svg') ||
+        target.tagName === 'svg' ||
+        target.hasAttribute('annotation-id') ||
+        // Check if target is a resizer handle or overlay
+        target.hasAttribute('data-resizer-handle') ||
+        target.closest('[data-resizer-overlay]');
+
+      // If click is not on an annotation and we have a selection, deselect
+      // But only if we're not in the middle of drawing
+      if (!isAnnotationClick && selectionManager.getSelected() && !selectionManager.isDrawingActive()) {
+        selectionManager.setSelected(null);
+      }
+    };
+
+    // Use bubble phase instead of capture to run after other handlers
+    // This prevents the race condition where deselection happens before selection is set
+    container.addEventListener('click', handleGlobalClick, false);
+
+    // Store the handler for cleanup
+    this._globalClickHandler = handleGlobalClick;
   }
 
   private _onScroll = debounce((event: Event) => {
@@ -203,24 +256,20 @@ class WebViewer {
   }
 
   /**
-   * Toggles the visibility of the thumbnail viewer sidebar.
+   * Toggles the thumbnail viewer sidebar.
    */
   public toogleThumbnailViewer() {
-    const thumbnailSidebarElement = this._cachedSideBarElement ?? document.querySelector(`#${this._viewerOptions.containerId} .${PDF_VIEWER_CLASSNAMES['A_SIDEBAR_CONTAINER']}`);
+    const thumbnailSidebarElement = document.querySelector(`#${this._viewerOptions.containerId} .${PDF_VIEWER_CLASSNAMES['A_SIDEBAR_CONTAINER']}`);
 
     if (!thumbnailSidebarElement) {
       console.error(`Invalid sidebar container element ${thumbnailSidebarElement}.`);
       return;
     }
 
-    if (!this._cachedSideBarElement) {
-      this._cachedSideBarElement = thumbnailSidebarElement as HTMLElement;
-    }
-
-    if (this._cachedSideBarElement.classList.contains('active')) {
-      this._cachedSideBarElement.classList.remove('active');
+    if (thumbnailSidebarElement.classList.contains('active')) {
+      thumbnailSidebarElement.classList.remove('active');
     } else {
-      this._cachedSideBarElement.classList.add('active');
+      thumbnailSidebarElement.classList.add('active');
       this._syncThumbnailScrollWithMainPageContainer();
     }
   }
@@ -504,19 +553,43 @@ class WebViewer {
   }
 
   public destroy(): void {
-    const main = document.querySelector(`#${this._viewerOptions.containerId} #${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}`);
-    this._boundScrollHandler?.cancel();
-    main?.removeEventListener('scroll', this._boundScrollHandler);
+    // Remove event listeners
+    if (this._globalClickHandler) {
+      const container = document.querySelector(`#${this._viewerOptions.containerId}`);
+      if (container) {
+        container.removeEventListener('click', this._globalClickHandler);
+      }
+    }
 
-    this._intersectionObserver?.disconnect();
-    this._annotationService.destroy();
-    this._toolbar?.destroy && this._toolbar.destroy();
-    this._pageVirtualization.destroy();
-    this._zoomHandler.destroy();
+    // Remove scroll handler
+    if (this._boundScrollHandler) {
+      const mainViewer = document.querySelector(`#${this._viewerOptions.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}`);
+      if (mainViewer) {
+        mainViewer.removeEventListener('scroll', this._boundScrollHandler);
+      }
+    }
 
-    const pagesWrapper = document.querySelector(`#${this._viewerOptions.containerId} .${PDF_VIEWER_CLASSNAMES.A_PAGE_VIEW}`)?.parentElement;
-    if (pagesWrapper) pagesWrapper.innerHTML = '';
-    this._pdfState.destroy();
+    // Clean up intersection observer
+    if (this._intersectionObserver) {
+      this._intersectionObserver.disconnect();
+    }
+
+    // Destroy components
+    if (this._toolbar) {
+      this._toolbar.destroy();
+    }
+
+    if (this._pageVirtualization) {
+      this._pageVirtualization.destroy();
+    }
+
+    if (this._annotationService) {
+      this._annotationService.destroy();
+    }
+
+    if (this._zoomHandler) {
+      this._zoomHandler.destroy();
+    }
   }
 }
 

@@ -284,7 +284,6 @@ export class PDFLinkService {
    * @param {string} hash - The hash value.
    */
   setHash(hash: string): void {
-    console.log('setHash called with:', hash);
     window.location.hash = hash;
   }
 

@@ -72,12 +72,36 @@ export class AnnotationManager {
   }
 
   /**
-   * Update default drawing configuration.
+   * Updates the drawing configuration and applies it to existing selected annotations.
    */
   set drawConfig(config: DrawConfig & { type: ShapeType }) {
-    this._drawConfig = {
-      ...config,
-    };
+    this._drawConfig = { ...config };
+
+    // Update the selected annotation if it exists
+    if (this._selectedAnnotation) {
+      this._updateSelectedAnnotationStyle(config);
+    }
+  }
+
+  private _updateSelectedAnnotationStyle(config: DrawConfig & { type: ShapeType }): void {
+    if (!this._selectedAnnotation) return;
+
+    // Update the selected annotation with new style
+    if (config.strokeStyle !== undefined) {
+      (this._selectedAnnotation as any).updateStrokeStyle?.(config.strokeStyle);
+    }
+    if (config.strokeWidth !== undefined) {
+      (this._selectedAnnotation as any).updateStrokeWidth?.(config.strokeWidth);
+    }
+    if (config.strokeColor !== undefined) {
+      (this._selectedAnnotation as any).updateStrokeColor?.(config.strokeColor);
+    }
+    if (config.fillColor !== undefined) {
+      (this._selectedAnnotation as any).updateFillColor?.(config.fillColor);
+    }
+    if (config.opacity !== undefined) {
+      (this._selectedAnnotation as any).updateOpacity?.(config.opacity);
+    }
   }
 
   /**
@@ -134,6 +158,9 @@ export class AnnotationManager {
     this._annotationDrawerContainer.parentElement.parentElement.addEventListener('mousedown', this._boundMouseDown);
     this._annotationDrawerContainer.parentElement.parentElement.addEventListener('mousemove', this._boundMouseMove);
     this._annotationDrawerContainer.parentElement.parentElement.addEventListener('mouseup', this._boundMouseUp);
+
+    // Emit drawing started event
+    this._pdfState?.emit('DRAWING_STARTED');
   }
 
   /**
@@ -146,6 +173,9 @@ export class AnnotationManager {
     this._annotationDrawerContainer.parentElement.parentElement.removeEventListener('mousedown', this._boundMouseDown);
     this._annotationDrawerContainer.parentElement.parentElement.removeEventListener('mousemove', this._boundMouseMove);
     this._annotationDrawerContainer.parentElement.parentElement.removeEventListener('mouseup', this._boundMouseUp);
+
+    // Emit drawing finished event
+    this._pdfState?.emit('DRAWING_FINISHED');
   }
 
   /**

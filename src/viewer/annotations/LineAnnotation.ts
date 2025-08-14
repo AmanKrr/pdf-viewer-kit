@@ -137,15 +137,21 @@ export class LineAnnotation extends Annotation {
     const w = Math.abs(dx),
       h = Math.abs(dy);
 
-    this.__svg.style.left = `${minX}px`;
-    this.__svg.style.top = `${minY}px`;
-    this.__svg.setAttribute('width', `${w}`);
-    this.__svg.setAttribute('height', `${h}`);
+    // Account for stroke width to prevent strokes from being cut off
+    const strokePadding = this._strokeWidth;
+    const svgWidth = w + strokePadding;
+    const svgHeight = h + strokePadding;
+    const strokeOffset = strokePadding / 2;
 
-    const x1r = dx >= 0 ? 0 : w;
-    const y1r = dy >= 0 ? 0 : h;
-    const x2r = dx >= 0 ? w : 0;
-    const y2r = dy >= 0 ? h : 0;
+    this.__svg.style.left = `${minX - strokeOffset}px`;
+    this.__svg.style.top = `${minY - strokeOffset}px`;
+    this.__svg.setAttribute('width', svgWidth.toString());
+    this.__svg.setAttribute('height', svgHeight.toString());
+
+    const x1r = dx >= 0 ? strokeOffset : w + strokeOffset;
+    const y1r = dy >= 0 ? strokeOffset : h + strokeOffset;
+    const x2r = dx >= 0 ? w + strokeOffset : strokeOffset;
+    const y2r = dy >= 0 ? h + strokeOffset : strokeOffset;
 
     const el = this.__element as SVGLineElement;
     el.setAttribute('x1', x1r.toString());
@@ -233,14 +239,18 @@ export class LineAnnotation extends Annotation {
    * @param y2 Second endpoint Y inside SVG
    */
   private createSvgLine(x1 = 0, y1 = 0, x2 = 0, y2 = 0): void {
+    // Account for stroke width to prevent strokes from being cut off
+    const strokePadding = this._strokeWidth;
+    const strokeOffset = strokePadding / 2;
+
     // visible line
     this.__element = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     this.__element.id = this.annotationId;
     const el = this.__element as SVGLineElement;
-    el.setAttribute('x1', x1.toString());
-    el.setAttribute('y1', y1.toString());
-    el.setAttribute('x2', x2.toString());
-    el.setAttribute('y2', y2.toString());
+    el.setAttribute('x1', (x1 + strokeOffset).toString());
+    el.setAttribute('y1', (y1 + strokeOffset).toString());
+    el.setAttribute('x2', (x2 + strokeOffset).toString());
+    el.setAttribute('y2', (y2 + strokeOffset).toString());
     el.setAttribute('stroke', this._strokeColor);
     el.setAttribute('stroke-width', this._strokeWidth.toString());
     el.setAttribute('opacity', this._opacity.toString());
@@ -255,14 +265,19 @@ export class LineAnnotation extends Annotation {
     // hit‐test line (transparent but thick)
     this.__hitElementRect = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     const hit = this.__hitElementRect as SVGLineElement;
-    hit.setAttribute('x1', x1.toString());
-    hit.setAttribute('y1', y1.toString());
-    hit.setAttribute('x2', x2.toString());
-    hit.setAttribute('y2', y2.toString());
+    hit.setAttribute('x1', (x1 + strokeOffset).toString());
+    hit.setAttribute('y1', (y1 + strokeOffset).toString());
+    hit.setAttribute('x2', (x2 + strokeOffset).toString());
+    hit.setAttribute('y2', (y2 + strokeOffset).toString());
     hit.setAttribute('stroke', 'transparent');
-    hit.style.strokeWidth = `${this._strokeWidth + 10}`;
+    // Use a thinner hit area to minimize interference with text selection
+    hit.style.strokeWidth = `${this._strokeWidth + 2}`;
     hit.style.cursor = 'pointer';
+
+    // For lines, we want to allow text selection behind them while still making them clickable
+    // We use a thin stroke width for the hit area to minimize interference with text selection
     hit.style.pointerEvents = 'auto';
+
     hit.onclick = (e) => {
       e.stopPropagation();
       e.preventDefault();
@@ -382,5 +397,78 @@ export class LineAnnotation extends Annotation {
     this._captureOriginal();
     this._setLineInfo();
     this._pdfState.emit('ANNOTATION_CREATED', this.getConfig());
+  }
+
+  /**
+   * Returns stroke-dasharray string corresponding to the stroke style.
+   */
+  private _getStrokeDashArray(): string {
+    // Handle both capitalized and lowercase values from toolbar
+    const style = this._strokeStyle.toLowerCase();
+    return style === 'dashed' ? '5,5' : style === 'dotted' ? '2,2' : '0';
+  }
+
+  /**
+   * Updates the stroke style of the existing shape.
+   * This is called when the user changes stroke style in the toolbar.
+   */
+  public updateStrokeStyle(newStyle: string): void {
+    this._strokeStyle = newStyle;
+
+    if (this.__element) {
+      this.__element.setAttribute('stroke-dasharray', this._getStrokeDashArray());
+    }
+
+    this._setLineInfo();
+  }
+
+  /**
+   * Updates the stroke width of the existing shape.
+   */
+  public updateStrokeWidth(newWidth: number): void {
+    this._strokeWidth = newWidth;
+
+    if (this.__element) {
+      this.__element.setAttribute('stroke-width', newWidth.toString());
+    }
+
+    if (this.__hitElementRect) {
+      this.__hitElementRect.style.strokeWidth = `${newWidth + 10}`;
+    }
+
+    this._setLineInfo();
+  }
+
+  /**
+   * Updates the stroke color of the existing shape.
+   */
+  public updateStrokeColor(newColor: string): void {
+    this._strokeColor = newColor;
+
+    if (this.__element) {
+      this.__element.setAttribute('stroke', newColor);
+    }
+
+    this._setLineInfo();
+  }
+
+  /**
+   * Updates the fill color of the existing shape.
+   */
+  public updateFillColor(newColor: string): void {
+    // This method is not applicable to LineAnnotation
+  }
+
+  /**
+   * Updates the opacity of the existing shape.
+   */
+  public updateOpacity(newOpacity: number): void {
+    this._opacity = newOpacity;
+
+    if (this.__element) {
+      this.__element.setAttribute('opacity', newOpacity.toString());
+    }
+
+    this._setLineInfo();
   }
 }

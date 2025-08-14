@@ -121,7 +121,9 @@ export class RectangleAnnotation extends Annotation {
     this._disableTextSelection();
   }
 
-  /** @inheritdoc */
+  /**
+   * Updates the drawing of the annotation as the pointer moves.
+   */
   public updateDrawing(x: number, y: number): void {
     if (!this.isDrawing || !this.__element || !this.__hitElementRect) return;
 
@@ -132,21 +134,29 @@ export class RectangleAnnotation extends Annotation {
     const width = clampedX - this.__startX;
     const height = clampedY - this.__startY;
 
-    this.__svg.setAttribute('width', `${Math.abs(width)}`);
-    this.__svg.setAttribute('height', `${Math.abs(height)}`);
+    // Account for stroke width to prevent strokes from being cut off
+    const strokePadding = this._strokeWidth;
+    const svgWidth = Math.abs(width) + strokePadding;
+    const svgHeight = Math.abs(height) + strokePadding;
 
-    this.__element.setAttribute('x', '0');
-    this.__element.setAttribute('y', '0');
+    this.__svg.setAttribute('width', svgWidth.toString());
+    this.__svg.setAttribute('height', svgHeight.toString());
+
+    // Position the shape element with stroke offset to center it in the expanded SVG
+    const strokeOffset = strokePadding / 2;
+    this.__element.setAttribute('x', strokeOffset.toString());
+    this.__element.setAttribute('y', strokeOffset.toString());
     this.__element.setAttribute('width', `${Math.abs(width)}`);
     this.__element.setAttribute('height', `${Math.abs(height)}`);
 
-    this.__hitElementRect.setAttribute('x', '0');
-    this.__hitElementRect.setAttribute('y', '0');
+    // Position the hit element to match the shape
+    this.__hitElementRect.setAttribute('x', strokeOffset.toString());
+    this.__hitElementRect.setAttribute('y', strokeOffset.toString());
     this.__hitElementRect.setAttribute('width', `${Math.abs(width)}`);
     this.__hitElementRect.setAttribute('height', `${Math.abs(height)}`);
 
-    if (width < 0) this.__svg.style.left = `${clampedX}px`;
-    if (height < 0) this.__svg.style.top = `${clampedY}px`;
+    if (width < 0) this.__svg.style.left = `${clampedX - strokeOffset}px`;
+    if (height < 0) this.__svg.style.top = `${clampedY - strokeOffset}px`;
   }
 
   /**
@@ -237,10 +247,16 @@ export class RectangleAnnotation extends Annotation {
    * @param width    Rectangle width
    */
   private _createSvgRect(width: number = 0, height: number = 0): void {
+    // Account for stroke width to prevent strokes from being cut off
+    const strokePadding = this._strokeWidth;
+    const svgWidth = Math.abs(width) + strokePadding;
+    const svgHeight = Math.abs(height) + strokePadding;
+    const strokeOffset = strokePadding / 2;
+
     this.__element = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     this.__element.id = this.annotationId;
-    this.__element.setAttribute('x', '0');
-    this.__element.setAttribute('y', '0');
+    this.__element.setAttribute('x', strokeOffset.toString());
+    this.__element.setAttribute('y', strokeOffset.toString());
     this.__element.setAttribute('width', Math.abs(width).toString());
     this.__element.setAttribute('height', Math.abs(height).toString());
     this.__element.setAttribute('fill', this._fillColor);
@@ -251,15 +267,16 @@ export class RectangleAnnotation extends Annotation {
     this.__element.style.pointerEvents = 'none';
 
     this.__hitElementRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    this.__hitElementRect.setAttribute('x', '0');
-    this.__hitElementRect.setAttribute('y', '0');
+    this.__hitElementRect.setAttribute('x', strokeOffset.toString());
+    this.__hitElementRect.setAttribute('y', strokeOffset.toString());
     this.__hitElementRect.setAttribute('width', Math.abs(width).toString());
     this.__hitElementRect.setAttribute('height', Math.abs(height).toString());
-    this.__hitElementRect.setAttribute('fill', 'transparent');
+    this.__hitElementRect.setAttribute('fill', 'none');
     this.__hitElementRect.setAttribute('stroke', 'transparent');
+    // Use thicker stroke width for easier clicking (like the old working code)
     this.__hitElementRect.style.strokeWidth = `${this._strokeWidth + 10}`;
-    this.__hitElementRect.style.pointerEvents = 'auto';
     this.__hitElementRect.style.cursor = 'pointer';
+    this.__hitElementRect.style.pointerEvents = 'auto';
     this.__svg.appendChild(this.__element);
 
     this.__hitElementRect.onclick = (event) => {
@@ -268,6 +285,51 @@ export class RectangleAnnotation extends Annotation {
       this.__onAnnotationClick(event, this.getConfig());
     };
     this.__svg.appendChild(this.__hitElementRect);
+  }
+
+  /**
+   * Updates the hit area size based on selection state and transparency
+   * - Unselected + transparent: minimal hit area (just stroke width)
+   * - Selected: full shape area for better interaction
+   * - Unselected + opaque: minimal hit area (just stroke width)
+   */
+  private _updateHitAreaSize(): void {
+    if (!this.__hitElementRect) return;
+
+    const isTransparent = this._fillColor === 'transparent' || this._fillColor === 'rgba(0,0,0,0)' || this._opacity === 0;
+
+    if (isTransparent && !this._resizer) {
+      // Unselected transparent shape: minimal hit area (just stroke width)
+      // This minimizes interference with text selection while keeping it clickable
+      const strokeOffset = this._strokeWidth / 2;
+
+      // For unselected transparent shapes, create a hit area that covers just the stroke boundary
+      // This ensures it's clickable while minimizing text interference
+      this.__hitElementRect.setAttribute('x', `${strokeOffset}`);
+      this.__hitElementRect.setAttribute('y', `${strokeOffset}`);
+
+      const currentWidth = parseFloat(this.__svg.getAttribute('width') || '0');
+      const currentHeight = parseFloat(this.__svg.getAttribute('height') || '0');
+
+      // Ensure the hit area covers the stroke boundary
+      const hitWidth = Math.max(this._strokeWidth, currentWidth - this._strokeWidth);
+      const hitHeight = Math.max(this._strokeWidth, currentHeight - this._strokeWidth);
+
+      this.__hitElementRect.setAttribute('width', `${hitWidth}`);
+      this.__hitElementRect.setAttribute('height', `${hitHeight}`);
+
+      // Make sure pointer events are enabled
+      this.__hitElementRect.style.pointerEvents = 'auto';
+    } else {
+      // Selected shape or opaque shape: full area for better interaction
+      this.__hitElementRect.setAttribute('x', '0');
+      this.__hitElementRect.setAttribute('y', '0');
+      this.__hitElementRect.setAttribute('width', this.__svg.getAttribute('width') || '0');
+      this.__hitElementRect.setAttribute('height', this.__svg.getAttribute('height') || '0');
+
+      // Make sure pointer events are enabled
+      this.__hitElementRect.style.pointerEvents = 'auto';
+    }
   }
 
   /** Adds keyboard listener for Delete/Backspace. */
@@ -355,7 +417,9 @@ export class RectangleAnnotation extends Annotation {
    * Returns stroke-dasharray string corresponding to the stroke style.
    */
   private _getStrokeDashArray(): string {
-    return this._strokeStyle === 'dashed' ? '5,5' : this._strokeStyle === 'dotted' ? '2,2' : '0';
+    // Handle both capitalized and lowercase values from toolbar
+    const style = this._strokeStyle.toLowerCase();
+    return style === 'dashed' ? '5,5' : style === 'dotted' ? '2,2' : '0';
   }
 
   /**
@@ -425,6 +489,83 @@ export class RectangleAnnotation extends Annotation {
     this._maintainOriginalBounding();
     this._setRectInfo();
     this.__pdfState?.emit('ANNOTATION_CREATED', this.getConfig());
+  }
+
+  /**
+   * Updates the stroke style of the existing shape.
+   * This is called when the user changes stroke style in the toolbar.
+   */
+  public updateStrokeStyle(newStyle: string): void {
+    this._strokeStyle = newStyle;
+
+    // Update the SVG element with new stroke dash array
+    if (this.__element) {
+      this.__element.setAttribute('stroke-dasharray', this._getStrokeDashArray());
+    }
+
+    // Update the hit element too
+    if (this.__hitElementRect) {
+      this.__hitElementRect.setAttribute('stroke-dasharray', this._getStrokeDashArray());
+    }
+
+    // Update internal state
+    this._setRectInfo();
+  }
+
+  /**
+   * Updates the stroke width of the existing shape.
+   */
+  public updateStrokeWidth(newWidth: number): void {
+    this._strokeWidth = newWidth;
+
+    if (this.__element) {
+      this.__element.setAttribute('stroke-width', newWidth.toString());
+    }
+
+    if (this.__hitElementRect) {
+      this.__hitElementRect.style.strokeWidth = `${newWidth + 10}`;
+    }
+
+    this._setRectInfo();
+  }
+
+  /**
+   * Updates the stroke color of the existing shape.
+   */
+  public updateStrokeColor(newColor: string): void {
+    this._strokeColor = newColor;
+
+    if (this.__element) {
+      this.__element.setAttribute('stroke', newColor);
+    }
+
+    this._setRectInfo();
+  }
+
+  /**
+   * Updates the fill color of the existing shape.
+   */
+  public updateFillColor(newColor: string): void {
+    this._fillColor = newColor;
+
+    if (this.__element) {
+      this.__element.setAttribute('fill', newColor);
+    }
+
+    this._setRectInfo();
+  }
+
+  /**
+   * Updates the opacity of the existing shape.
+   */
+  public updateOpacity(newOpacity: number): void {
+    this._opacity = newOpacity;
+
+    if (this.__element) {
+      this.__element.setAttribute('opacity', newOpacity.toString());
+    }
+
+    this._setRectInfo();
   }
 
   /**

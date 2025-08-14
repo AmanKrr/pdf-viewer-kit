@@ -125,15 +125,21 @@ export class EllipseAnnotation extends Annotation {
     const w = Math.abs(dx);
     const h = Math.abs(dy);
 
-    this.__svg.style.left = `${left}px`;
-    this.__svg.style.top = `${top}px`;
-    this.__svg.setAttribute('width', `${w}`);
-    this.__svg.setAttribute('height', `${h}`);
+    // Account for stroke width to prevent strokes from being cut off
+    const strokePadding = this._strokeWidth;
+    const svgWidth = w + strokePadding;
+    const svgHeight = h + strokePadding;
+    const strokeOffset = strokePadding / 2;
+
+    this.__svg.style.left = `${left - strokeOffset}px`;
+    this.__svg.style.top = `${top - strokeOffset}px`;
+    this.__svg.setAttribute('width', svgWidth.toString());
+    this.__svg.setAttribute('height', svgHeight.toString());
 
     const rx = w / 2;
     const ry = h / 2;
-    const cx = rx;
-    const cy = ry;
+    const cx = rx + strokeOffset;
+    const cy = ry + strokeOffset;
 
     (this.__element as SVGEllipseElement).setAttribute('cx', `${cx}`);
     (this.__element as SVGEllipseElement).setAttribute('cy', `${cy}`);
@@ -211,10 +217,14 @@ export class EllipseAnnotation extends Annotation {
    * Creates the visible ellipse and an invisible, thicker hit-test ellipse.
    */
   private createSvgEllipse(cx = 0, cy = 0, rx = 0, ry = 0): void {
+    // Account for stroke width to prevent strokes from being cut off
+    const strokePadding = this._strokeWidth;
+    const strokeOffset = strokePadding / 2;
+
     this.__element = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
     this.__element.id = this.annotationId;
-    this.__element.setAttribute('cx', `${cx}`);
-    this.__element.setAttribute('cy', `${cy}`);
+    this.__element.setAttribute('cx', `${cx + strokeOffset}`);
+    this.__element.setAttribute('cy', `${cy + strokeOffset}`);
     this.__element.setAttribute('rx', `${rx}`);
     this.__element.setAttribute('ry', `${ry}`);
     this.__element.setAttribute('fill', this._fillColor);
@@ -225,15 +235,17 @@ export class EllipseAnnotation extends Annotation {
     this.__svg.appendChild(this.__element);
 
     this.__hitElementRect = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
-    this.__hitElementRect.setAttribute('cx', `${cx}`);
-    this.__hitElementRect.setAttribute('cy', `${cy}`);
+    this.__hitElementRect.setAttribute('cx', `${cx + strokeOffset}`);
+    this.__hitElementRect.setAttribute('cy', `${cy + strokeOffset}`);
     this.__hitElementRect.setAttribute('rx', `${rx}`);
     this.__hitElementRect.setAttribute('ry', `${ry}`);
     this.__hitElementRect.setAttribute('fill', 'none');
     this.__hitElementRect.setAttribute('stroke', 'transparent');
+    // Use thicker stroke width for easier clicking (like the old working code)
     this.__hitElementRect.style.strokeWidth = `${this._strokeWidth + 10}`;
     this.__hitElementRect.style.cursor = 'pointer';
     this.__hitElementRect.style.pointerEvents = 'auto';
+
     this.__hitElementRect.onclick = (e) => {
       e.stopPropagation();
       e.preventDefault();
@@ -299,9 +311,13 @@ export class EllipseAnnotation extends Annotation {
     }
   }
 
-  /** Returns the SVG `stroke-dasharray` based on style. */
+  /**
+   * Returns stroke-dasharray string corresponding to the stroke style.
+   */
   private _getStrokeDashArray(): string {
-    return this._strokeStyle === 'dashed' ? '5,5' : this._strokeStyle === 'dotted' ? '2,2' : '0';
+    // Handle both capitalized and lowercase values from toolbar
+    const style = this._strokeStyle.toLowerCase();
+    return style === 'dashed' ? '5,5' : style === 'dotted' ? '2,2' : '0';
   }
 
   /**

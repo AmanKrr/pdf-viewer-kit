@@ -97,7 +97,7 @@ export class Resizer {
   }
 
   /**
-   * Syncs the overlay’s position and size to the annotation svg’s current absolute position and dimensions.
+   * Syncs the overlay's position and size to the annotation svg's current absolute position and dimensions.
    */
   public syncOverlayToSvg(): void {
     const svgWidth = parseFloat(this._svg.getAttribute('width') || '0');
@@ -121,13 +121,30 @@ export class Resizer {
     const width = svgWidth;
     const height = svgHeight;
 
-    this._overlaySvg.style.left = left + 'px';
-    this._overlaySvg.style.top = top + 'px';
-    this._overlaySvg.setAttribute('width', width.toString());
-    this._overlaySvg.setAttribute('height', height.toString());
+    if (this._kind !== 'line') {
+      // For shapes, expand the overlay to accommodate handles positioned outside
+      const offset = 8; // Same offset as used in handle positioning
+      const expandedWidth = width + offset * 2;
+      const expandedHeight = height + offset * 2;
+
+      // Position overlay container so that the expanded overlay is centered over the shape
+      const overlayLeft = left - offset;
+      const overlayTop = top - offset;
+
+      this._overlaySvg.style.left = overlayLeft + 'px';
+      this._overlaySvg.style.top = overlayTop + 'px';
+      this._overlaySvg.setAttribute('width', expandedWidth.toString());
+      this._overlaySvg.setAttribute('height', expandedHeight.toString());
+    } else {
+      // For lines, keep original positioning
+      this._overlaySvg.style.left = left + 'px';
+      this._overlaySvg.style.top = top + 'px';
+      this._overlaySvg.setAttribute('width', width.toString());
+      this._overlaySvg.setAttribute('height', height.toString());
+    }
 
     if (this._kind === 'line') {
-      // mirror the annotation’s current endpoints
+      // mirror the annotation's current endpoints
       const x1 = this._element.getAttribute('x1')!;
       const y1 = this._element.getAttribute('y1')!;
       const x2 = this._element.getAttribute('x2')!;
@@ -146,7 +163,7 @@ export class Resizer {
       return;
     }
 
-    this._updateOverlayDimensions(left, top, width, height);
+    this._updateOverlayDimensions(0, 0, width, height);
   }
 
   /**
@@ -167,6 +184,7 @@ export class Resizer {
     this._overlaySvg.style.position = 'absolute';
     this._overlaySvg.style.overflow = 'visible';
     this._overlaySvg.style.pointerEvents = 'none';
+    this._overlaySvg.setAttribute('data-resizer-overlay', 'true');
     this._svg.parentElement?.appendChild(this._overlaySvg);
 
     if (this._kind === 'line') {
@@ -201,6 +219,7 @@ export class Resizer {
         c.style.cursor = 'move';
         c.style.pointerEvents = 'all';
         c.dataset.idx = String(idx);
+        c.setAttribute('data-resizer-handle', 'true');
         c.addEventListener('mousedown', (e) => this._onLineMouseDown(e, idx));
         this._overlaySvg.appendChild(c);
         this._resizers.push(c);
@@ -214,6 +233,7 @@ export class Resizer {
       handle.setAttribute('stroke', 'white');
       handle.setAttribute('stroke-width', '1');
       handle.dataset.index = i.toString();
+      handle.setAttribute('data-resizer-handle', 'true');
       handle.style.cursor = this._cursorForHandle(i);
       handle.style.pointerEvents = 'all';
       handle.addEventListener('mousedown', (e) => this._onHandleMouseDown(e, i));
@@ -251,29 +271,44 @@ export class Resizer {
 
   /**
    * Updates the overlay outline and repositions the handles.
-   * Note that here the overlay’s internal coordinate system has (0,0) at its top‐left.
+   * The overlay covers the shape plus offset space for handles.
    */
   private _updateOverlayDimensions(x: number, y: number, width: number, height: number): void {
+    const offset = 8; // Same offset as used in handle positioning
+
+    // Expand overlay to accommodate handles positioned outside the shape
+    const expandedWidth = width + offset * 2;
+    const expandedHeight = height + offset * 2;
+
+    // Position overlay at (0,0) and expand it to accommodate handles
     this._overlayRect.setAttribute('x', '0');
     this._overlayRect.setAttribute('y', '0');
-    this._overlayRect.setAttribute('width', width.toString());
-    this._overlayRect.setAttribute('height', height.toString());
-    this._updateHandlePositions(width, height);
+    this._overlayRect.setAttribute('width', expandedWidth.toString());
+    this._overlayRect.setAttribute('height', expandedHeight.toString());
+
+    // Pass the original shape dimensions and offset for handle positioning
+    this._updateHandlePositions(width, height, offset);
   }
 
   /**
    * Positions the eight handles at the corners and midpoints of the overlay.
+   * Handles are positioned outside the shape with a small offset for better usability.
    */
-  private _updateHandlePositions(width: number, height: number): void {
+  private _updateHandlePositions(width: number, height: number, offset: number): void {
+    // Since the overlay is expanded by offset*2, we need to position handles
+    // relative to the expanded overlay boundaries
+    const expandedWidth = width + offset * 2;
+    const expandedHeight = height + offset * 2;
+
     const positions = [
-      { x: 0, y: 0 },
-      { x: width / 2, y: 0 },
-      { x: width, y: 0 },
-      { x: width, y: height / 2 },
-      { x: width, y: height },
-      { x: width / 2, y: height },
-      { x: 0, y: height },
-      { x: 0, y: height / 2 },
+      { x: 0, y: 0 }, // Top-left corner
+      { x: expandedWidth / 2, y: 0 }, // Top edge
+      { x: expandedWidth, y: 0 }, // Top-right corner
+      { x: expandedWidth, y: expandedHeight / 2 }, // Right edge
+      { x: expandedWidth, y: expandedHeight }, // Bottom-right corner
+      { x: expandedWidth / 2, y: expandedHeight }, // Bottom edge
+      { x: 0, y: expandedHeight }, // Bottom-left corner
+      { x: 0, y: expandedHeight / 2 }, // Left edge
     ];
 
     this._resizers.forEach((handle, index) => {
