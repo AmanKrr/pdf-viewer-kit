@@ -20,7 +20,7 @@ import PdfState from './PDFState';
 import { debounce } from 'lodash';
 import PageVirtualization from './PDFPageVirtualization';
 import ZoomHandler from './PDFZoomHandler';
-import { ViewerLoadOptions } from '../../types/webpdf.types';
+import { LoadOptions, ViewerLoadOptions } from '../../types/webpdf.types';
 import { AnnotationService } from '../services/AnnotationService';
 import { SelectionManager } from '../manager/SelectionManager';
 import SearchBar from './PDFSearchBar';
@@ -28,6 +28,8 @@ import SearchHighlighter from '../manager/SearchHighlighter';
 import { Toolbar } from './PDFToolbar';
 import { DownloadManager } from '../manager/PDFDownloadManager';
 import { IToolbar } from '../../interface/IToolbar';
+import { InstanceWebViewer } from '../../core/InstanceWebViewer';
+import { PDFViewerInstance } from '../../core/PDFViewerInstance';
 
 /**
  * Manages the PDF viewer instance and provides various functionalities, including:
@@ -37,20 +39,30 @@ import { IToolbar } from '../../interface/IToolbar';
  * - Toolbar interactions
  */
 class WebViewer {
-  // Private properties
-  private _pdfInstance: PDFDocumentProxy;
-  private _viewerOptions: ViewerLoadOptions;
-  private _pdfState: PdfState;
-  private _pageVirtualization: PageVirtualization;
+  private readonly _options: LoadOptions;
+  private readonly _instance: PDFViewerInstance;
+
+  private _isInitialized = false;
+  private _isDestroyed = false;
+  private _initializationPromise!: Promise<void>;
+
+  // Instance-specific services
+  private _pageVirtualization!: PageVirtualization;
   private _toolbar?: IToolbar;
-  private _annotationService: AnnotationService;
-  private _downloadManager: DownloadManager;
-  private _zoomHandler: ZoomHandler;
-  private _boundScrollHandler: (event: Event) => void;
+  private _annotationService!: AnnotationService;
+  private _downloadManager!: DownloadManager;
+  private _zoomHandler!: ZoomHandler;
+  private _selectionManager!: SelectionManager;
+  private _searchHighlighter!: SearchHighlighter;
+
+  // Event handlers
+  private _boundScrollHandler!: (event: Event) => void;
   private _intersectionObserver?: IntersectionObserver;
   private _globalClickHandler?: (event: Event) => void;
 
-  public ready!: Promise<void>;
+  // DOM elements
+  private _parentContainer!: HTMLElement;
+  private _pageParentContainer!: HTMLElement;
 
   /**
    * Initializes the WebViewer instance.
@@ -60,83 +72,195 @@ class WebViewer {
    * @param {HTMLElement} parentContainer - The parent container where the viewer is rendered.
    * @param {HTMLElement} pageParentContainer - The container holding the PDF pages.
    */
-  constructor(pdfInstance: PDFDocumentProxy, viewerOptions: ViewerLoadOptions, parentContainer: HTMLElement, pageParentContainer: HTMLElement) {
-    this._pdfInstance = pdfInstance;
-    this._viewerOptions = viewerOptions;
+  constructor(options: ViewerLoadOptions, instance: PDFViewerInstance, parentContainer: HTMLElement, pageParentContainer: HTMLElement) {
+    this._options = options;
+    this._instance = instance;
+    this._parentContainer = parentContainer;
+    this._pageParentContainer = pageParentContainer;
 
-    this._pdfState = PdfState.getInstance(viewerOptions.containerId);
-    const selectionManager = new SelectionManager();
-    const searchHighlighter = new SearchHighlighter(this._pdfState, this);
-    new SearchBar(
-      this._pdfState,
-      async (searchTerm, options) => {
-        await searchHighlighter.search(searchTerm, options, this._pdfState);
-      },
-      searchHighlighter.prevMatch.bind(searchHighlighter),
-      searchHighlighter.nextMatch.bind(searchHighlighter),
-      searchHighlighter.getMatchStatus.bind(searchHighlighter),
-    );
-    this._pageVirtualization = new PageVirtualization(
-      this._viewerOptions,
-      parentContainer.querySelector(`#${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}`)!,
-      pageParentContainer,
-      this._pdfInstance.numPages,
-      this,
-      selectionManager,
-      searchHighlighter,
-    );
+    this.initialize();
+  }
 
-    if (!viewerOptions.disableToolbar) {
-      const toolbarHost = document.querySelector(`#${this._viewerOptions.containerId} #toolbar-container`)! as HTMLElement;
-      const pdfState = PdfState.getInstance(viewerOptions.containerId);
-      const buttons = viewerOptions.customToolbarItems ?? [];
-      const opts = viewerOptions.toolbarOptions ?? {};
-      this._toolbar = viewerOptions.customToolbar ? viewerOptions.customToolbar : (new Toolbar(this, pdfState, buttons, opts) as any);
-      this._toolbar!.render(toolbarHost);
+  get instance() {
+    return this._instance;
+  }
+
+  get instanceId(): string {
+    return this._instance.instanceId;
+  }
+
+  get containerId(): string {
+    return this._instance.containerId;
+  }
+
+  get state() {
+    return this._instance.state;
+  }
+
+  get pdfDocument() {
+    return this._instance.pdfDocument!;
+  }
+
+  get events() {
+    return this._instance.events;
+  }
+
+  get canvasPool() {
+    return this._instance.canvasPool;
+  }
+
+  /**
+   * Gets the ready promise for initialization completion
+   */
+  get ready() {
+    return this._initializationPromise;
+  }
+
+  /**
+   * Checks if this instance has been destroyed
+   */
+  get isDestroyed(): boolean {
+    return this._isDestroyed;
+  }
+
+  /**
+   * Initializes the web viewer and all its components
+   */
+  async initialize(): Promise<void> {
+    if (this._isInitialized || this._isDestroyed) {
+      return;
     }
 
-    this._boundScrollHandler = this._onScroll.bind(this);
-    this._addEvents();
-    this._zoomHandler = new ZoomHandler(this._pdfState, this._pageVirtualization);
-    this._annotationService = new AnnotationService(this._pdfState, this);
+    this._initializationPromise = this._performInitialization();
+    await this._initializationPromise;
+  }
+
+  /**
+   * Performs the actual initialization
+   */
+  private async _performInitialization(): Promise<void> {
+    try {
+      // Initialize components with instance-specific resources
+      this._initializeComponents();
+
+      // Set up event handlers
+      this._setupEventHandlers();
+
+      // wait for page virtualization to setup everything.
+      await this._pageVirtualization.bufferReady;
+      // Set up page observation once page virtualization is ready, add observer since we know that now pages are present.
+      this._setupPageObserver();
+
+      this._isInitialized = true;
+      console.log(`InstanceWebViewer initialized for instance ${this._instance.instanceId}`);
+    } catch (error) {
+      console.error(`Failed to initialize InstanceWebViewer for instance ${this._instance.instanceId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Initializes all viewer components
+   */
+  private _initializeComponents(): void {
+    const instanceState = this._instance.state;
+    const instanceEvents = this._instance.events;
+
+    // Initialize selection manager
+    this._selectionManager = new SelectionManager();
+
+    // Initialize search highlighter
+    this._searchHighlighter = new SearchHighlighter(this);
+
+    // Initialize search bar
+    new SearchBar(
+      this,
+      async (searchTerm, options) => {
+        await this._searchHighlighter.search(searchTerm, options);
+      },
+      this._searchHighlighter.prevMatch.bind(this._searchHighlighter),
+      this._searchHighlighter.nextMatch.bind(this._searchHighlighter),
+      this._searchHighlighter.getMatchStatus.bind(this._searchHighlighter),
+    );
+
+    // Initialize page virtualization
+    const mainViewerContainer = document.querySelector(`#${this.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`);
+    if (!mainViewerContainer) {
+      throw new Error(`Main viewer container not found for instance ${this._instance.instanceId}`);
+    }
+
+    this._pageVirtualization = new PageVirtualization(
+      this._options,
+      this._parentContainer.querySelector(`#${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`)!,
+      this._pageParentContainer,
+      this.pdfDocument.numPages,
+      this,
+      this._selectionManager,
+      this._searchHighlighter,
+    );
+
+    if (!this._options.disableToolbar) {
+      const toolbarHost = document.querySelector(`#${PDF_VIEWER_IDS.TOOLBAR_CONTAINER}-${this._instance.instanceId}`)! as HTMLElement;
+      const buttons = this._options.customToolbarItems ?? [];
+      const opts = this._options.toolbarOptions ?? {};
+      this._toolbar = this._options.customToolbar ? this._options.customToolbar : (new Toolbar(this, buttons, opts) as any);
+      if (typeof this._toolbar?.render === 'function') {
+        this._toolbar.render(toolbarHost);
+      } else {
+        throw new Error('Custom toolbar must implement a render method.');
+      }
+    }
+
+    this._zoomHandler = new ZoomHandler(this, this._pageVirtualization);
+    this._annotationService = new AnnotationService(this);
 
     // Subscribe to drawing events to manage interactive effects through SelectionManager
-    this._pdfState.on('DRAWING_STARTED', () => {
-      selectionManager.setDrawingState(true);
+    this._instance.events.on('DRAWING_STARTED', () => {
+      this._selectionManager.setDrawingState(true);
     });
 
-    this._pdfState.on('DRAWING_FINISHED', () => {
+    this._instance.events.on('DRAWING_FINISHED', () => {
       // Small delay to ensure selection is fully registered
       setTimeout(() => {
-        selectionManager.setDrawingState(false);
+        this._selectionManager.setDrawingState(false);
       }, 50);
     });
 
-    // Add global click handler for deselection
-    this._addGlobalClickHandler(selectionManager);
-
-    this.ready.then(() => {
-      this.observer((pageNum) => {
-        this._pdfState.currentPage = pageNum;
-        this._updateCurrentPageInput();
-      });
-    });
-    this._downloadManager = new DownloadManager(this._annotationService, this._pdfState);
+    // this._downloadManager = new DownloadManager(this._annotationService, instanceState);
   }
 
-  private observer(callback: (pageNumber: number) => void) {
+  /**
+   * Sets up event handlers
+   */
+  private _setupEventHandlers(): void {
+    this._boundScrollHandler = this._onScroll.bind(this);
+    this._addInstanceEvents();
+    // this._addGlobalClickHandler();
+  }
+
+  /**
+   * Sets up page observer for navigation
+   */
+  private _setupPageObserver(): void {
+    this._observer((pageNum) => {
+      this._instance.state.currentPage = pageNum;
+      this._updateCurrentPageInput();
+    });
+  }
+
+  /**
+   * Page observer for tracking current page
+   */
+  private _observer(callback: (pageNumber: number) => void): void {
     let lastNotified: number | null = null;
     if (!this._intersectionObserver) {
       this._intersectionObserver = new IntersectionObserver(
         (entries) => {
-          // pick only the entries currently intersecting
           const visible = entries.filter((e) => e.isIntersecting);
-          if (!visible.length) {
-            return;
-          }
-          // find the one with the largest overlap
+          if (!visible.length) return;
+
           const best = visible.reduce((a, b) => (a.intersectionRatio > b.intersectionRatio ? a : b));
-          const pageNum = parseInt(best.target.id.split('-')[1], 10);
+          const pageNum = parseInt(best.target.getAttribute('data-page-number') || '', 10);
 
           if (pageNum !== lastNotified) {
             lastNotified = pageNum;
@@ -144,11 +268,12 @@ class WebViewer {
           }
         },
         {
-          root: document.querySelector(`#${this._viewerOptions.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}`),
+          root: document.querySelector(`#${this.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`),
           threshold: 0,
           rootMargin: '-50% 0px -50% 0px',
         },
       );
+
       this._pageVirtualization.pageObserver = this._intersectionObserver;
       this._pageVirtualization._forceObservePage();
     }
@@ -157,9 +282,9 @@ class WebViewer {
   /**
    * Adds event listeners for scrolling and updates page number input dynamically.
    */
-  private _addEvents() {
-    const mainViewer = document.querySelector(`#${this._viewerOptions.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}`);
-    if (mainViewer && this._viewerOptions.toolbarOptions?.showThumbnail) {
+  private _addInstanceEvents() {
+    const mainViewer = document.querySelector(`#${this.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`);
+    if (mainViewer && this._options.toolbarOptions?.showThumbnail) {
       mainViewer.addEventListener('scroll', this._boundScrollHandler);
     }
   }
@@ -167,8 +292,8 @@ class WebViewer {
   /**
    * Adds global click handler to detect clicks outside of annotations for deselection.
    */
-  private _addGlobalClickHandler(selectionManager: SelectionManager) {
-    const container = document.querySelector(`#${this._viewerOptions.containerId}`);
+  private _addGlobalClickHandler() {
+    const container = document.querySelector(`#${this.containerId}`);
     if (!container) return;
 
     const handleGlobalClick = (event: Event) => {
@@ -187,8 +312,8 @@ class WebViewer {
 
       // If click is not on an annotation and we have a selection, deselect
       // But only if we're not in the middle of drawing
-      if (!isAnnotationClick && selectionManager.getSelected() && !selectionManager.isDrawingActive()) {
-        selectionManager.setSelected(null);
+      if (!isAnnotationClick && this._selectionManager.getSelected() && !this._selectionManager.isDrawingActive()) {
+        this._selectionManager.setSelected(null);
       }
     };
 
@@ -209,11 +334,11 @@ class WebViewer {
    */
   private _syncThumbnailScrollWithMainPageContainer() {
     const pageNumber = this.currentPageNumber;
-    const previousActiveThumbnail = document.querySelector(`#${this._viewerOptions.containerId} .thumbnail.thumbnail-active`);
+    const previousActiveThumbnail = document.querySelector(`#${this.containerId} .thumbnail.thumbnail-active`);
     if (previousActiveThumbnail) {
       previousActiveThumbnail.classList.remove(`thumbnail-active`);
     }
-    const thumbnailToBeActive = document.querySelector(`#${this._viewerOptions.containerId} .thumbnail[data-page-number="${pageNumber}"]`);
+    const thumbnailToBeActive = document.querySelector(`#${this.containerId} .thumbnail[data-page-number="${pageNumber}"]`);
     if (thumbnailToBeActive) {
       thumbnailToBeActive.classList.add('thumbnail-active');
       thumbnailToBeActive.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -237,29 +362,29 @@ class WebViewer {
 
   /** @returns {number} The currently active page number. */
   get currentPageNumber(): number {
-    return this._pdfState.currentPage;
+    return this._instance.state.currentPage;
   }
 
   /** @returns {number} The total number of pages in the PDF document. */
   get totalPages(): number {
-    return this._pdfState.pdfInstance?.numPages;
+    return this.pdfDocument.numPages;
   }
 
   /** @returns {number} The current zoom scale of the PDF viewer. */
   get currentScale(): number {
-    return this._pdfState.scale;
+    return this._instance.state.scale;
   }
 
   /** @returns {PDFDocumentProxy} The PDF.js document instance. */
-  get pdfInstance(): PDFDocumentProxy {
-    return this._pdfInstance;
-  }
+  // get pdfInstance(): PDFDocumentProxy {
+  //   return this.pdfDocument;
+  // }
 
   /**
    * Toggles the thumbnail viewer sidebar.
    */
   public toogleThumbnailViewer() {
-    const thumbnailSidebarElement = document.querySelector(`#${this._viewerOptions.containerId} .${PDF_VIEWER_CLASSNAMES['A_SIDEBAR_CONTAINER']}`);
+    const thumbnailSidebarElement = document.querySelector(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES['A_SIDEBAR_CONTAINER']}`);
 
     if (!thumbnailSidebarElement) {
       console.error(`Invalid sidebar container element ${thumbnailSidebarElement}.`);
@@ -285,7 +410,7 @@ class WebViewer {
     }
 
     if (this.currentPageNumber < this.totalPages!) {
-      this._pdfState.currentPage = this.currentPageNumber + 1;
+      this._instance.state.currentPage = this.currentPageNumber + 1;
       this.goToPage(this.currentPageNumber);
     }
   }
@@ -296,7 +421,7 @@ class WebViewer {
    */
   public previousPage(): void {
     if (this.currentPageNumber > 1) {
-      this._pdfState.currentPage = this.currentPageNumber - 1;
+      this._instance.state.currentPage = this.currentPageNumber - 1;
       this.goToPage(this.currentPageNumber);
     }
   }
@@ -306,7 +431,7 @@ class WebViewer {
    */
   public firstPage(): void {
     if (this.currentPageNumber > 1) {
-      this._pdfState.currentPage = 1;
+      this._instance.state.currentPage = 1;
       this.goToPage(this.currentPageNumber);
     }
   }
@@ -321,7 +446,7 @@ class WebViewer {
     }
 
     if (this.currentPageNumber < this.totalPages!) {
-      this._pdfState.currentPage = this.totalPages!;
+      this._instance.state.currentPage = this.totalPages!;
       this.goToPage(this.currentPageNumber);
     }
   }
@@ -454,7 +579,7 @@ class WebViewer {
    * Toggles the visibility of the search box in the viewer.
    */
   public search(): void {
-    const searchContainer = document.querySelector(`#${this._viewerOptions.containerId} .a-search-container`);
+    const searchContainer = document.querySelector(`#${this.containerId} .a-search-container`);
     if (searchContainer) {
       searchContainer.classList.toggle('a-search-hidden');
     }
@@ -493,10 +618,10 @@ class WebViewer {
     if (pageNumber >= 1 && pageNumber <= this.totalPages!) {
       const pagePosition = this._pageVirtualization.pagePositions.get(pageNumber);
       if (pagePosition != undefined) {
-        const scrollElement = document.querySelector(`#${this._viewerOptions.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}`);
+        const scrollElement = document.querySelector(`#${this.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`);
         if (scrollElement) {
           scrollElement.scrollTop = pagePosition;
-          this._pdfState.currentPage = pageNumber;
+          this._instance.state.currentPage = pageNumber;
           this._updateCurrentPageInput();
         }
       }
@@ -509,7 +634,7 @@ class WebViewer {
    * Updates the current page number input field in the toolbar.
    */
   private _updateCurrentPageInput() {
-    const currentPageInputField = document.querySelector(`#${this._viewerOptions.containerId} #${PDF_VIEWER_IDS.CURRENT_PAGE_INPUT}`);
+    const currentPageInputField = document.querySelector(`#${this.containerId} #${PDF_VIEWER_IDS.CURRENT_PAGE_INPUT}-${this.instanceId}`);
     if (currentPageInputField) {
       (currentPageInputField as HTMLInputElement).value = String(this.currentPageNumber);
     }
@@ -542,7 +667,7 @@ class WebViewer {
         await this.zoomOut();
         break;
       case 'currentPageNumber':
-        this._pdfState.currentPage = parseInt((event.target as HTMLInputElement).value);
+        this._instance.state.currentPage = parseInt((event.target as HTMLInputElement).value);
         if ((event as KeyboardEvent).key === 'Enter') {
           (event.target as HTMLInputElement).blur();
           this.goToPage(this.currentPageNumber);
@@ -555,7 +680,7 @@ class WebViewer {
   public destroy(): void {
     // Remove event listeners
     if (this._globalClickHandler) {
-      const container = document.querySelector(`#${this._viewerOptions.containerId}`);
+      const container = document.querySelector(`#${this.containerId}`);
       if (container) {
         container.removeEventListener('click', this._globalClickHandler);
       }
@@ -563,7 +688,7 @@ class WebViewer {
 
     // Remove scroll handler
     if (this._boundScrollHandler) {
-      const mainViewer = document.querySelector(`#${this._viewerOptions.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}`);
+      const mainViewer = document.querySelector(`#${this.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`);
       if (mainViewer) {
         mainViewer.removeEventListener('scroll', this._boundScrollHandler);
       }

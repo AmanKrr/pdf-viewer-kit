@@ -18,6 +18,7 @@ import { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import PdfState from '../ui/PDFState';
 import SearchIndexManager from './SearchIndexManager';
 import WebViewer from '../ui/WebViewer';
+import { PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
 
 export interface SearchOptions {
   matchCase: boolean;
@@ -50,14 +51,36 @@ class SearchHighlighter {
   private _flatResults: { pageNumber: number; element: HTMLElement }[] = [];
   private _allFlatResults: { pageNumber: number; matchPosition: { startIndex: number; length: number } }[] = [];
   private _currentMatchIndex: number = -1;
-  private _pdfViewer: WebViewer;
-  private _pdfState: PdfState;
-  private _searchIndexManager: SearchIndexManager;
+  private readonly _webViewer: WebViewer;
+  private readonly _searchIndexManager: SearchIndexManager;
 
-  constructor(pdfState: PdfState, pdfViewer: WebViewer) {
-    this._pdfState = pdfState;
-    this._pdfViewer = pdfViewer;
+  constructor(webViewer: WebViewer) {
+    this._webViewer = webViewer;
     this._searchIndexManager = new SearchIndexManager();
+  }
+
+  get instance() {
+    return this._webViewer;
+  }
+
+  get instanceId(): string {
+    return this._webViewer.instanceId;
+  }
+
+  get containerId(): string {
+    return this._webViewer.containerId;
+  }
+
+  get state() {
+    return this._webViewer.state;
+  }
+
+  get pdfDocument() {
+    return this._webViewer.pdfDocument!;
+  }
+
+  get events() {
+    return this._webViewer.events;
   }
 
   /**
@@ -66,7 +89,7 @@ class SearchHighlighter {
    * @param options Search options.
    * @returns An array of PageSearchResult objects.
    */
-  async search(searchTerm: string, options: SearchOptions, pdfState: PdfState): Promise<PageSearchResult[]> {
+  async search(searchTerm: string, options: SearchOptions): Promise<PageSearchResult[]> {
     this._currentSearchTerm = searchTerm;
     this._currentOptions = options;
     this._flatResults = [];
@@ -80,7 +103,7 @@ class SearchHighlighter {
 
     if (pageNumbers.length === 0) {
       // If no pages are indexed, extract content from the PDF.
-      await this.extractPdfContent(pdfState.pdfInstance.numPages, pdfState.pdfInstance);
+      await this.extractPdfContent(this._webViewer.pdfDocument.numPages, this._webViewer.pdfDocument);
       // Re-fetch the page numbers after extraction.
       pageNumbers = this._searchIndexManager.getAllPageNumbers();
     }
@@ -184,7 +207,7 @@ class SearchHighlighter {
       let attempts = 0;
       const maxAttempts = 0.2; // 50 * 100ms = 5 seconds
       const check = () => {
-        const el = document.querySelector(`#${this._pdfState?.containerId} #pageContainer-${pageNumber}`) as HTMLElement;
+        const el = document.querySelector(`#${this.containerId} #pageContainer-${this.instanceId}-${pageNumber}[data-page-number="${pageNumber}"]`) as HTMLElement;
         if (el) {
           resolve(el);
         } else {
@@ -204,7 +227,7 @@ class SearchHighlighter {
    * Removes all inline highlights from all text layers.
    */
   removeHighlights(): void {
-    document.querySelectorAll(`#${this._pdfState?.containerId} .a-text-layer`).forEach((layer) => {
+    document.querySelectorAll(`#${this.containerId} .a-text-layer`).forEach((layer) => {
       layer.querySelectorAll('span[role="presentation"]').forEach((span) => {
         if (span.textContent) {
           span.innerHTML = span.textContent;
@@ -229,7 +252,7 @@ class SearchHighlighter {
    * Called when a page is unmounted; cleans up any highlight data for that page.
    */
   deregisterPage(pageNumber: number): void {
-    const container = document.querySelector(`#${this._pdfState?.containerId} #pageContainer-${pageNumber}`);
+    const container = document.querySelector(`#${this.containerId} #pageContainer-${this.instanceId}-${pageNumber}[data-page-number="${pageNumber}"]`);
     if (container) {
       const textLayer = container.querySelector('.a-text-layer');
       if (textLayer) {
@@ -255,9 +278,9 @@ class SearchHighlighter {
     // and wait for the page to be rendered.
     // This is a workaround for the issue where the page is not rendered yet.
     if (targetMatch) {
-      const container = document.querySelector(`#${this._pdfState?.containerId} #pageContainer-${targetMatch.pageNumber}`);
-      if (!container && this._pdfViewer) {
-        this._pdfViewer.goToPage(targetMatch.pageNumber);
+      const container = document.querySelector(`#${this.containerId} #pageContainer-${this.instanceId}-${targetMatch.pageNumber}[data-page-number="${targetMatch.pageNumber}"]`);
+      if (!container && this._webViewer) {
+        this._webViewer.goToPage(targetMatch.pageNumber);
         setTimeout(() => {
           this.selectMatch(index);
         }, 300);

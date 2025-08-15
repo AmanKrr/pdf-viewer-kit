@@ -183,13 +183,16 @@ export class PDFViewerManager {
    * Gets instance statistics
    */
   getStats(): {
+    instanceCount: number;
+    memoryUsage: number;
+    workerCount: number;
+    canvasCount: number;
     totalInstances: number;
     activeInstances: number;
     destroyedInstances: number;
     containersInUse: number;
-    memoryUsage: {
+    detailedMemoryUsage: {
       totalCanvases: number;
-      totalBitmaps: number;
       estimatedMemoryMB: number;
     };
   } {
@@ -199,27 +202,26 @@ export class PDFViewerManager {
 
     // Calculate memory usage across all instances
     let totalCanvases = 0;
-    let totalBitmaps = 0;
     let totalMemoryMB = 0;
 
     activeInstances.forEach((instance) => {
       const canvasStats = instance.canvasPool.getPoolStats();
-      const bitmapStats = instance.imageBitmapPool.getPoolStats();
 
       totalCanvases += canvasStats.totalCanvases;
-      totalBitmaps += bitmapStats.totalBitmaps;
       totalMemoryMB += parseFloat(canvasStats.memoryUsage.replace(' MB', ''));
-      totalMemoryMB += bitmapStats.estimatedMemoryMB;
     });
 
     return {
+      instanceCount: activeInstances.length,
+      memoryUsage: totalMemoryMB * 1024 * 1024, // Convert to bytes for the example
+      workerCount: activeInstances.length, // Each instance has its own worker
+      canvasCount: totalCanvases,
       totalInstances: allInstances.length,
       activeInstances: activeInstances.length,
       destroyedInstances: destroyedInstances.length,
       containersInUse: this._containerToInstance.size,
-      memoryUsage: {
+      detailedMemoryUsage: {
         totalCanvases,
-        totalBitmaps,
         estimatedMemoryMB: parseFloat(totalMemoryMB.toFixed(2)),
       },
     };
@@ -272,7 +274,6 @@ export class PDFViewerManager {
     this.getAllInstances().forEach((instance) => {
       try {
         instance.canvasPool.handleMemoryPressure();
-        instance.imageBitmapPool.handleMemoryPressure();
       } catch (error) {
         console.error(`Error handling memory pressure for instance ${instance.instanceId}:`, error);
       }
@@ -289,7 +290,6 @@ export class PDFViewerManager {
         this.getAllInstances().forEach((instance) => {
           try {
             instance.canvasPool.setupPeriodicCleanup();
-            instance.imageBitmapPool.setupPeriodicCleanup();
           } catch (error) {
             console.error(`Error setting up cleanup for instance ${instance.instanceId}:`, error);
           }

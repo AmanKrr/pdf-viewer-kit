@@ -15,6 +15,7 @@ export const PDF_VIEWER_IDS = {
 export const PDF_VIEWER_CLASSNAMES = {
   PDF_LOADING: 'pdf-loading',
   A_PDF_VIEWER: 'a-pdf-viewer',
+  A_TOOLBAR_CONTAINER: 'a-toolbar-container',
   A_TOOLBAR_ITEMS: 'a-toolbar-items',
   A_VIEWER_WRAPPER: 'a-viewer-wrapper',
   A_VIEWER_CONTAINER: 'a-viewer-container',

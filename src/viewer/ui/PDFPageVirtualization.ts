@@ -71,16 +71,13 @@ class PageVirtualization {
 
   private _thumbnailViewer: ThumbnailViewer | null = null;
   private _pagePositions: Map<number, number> = new Map();
-  private _pdfState: PdfState;
-  private _pdfViewer: WebViewer;
+  private _webViewer: WebViewer;
   private _selectionManager: SelectionManager;
   private _searchHighlighter: SearchHighlighter;
-  private _canvasPool!: CanvasPool;
 
   private _boundOnScaleChange = this._onScaleChange.bind(this);
   private _isScaleChangeInProgress = false;
 
-  private _resolveReadyPromise!: () => void;
   private _pageIntersectionObserver: IntersectionObserver | null = null;
   private _intersectionObserver: IntersectionObserver | null = null;
 
@@ -97,8 +94,11 @@ class PageVirtualization {
   private _rapidScrollThreshold = 500; // ms between scroll events to detect rapid scrolling
   private _lastScrollTime = 0;
 
+  public readonly bufferReady: Promise<void>;
+  private _resolveBufferReady!: () => void;
+
   /**
-   * @param options            Viewer configuration & container IDs.
+   * @param options             Viewer configuration & container IDs.
    * @param scrollableContainer The scrollable wrapper element.
    * @param pagesParentDiv      The element into which page wrappers are inserted.
    * @param totalPages          Total number of PDF pages.
@@ -117,38 +117,63 @@ class PageVirtualization {
     searchHighlighter: SearchHighlighter,
     pageBuffer = 3,
   ) {
-    Logger.info('PageVirtualization ctor', { containerId: options.containerId, totalPages });
     this._options = options;
     this._totalPages = totalPages;
     this._scrollableContainer = scrollableContainer;
     this._pagesParentDiv = pagesParentDiv;
     this._pageBuffer = pageBuffer;
 
-    this._pdfState = PdfState.getInstance(options.containerId);
-    this._pdfDocument = this._pdfState.pdfInstance;
-    this._pdfViewer = pdfViewer;
+    this._webViewer = pdfViewer;
+    this._pdfDocument = this._webViewer.pdfDocument;
     this._selectionManager = selectionManager;
     this._searchHighlighter = searchHighlighter;
 
     // Signal readiness after initialization completes
-    this._pdfViewer.ready = new Promise<void>((res) => (this._resolveReadyPromise = res));
+    // this._webViewer.ready = new Promise<void>((res) => (this._resolveReadyPromise = res));
+    this.bufferReady = new Promise((res) => (this._resolveBufferReady = res));
     this._initAsync();
+  }
+
+  get instanceId(): string {
+    return this._webViewer.instanceId;
+  }
+
+  get containerId(): string {
+    return this._webViewer.containerId;
+  }
+
+  get state() {
+    return this._webViewer.state;
+  }
+
+  get pdfDocument() {
+    return this._webViewer.pdfDocument!;
+  }
+
+  get events() {
+    return this._webViewer.events;
+  }
+
+  get canvasPool() {
+    return this._webViewer.canvasPool;
+  }
+
+  /** call when first screenful of pages fully rendered */
+  private _markBufferReady() {
+    this._resolveBufferReady();
   }
 
   /**
    * Initializes page wrapper pool, computes positions, and sets up scroll/observer.
    */
   private async _initAsync(): Promise<void> {
-    Logger.info('_initAsync start');
     const initialPagesToFillViewport = await this._calculateInitialPagesToRender();
-    Logger.info('_calculateInitialPagesToRender →', initialPagesToFillViewport);
     const calculatedWrappers = initialPagesToFillViewport * 2 + 5;
     this._maxPooledWrappers = Math.min(this._totalPages > 0 ? this._totalPages : calculatedWrappers, calculatedWrappers);
     if (this._totalPages === 0) this._maxPooledWrappers = 5; // Fallback for empty PDF
     this._setupPeriodicCancellation();
-    this._canvasPool = new CanvasPool(this._maxPooledWrappers > 0 ? this._maxPooledWrappers + 2 : 5);
-    this._canvasPool.setupMemoryPressureHandling();
-    PageElement.init(this._canvasPool);
+    this.canvasPool.maxPoolSize = this._maxPooledWrappers > 0 ? this._maxPooledWrappers + 2 : 5;
+
     if (this._maxPooledWrappers > 0) {
       this._initializePageWrapperPool();
     }
@@ -169,7 +194,7 @@ class PageVirtualization {
               const pageNum = Number(wrapper.dataset.pageNumber);
 
               // Only fully render the page the app thinks is "current"
-              if (pageNum !== this._pdfState.currentPage) {
+              if (pageNum !== this.state.currentPage) {
                 // Optionally unobserve so we don't even get called again for this page
                 this._intersectionObserver?.unobserve(wrapper);
                 continue;
@@ -193,7 +218,7 @@ class PageVirtualization {
       await this._renderSpecificPageOnly(this.isRenderingSpecificPageOnly);
     }
 
-    this._resolveReadyPromise();
+    this._markBufferReady();
     if ((this._options?.toolbarOptions ?? {})?.showThumbnail && this._totalPages > 0) {
       await this.generateThumbnails();
     }
@@ -276,7 +301,7 @@ class PageVirtualization {
         const { pageInfo } = queueItem;
 
         // Additional checks after aggressive cancellation
-        const distance = Math.abs(pageInfo.pageNumber - this._pdfState.currentPage);
+        const distance = Math.abs(pageInfo.pageNumber - this.state.currentPage);
         if (distance > this._aggressiveCancelDistance) {
           continue; // Skip if now too far away
         }
@@ -344,7 +369,7 @@ class PageVirtualization {
     }
     this._lastCancelCheck = now;
 
-    const currentPage = this._pdfState.currentPage;
+    const currentPage = this.state.currentPage;
     const isMemoryPressure = this._checkMemoryPressure();
     const cancelledCount = { base: 0, highRes: 0, queued: 0 };
 
@@ -396,7 +421,7 @@ class PageVirtualization {
     distance: number,
     isMemoryPressure: boolean,
   ): { cancelBase: boolean; cancelHighRes: boolean; removeFromQueue: boolean } {
-    const currentPage = this._pdfState.currentPage;
+    const currentPage = this.state.currentPage;
 
     // Never cancel current page
     if (pageInfo.pageNumber === currentPage) {
@@ -440,7 +465,7 @@ class PageVirtualization {
 
       // Release canvas back to pool if it exists
       if (pageInfo.canvasElement) {
-        PageElement.releaseCanvasToPool(pageInfo.canvasElement);
+        this.canvasPool.releaseCanvas(pageInfo.canvasElement);
         pageInfo.canvasElement = undefined;
       }
 
@@ -499,7 +524,7 @@ class PageVirtualization {
     }
 
     // Fallback: check pool stats
-    const poolStats = this._canvasPool.getPoolStats();
+    const poolStats = this.canvasPool.getPoolStats();
     const estimatedMemoryMB = parseFloat(poolStats.memoryUsage.replace(/[^\d.]/g, ''));
     return estimatedMemoryMB > 50; // 50MB threshold
   }
@@ -511,7 +536,7 @@ class PageVirtualization {
     Logger.warn('Emergency render cancellation triggered');
 
     let cancelledCount = 0;
-    const currentPage = this._pdfState.currentPage;
+    const currentPage = this.state.currentPage;
 
     this._cachedPages.forEach((pageInfo) => {
       // Keep only current page and immediate neighbors
@@ -530,7 +555,7 @@ class PageVirtualization {
     this._renderQueue = this._renderQueue.filter((item) => item.priority <= 1);
 
     // Force memory cleanup
-    this._canvasPool.handleMemoryPressure();
+    this.canvasPool.handleMemoryPressure();
 
     Logger.warn(`Emergency cancellation completed: ${cancelledCount} renders cancelled`);
   }
@@ -556,7 +581,7 @@ class PageVirtualization {
 
         // Release canvas back to pool
         if (pageInfo.canvasElement) {
-          PageElement.releaseCanvasToPool(pageInfo.canvasElement);
+          this.canvasPool.releaseCanvas(pageInfo.canvasElement);
           pageInfo.canvasElement = undefined;
         }
 
@@ -623,7 +648,7 @@ class PageVirtualization {
    * Registers scroll and scale listeners.
    */
   private _attachScrollListener(): void {
-    this._pdfState.on('scaleChange', this._boundOnScaleChange);
+    this.events.on('scaleChange', this._boundOnScaleChange);
     this._scrollableContainer.addEventListener('scroll', this._scrollHandler);
   }
 
@@ -717,7 +742,7 @@ class PageVirtualization {
    * Handles PDF scaleChange events.
    */
   private async _onScaleChange(): Promise<void> {
-    Logger.info('scale change start', { newScale: this._pdfState.scale });
+    Logger.info('scale change start', { newScale: this.state.scale });
     this._isScaleChangeInProgress = true;
     // Emergency cancel all non-essential renders during scale change
     this._emergencyCancelAll();
@@ -741,7 +766,7 @@ class PageVirtualization {
     for (const pageInfo of this._cachedPages.values()) {
       // console.log('pageInfo', pageInfo);
       if (pageInfo.isVisible && pageInfo.isFullyRendered && pageInfo.pdfPageProxy && pageInfo.canvasElement) {
-        const newViewport = pageInfo.pdfPageProxy.getViewport({ scale: this._pdfState.scale });
+        const newViewport = pageInfo.pdfPageProxy.getViewport({ scale: this.state.scale });
         const pageNum = pageInfo.pageNumber;
 
         pageInfo.pageWrapperDiv.style.width = `${newViewport.width}px`;
@@ -776,7 +801,7 @@ class PageVirtualization {
         div.style.height = `${newViewport.height}px`;
       }
     };
-    resize(`#${PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER}`);
+    resize(`#${PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER}-${this.instanceId}`);
   }
 
   /**
@@ -788,7 +813,7 @@ class PageVirtualization {
 
     for (const pageInfo of pagesToRefresh) {
       if (pageInfo.isVisible && pageInfo.isFullyRendered && pageInfo.pdfPageProxy) {
-        const newViewport = pageInfo.pdfPageProxy.getViewport({ scale: this._pdfState.scale });
+        const newViewport = pageInfo.pdfPageProxy.getViewport({ scale: this.state.scale });
         await this.appendHighResImage(pageInfo, newViewport);
       }
     }
@@ -815,24 +840,24 @@ class PageVirtualization {
       // debugWarn(`no PDFPageProxy for page ${pageInfo.pageNumber} during scale update, using placeholder`);
       Logger.warn(`no proxy for page ${pageInfo.pageNumber} on scale update`);
       // We can still try to resize the placeholder div if pagePositions are available
-      const placeholderViewportAttempt = PageElement.createLayers('', '', { width: 100, height: 100, scale: 1, rotation: 0 } as any).getBoundingClientRect();
+      const placeholderViewportAttempt = PageElement.createLayers('', '', { width: 100, height: 100, scale: 1, rotation: 0 } as any, this.instanceId).getBoundingClientRect();
       const tempViewport = {
         width: this._pagePositions.has(pageInfo.pageNumber + 1) ? this._pagesParentDiv.clientWidth - PageElement.gap * 2 : placeholderViewportAttempt.width,
         height: this._pagePositions.has(pageInfo.pageNumber + 1)
           ? this._pagePositions.get(pageInfo.pageNumber + 1)! - this._pagePositions.get(pageInfo.pageNumber)! - PageElement.gap
           : placeholderViewportAttempt.height,
-        scale: this._pdfState.scale,
+        scale: this.state.scale,
         rotation: 0,
       } as PageViewport; // This is a rough estimate if proxy fails
 
-      PageElement.createOrUpdatePageContainerDiv(pageInfo.pageNumber, tempViewport, this._pagePositions, pageInfo.pageWrapperDiv);
+      PageElement.createOrUpdatePageContainerDiv(pageInfo.pageNumber, tempViewport, this._pagePositions, this.instanceId, pageInfo.pageWrapperDiv);
       pageInfo.isFullyRendered = false;
       return;
     }
 
-    const newViewport = pageInfo.pdfPageProxy.getViewport({ scale: this._pdfState.scale });
+    const newViewport = pageInfo.pdfPageProxy.getViewport({ scale: this.state.scale });
 
-    PageElement.createOrUpdatePageContainerDiv(pageInfo.pageNumber, newViewport, this._pagePositions, pageInfo.pageWrapperDiv);
+    PageElement.createOrUpdatePageContainerDiv(pageInfo.pageNumber, newViewport, this._pagePositions, this.instanceId, pageInfo.pageWrapperDiv);
 
     this._clearPageRenderArtifacts(pageInfo, true);
     pageInfo.isFullyRendered = false;
@@ -866,7 +891,7 @@ class PageVirtualization {
   private async _ensureVisiblePagesRendered(): Promise<void> {
     if (this._isScaleChangeInProgress) return;
 
-    const currentPage = this._pdfState.currentPage;
+    const currentPage = this.state.currentPage;
     const pagesToQueue: Array<{ pageInfo: CachedPageInfo; priority: number }> = [];
 
     // **Highest Priority (0)**: Current page
@@ -942,14 +967,14 @@ class PageVirtualization {
       }
       if (!pageInfo.pdfPageProxy || pageInfo.renderFailed) return;
 
-      const viewport = pageInfo.pdfPageProxy.getViewport({ scale: this._pdfState.scale });
+      const viewport = pageInfo.pdfPageProxy.getViewport({ scale: this.state.scale });
 
-      PageElement.createOrUpdatePageContainerDiv(pageInfo.pageNumber, viewport, this._pagePositions, pageInfo.pageWrapperDiv);
+      PageElement.createOrUpdatePageContainerDiv(pageInfo.pageNumber, viewport, this._pagePositions, this.instanceId, pageInfo.pageWrapperDiv);
 
       Logger.info(`_transitionToFullRender → page ${pageInfo.pageNumber}`);
       await this._renderPageContent(pageInfo, viewport);
 
-      if (!pageInfo.renderFailed && this._pdfState.scale != 1) {
+      if (!pageInfo.renderFailed && this.state.scale != 1) {
         await this.appendHighResImage(pageInfo, viewport);
       }
 
@@ -977,7 +1002,7 @@ class PageVirtualization {
 
     let accumulatedHeight = 0;
     let pagesToRender = 0;
-    const scale = this._pdfState.scale;
+    const scale = this.state.scale;
 
     for (let pageNum = 1; pageNum <= this._totalPages; pageNum++) {
       const page = await this._pdfDocument.getPage(pageNum);
@@ -1010,7 +1035,7 @@ class PageVirtualization {
     let pageInfo = await this._addPageToDom(pageNumber); // Adds as placeholder
     if (pageInfo) {
       pageInfo.isVisible = true;
-      this._pdfState.currentPage = pageNumber;
+      this.state.currentPage = pageNumber;
       await this._transitionToFullRender(pageInfo); // Then fully render it
     }
   }
@@ -1023,7 +1048,7 @@ class PageVirtualization {
     if (this._totalPages === 0) return;
     const isSpecificPage = this.isRenderingSpecificPageOnly;
     const thumbnailContainer = ThumbnailViewer.createThumbnailContainer(this._options!.containerId);
-    const linkService = new PDFLinkService({ pdfViewer: this._pdfViewer });
+    const linkService = new PDFLinkService({ pdfViewer: this._webViewer });
 
     for (let pageNum = isSpecificPage ?? 1; pageNum <= (isSpecificPage ?? this._totalPages); pageNum++) {
       const thumbnail = new ThumbnailViewer({
@@ -1033,8 +1058,8 @@ class PageVirtualization {
         linkService,
       });
       await thumbnail.initThumbnail();
-      if (pageNum === (isSpecificPage ?? this._pdfState.currentPage)) {
-        thumbnail.activeThumbnail = this._pdfState.currentPage;
+      if (pageNum === (isSpecificPage ?? this.state.currentPage)) {
+        thumbnail.activeThumbnail = this.state.currentPage;
       }
       this._thumbnailViewer = thumbnail;
     }
@@ -1045,7 +1070,7 @@ class PageVirtualization {
    * @returns {Promise<Map<number, number>>} A map of page numbers to their top offsets.
    */
   async calculatePagePositions(): Promise<Map<number, number>> {
-    const scale = this._pdfState.scale;
+    const scale = this.state.scale;
     let currentYOffset = PageElement.gap;
     let maxPageWidth = 0;
     this._pagePositions.clear();
@@ -1092,7 +1117,7 @@ class PageVirtualization {
       let pageBottomY = pageTopY + this._scrollableContainer.clientHeight * 0.8;
 
       if (pageInfo?.pdfPageProxy && pageInfo.isFullyRendered) {
-        const viewport = pageInfo.pdfPageProxy.getViewport({ scale: this._pdfState.scale });
+        const viewport = pageInfo.pdfPageProxy.getViewport({ scale: this.state.scale });
         pageBottomY = pageTopY + viewport.height;
       } else if (this._pagePositions.has(pageNum + 1)) {
         pageBottomY = this._pagePositions.get(pageNum + 1)! - PageElement.gap;
@@ -1119,8 +1144,8 @@ class PageVirtualization {
     if (this.isRenderingSpecificPageOnly != null || this._totalPages === 0) return;
 
     const centralPageNum = this._determineCenterPageInViewport(scrollTop);
-    if (this._pdfState.currentPage !== centralPageNum) {
-      this._pdfState.currentPage = centralPageNum;
+    if (this.state.currentPage !== centralPageNum) {
+      this.state.currentPage = centralPageNum;
     }
 
     const pagesToKeepInDom = new Set<number>();
@@ -1168,7 +1193,7 @@ class PageVirtualization {
       pageInfo.highResRenderTask = undefined;
     }
     if (pageInfo.canvasElement) {
-      PageElement.releaseCanvasToPool(pageInfo.canvasElement);
+      this.canvasPool.releaseCanvas(pageInfo.canvasElement);
       pageInfo.canvasElement = undefined;
     }
     if (pageInfo.highResImageBitmap) {
@@ -1184,7 +1209,7 @@ class PageVirtualization {
       pageInfo.textLayer = undefined;
       pageInfo.annotationLayer?.destroy();
       pageInfo.annotationLayer = undefined;
-      this._pdfViewer.annotation.unregisterAnnotationManager(pageInfo.pageNumber);
+      this._webViewer.annotation.unregisterAnnotationManager(pageInfo.pageNumber);
       this._searchHighlighter.deregisterPage(pageInfo.pageNumber);
     }
     pageInfo.isFullyRendered = false;
@@ -1211,16 +1236,16 @@ class PageVirtualization {
     let placeholderViewport: PageViewport;
     try {
       const tempPageForSize = await this._pdfDocument.getPage(pageNumber);
-      placeholderViewport = tempPageForSize.getViewport({ scale: this._pdfState.scale });
+      placeholderViewport = tempPageForSize.getViewport({ scale: this.state.scale });
     } catch (e) {
       reportError(`getting page ${pageNumber} for placeholder size`, e);
       Logger.error(`_addPageToDom: failed placeholder size for page ${pageNumber}`, e);
-      placeholderViewport = { width: 200, height: 300, scale: this._pdfState.scale, rotation: 0 } as PageViewport;
+      placeholderViewport = { width: 200, height: 300, scale: this.state.scale, rotation: 0 } as PageViewport;
     }
 
     pageWrapperDiv.style.backgroundColor = '#fff';
     pageWrapperDiv.classList.add('page-placeholder');
-    PageElement.createOrUpdatePageContainerDiv(pageNumber, placeholderViewport, this._pagePositions, pageWrapperDiv);
+    PageElement.createOrUpdatePageContainerDiv(pageNumber, placeholderViewport, this._pagePositions, this.instanceId, pageWrapperDiv);
     if (this._intersectionObserver) {
       this._intersectionObserver.observe(pageWrapperDiv);
     }
@@ -1255,7 +1280,7 @@ class PageVirtualization {
   private async _renderPageContent(pageInfo: CachedPageInfo, viewport: PageViewport): Promise<void> {
     Logger.info(`renderPageContent start`, {
       page: pageInfo.pageNumber,
-      scale: this._pdfState.scale,
+      scale: this.state.scale,
       width: viewport.width,
       height: viewport.height,
     });
@@ -1275,7 +1300,7 @@ class PageVirtualization {
 
       // also put that canvas back into the pool if it hasn’t been already
       if (pageInfo.canvasElement) {
-        PageElement.releaseCanvasToPool(pageInfo.canvasElement);
+        this.canvasPool.releaseCanvas(pageInfo.canvasElement);
         pageInfo.canvasElement = undefined;
       }
     }
@@ -1287,14 +1312,14 @@ class PageVirtualization {
     // Passing 'false' to not destroy layer instances if they might be reused (though unlikely here)
     this._clearPageRenderArtifacts(pageInfo, false);
 
-    const baseRenderScale = this._pdfState.scale > 1 ? Math.min(1.0, this._pdfState.scale / 2) : this._pdfState.scale;
+    const baseRenderScale = this.state.scale > 1 ? Math.min(1.0, this.state.scale / 2) : this.state.scale;
     const baseViewport = pageInfo.pdfPageProxy.getViewport({ scale: baseRenderScale });
 
-    const [canvas, context] = PageElement.getCanvasFromPool(baseViewport);
+    const [canvas, context] = this.canvasPool.getCanvas(baseViewport.width, baseViewport.height);
     pageInfo.canvasElement = canvas;
 
     const canvasPresentationDiv = this._ensureCanvasPresentationDiv(pageInfo);
-    if (this._pdfState.scale > 1) {
+    if (this.state.scale > 1) {
       canvas.style.width = 'inherit';
       canvas.style.height = 'inherit';
     }
@@ -1312,7 +1337,7 @@ class PageVirtualization {
       Logger.info(`base render complete`, { page: pageInfo.pageNumber });
     } catch (error: any) {
       pageInfo.renderTask = undefined;
-      PageElement.releaseCanvasToPool(canvas);
+      this.canvasPool.releaseCanvas(canvas);
       if (error && error.name === 'RenderingCancelledException') {
         // debugWarn(`rendering base canvas for page ${pageInfo.pageNumber}`, error);
         Logger.warn(`base render cancelled for page ${pageInfo.pageNumber}`, error);
@@ -1336,21 +1361,21 @@ class PageVirtualization {
     if (this._options && !this._options.disableTextSelection) {
       if (!pageInfo.pdfPageProxy || !viewport || !pageInfo.isVisible) return;
       try {
-        pageInfo.textLayer = new TextLayer(this._pdfState.containerId, pageInfo.pageWrapperDiv, pageInfo.pdfPageProxy, viewport);
+        pageInfo.textLayer = new TextLayer(this.containerId, this.instanceId, pageInfo.pageWrapperDiv, pageInfo.pdfPageProxy, viewport);
         const [, annotationHostDiv] = await pageInfo.textLayer.createTextLayer();
 
         pageInfo.annotationLayer = new AnnotationLayer(pageInfo.pageWrapperDiv, pageInfo.pdfPageProxy, viewport);
-        await pageInfo.annotationLayer.createAnnotationLayer(this._pdfViewer, this._pdfDocument, annotationHostDiv);
+        await pageInfo.annotationLayer.createAnnotationLayer(this._webViewer, this._pdfDocument, annotationHostDiv);
 
-        if (this._pdfState.isAnnotationEnabled && this._pdfState.isAnnotationConfigurationPropertiesEnabled) {
+        if (this.state.isAnnotationEnabled && this.state.isAnnotationConfigurationPropertiesEnabled) {
           if (annotationHostDiv) {
             (annotationHostDiv as HTMLElement).style.cursor = 'crosshair';
             (annotationHostDiv as HTMLElement).style.pointerEvents = 'all';
           }
         }
         this._searchHighlighter.registerPage(pageInfo.pageNumber);
-        if (!this._pdfViewer.annotation.isAnnotationManagerRegistered(pageInfo.pageNumber)) {
-          this._pdfViewer.annotation.registerAnnotationManager(pageInfo.pageNumber, new AnnotationManager(annotationHostDiv, this._pdfState, this._selectionManager));
+        if (!this._webViewer.annotation.isAnnotationManagerRegistered(pageInfo.pageNumber)) {
+          this._webViewer.annotation.registerAnnotationManager(pageInfo.pageNumber, new AnnotationManager(annotationHostDiv, this, this._selectionManager));
         }
       } catch (error: any) {
         if ((error.message || '').includes('was destroyed')) {
@@ -1371,7 +1396,7 @@ class PageVirtualization {
    */
   private _ensureCanvasPresentationDiv(pageInfo: CachedPageInfo): HTMLDivElement {
     const canvasPresentationDivId = `canvasPresentation-${pageInfo.pageNumber}`;
-    let canvasPresentationDiv = pageInfo.pageWrapperDiv.querySelector<HTMLDivElement>(`#${canvasPresentationDivId}`);
+    let canvasPresentationDiv = pageInfo.pageWrapperDiv.querySelector<HTMLDivElement>(`#${this.containerId} #${canvasPresentationDivId}`);
     if (!canvasPresentationDiv) {
       canvasPresentationDiv = document.createElement('div');
       canvasPresentationDiv.id = canvasPresentationDivId;
@@ -1381,7 +1406,7 @@ class PageVirtualization {
       // Clear it if it exists from a previous placeholder state or partial render
       while (canvasPresentationDiv.firstChild) canvasPresentationDiv.removeChild(canvasPresentationDiv.firstChild);
     }
-    if (this._pdfState.scale > 1) {
+    if (this.state.scale > 1) {
       canvasPresentationDiv.style.width = 'inherit';
       canvasPresentationDiv.style.height = 'inherit';
     }
@@ -1394,7 +1419,7 @@ class PageVirtualization {
    */
   private _ensureImageContainerDiv(pageInfo: CachedPageInfo, viewport: PageViewport, canvasPresentationDiv: HTMLDivElement): HTMLDivElement {
     const imageContainerId = `zoomedImageContainer-${pageInfo.pageNumber}`;
-    let imageContainer = canvasPresentationDiv.querySelector<HTMLDivElement>(`#${imageContainerId}`);
+    let imageContainer = canvasPresentationDiv.querySelector<HTMLDivElement>(`#${this.containerId} #${imageContainerId}`);
     if (!imageContainer) {
       imageContainer = document.createElement('div');
       imageContainer.id = imageContainerId;
@@ -1474,11 +1499,11 @@ class PageVirtualization {
       // Get the wrapper div for this page
       const wrapperDiv = pageInfo.pageWrapperDiv;
       if (!wrapperDiv) return;
-      const container = wrapperDiv || document.querySelector<HTMLElement>(`#${this._options.containerId} #pageContainer-${pageNum}`);
+      const container = wrapperDiv || document.querySelector<HTMLElement>(`#${this.containerId} #pageContainer-${this.instanceId}-${pageNum}[data-page-number="${pageNum}"]`);
       if (!container) return;
 
       const page = await this._pdfDocument.getPage(pageNum);
-      const scale = this._pdfState.scale;
+      const scale = this.state.scale;
       const viewport = page.getViewport({ scale });
       const top = this._pagePositions.get(pageNum) || 0;
 
@@ -1495,7 +1520,7 @@ class PageVirtualization {
       }
 
       // resize annotation layer
-      const anno = container.querySelector<HTMLElement>(`#${PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER}`);
+      const anno = container.querySelector<HTMLElement>(`#${PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER}-${this.instanceId}`);
       if (anno) {
         anno.style.width = `${viewport.width}px`;
         anno.style.height = `${viewport.height}px`;
@@ -1550,7 +1575,7 @@ class PageVirtualization {
       if (pageInfo.highResImageBitmap) {
         pageInfo.highResImageBitmap.close();
         pageInfo.highResImageBitmap = undefined;
-        const imageContainer = pageInfo.pageWrapperDiv.querySelector(`#zoomedImageContainer-${pageInfo.pageNumber}`);
+        const imageContainer = pageInfo.pageWrapperDiv.querySelector(`${this.containerId} #zoomedImageContainer-${pageInfo.pageNumber}`);
         if (imageContainer) imageContainer.innerHTML = '';
       }
       return;
@@ -1560,13 +1585,13 @@ class PageVirtualization {
     if (pageInfo.highResImageBitmap) pageInfo.highResImageBitmap.close();
     pageInfo.highResImageBitmap = undefined; // Clear previous before new render
 
-    const imageContainer = pageInfo.pageWrapperDiv.querySelector(`#zoomedImageContainer-${pageInfo.pageNumber}`) as HTMLElement;
+    const imageContainer = pageInfo.pageWrapperDiv.querySelector(`#${this.containerId} #zoomedImageContainer-${pageInfo.pageNumber}`) as HTMLElement;
     if (!imageContainer) {
       return;
     }
     imageContainer.innerHTML = '';
 
-    const [offscreenCanvas, offscreenContext] = PageElement.getCanvasFromPool(viewport);
+    const [offscreenCanvas, offscreenContext] = this.canvasPool.getCanvas(viewport.width, viewport.height);
 
     const renderParams: RenderParameters = {
       canvasContext: offscreenContext,
@@ -1579,7 +1604,7 @@ class PageVirtualization {
       await pageInfo.highResRenderTask.promise;
       Logger.info(`base render complete`, { page: pageInfo.pageNumber });
       if (!pageInfo.isVisible) {
-        PageElement.releaseCanvasToPool(offscreenCanvas);
+        this.canvasPool.releaseCanvas(offscreenCanvas);
         pageInfo.highResRenderTask = undefined;
         return;
       }
@@ -1613,7 +1638,7 @@ class PageVirtualization {
       }
     } finally {
       pageInfo.highResRenderTask = undefined;
-      PageElement.releaseCanvasToPool(offscreenCanvas);
+      this.canvasPool.releaseCanvas(offscreenCanvas);
     }
   }
 
@@ -1665,7 +1690,7 @@ class PageVirtualization {
     this._thumbnailViewer?.destroy();
     this._thumbnailViewer = null;
     this._scrollableContainer.removeEventListener('scroll', this._scrollHandler);
-    this._pdfState.off('scaleChange', this._boundOnScaleChange);
+    this.events.off('scaleChange', this._boundOnScaleChange);
     this._debouncedEnsureVisiblePagesRendered.cancel(); // Cancel any pending debounced calls
     this._throttledScrollHandler.cancel(); // Cancel any pending throttled calls
     this._intersectionObserver?.disconnect();
@@ -1680,9 +1705,9 @@ class PageVirtualization {
     this._pageWrapperPool.forEach((wrapper) => wrapper.remove());
     this._pageWrapperPool = [];
 
-    if (this._canvasPool) {
+    if (this.canvasPool) {
       // Check if canvas pool was initialized
-      this._canvasPool.destroy();
+      this.canvasPool.destroy();
     }
 
     this._pagePositions.clear();

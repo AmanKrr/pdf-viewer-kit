@@ -34,7 +34,7 @@
 }
 
 /* Toolbar group one (left-aligned) */
-#toolbar-group-one {
+.toolbar-group-one {
   min-width: 10%;
   max-width: 60%;
   width: 60%;
@@ -42,7 +42,7 @@
 }
 
 /* Toolbar group two (right-aligned) */
-#toolbar-group-two {
+.toolbar-group-two {
   min-width: 10%;
   max-width: 40%;
   width: 40%;

@@ -18,6 +18,7 @@ import { IAnnotation } from '../../interface/IAnnotation';
 import { DrawConfig, ShapeConfig, ShapeType } from '../../types/geometry.types';
 import { normalizeRect, isModernFormat } from '../../utils/annotation-utils';
 import { AnnotationFactory } from '../annotations/PDFAnnotationFactory';
+import PageVirtualization from '../ui/PDFPageVirtualization';
 import PdfState from '../ui/PDFState';
 import { ISelectable, SelectionManager } from './SelectionManager';
 
@@ -26,8 +27,8 @@ import { ISelectable, SelectionManager } from './SelectionManager';
  * selection, deselection, serialization, and cleanup.
  */
 export class AnnotationManager {
+  private readonly _pageVirtualization: PageVirtualization;
   private _annotationDrawerContainer: HTMLElement | null;
-  private _pdfState: PdfState | null = null;
 
   private _annotations: IAnnotation[] = [];
   private _activeAnnotation: IAnnotation | null = null;
@@ -56,9 +57,9 @@ export class AnnotationManager {
    * @param pdfState                  Shared PdfState instance
    * @param selectionManager          Handles selection events
    */
-  constructor(annotationDrawerContainer: HTMLElement, pdfState: PdfState, selectionManager: SelectionManager) {
+  constructor(annotationDrawerContainer: HTMLElement, pageVirtualization: PageVirtualization, selectionManager: SelectionManager) {
     this._annotationDrawerContainer = annotationDrawerContainer;
-    this._pdfState = pdfState;
+    this._pageVirtualization = pageVirtualization;
     this._selectionManager = selectionManager;
 
     // Listen for external selection changes
@@ -68,7 +69,23 @@ export class AnnotationManager {
       }
     });
 
-    this._pdfState.on('ANNOTATION_SELECTED', this._boundAnnotationSelection);
+    this.events.on('ANNOTATION_SELECTED', this._boundAnnotationSelection);
+  }
+
+  get instanceId(): string {
+    return this._pageVirtualization.instanceId;
+  }
+
+  get containerId(): string {
+    return this._pageVirtualization.containerId;
+  }
+
+  get state() {
+    return this._pageVirtualization.state;
+  }
+
+  get events() {
+    return this._pageVirtualization.events;
   }
 
   /**
@@ -102,13 +119,6 @@ export class AnnotationManager {
     if (config.opacity !== undefined) {
       (this._selectedAnnotation as any).updateOpacity?.(config.opacity);
     }
-  }
-
-  /**
-   * Update the PdfState instance used by this manager.
-   */
-  set pdfState(pdfState: PdfState) {
-    this._pdfState = pdfState;
   }
 
   /**
@@ -160,7 +170,7 @@ export class AnnotationManager {
     this._annotationDrawerContainer.parentElement.parentElement.addEventListener('mouseup', this._boundMouseUp);
 
     // Emit drawing started event
-    this._pdfState?.emit('DRAWING_STARTED');
+    this.events.emit('DRAWING_STARTED');
   }
 
   /**
@@ -175,7 +185,7 @@ export class AnnotationManager {
     this._annotationDrawerContainer.parentElement.parentElement.removeEventListener('mouseup', this._boundMouseUp);
 
     // Emit drawing finished event
-    this._pdfState?.emit('DRAWING_FINISHED');
+    this.events.emit('DRAWING_FINISHED');
   }
 
   /**
@@ -190,7 +200,7 @@ export class AnnotationManager {
    * Handler for mouse up (stop drawing).
    */
   private _onMouseDown(event: MouseEvent) {
-    if (!this._annotationDrawerContainer || !this._activeAnnotation || !this._pdfState) return;
+    if (!this._annotationDrawerContainer || !this._activeAnnotation) return;
     if (!event.target) {
       console.error('Failed to draw annotation. Target not found.');
       return;
@@ -201,8 +211,8 @@ export class AnnotationManager {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    const pageNumber = (event?.target as HTMLElement | null)?.parentElement?.id?.split('-')?.[1];
-    this._activeAnnotation.startDrawing(x, y, pageNumber ? parseInt(pageNumber) : this._pdfState.currentPage);
+    const pageNumber = (event?.target as HTMLElement | null)?.parentElement?.getAttribute('data-page-number');
+    this._activeAnnotation.startDrawing(x, y, pageNumber ? parseInt(pageNumber) : this.state.currentPage);
   }
 
   /**
@@ -257,7 +267,7 @@ export class AnnotationManager {
       id?: string;
     } = {},
   ): void {
-    if (!this._annotationDrawerContainer || !this._pdfState) return;
+    if (!this._annotationDrawerContainer) return;
 
     // Deselect all so we start fresh
     this.deselectAll();
@@ -267,7 +277,12 @@ export class AnnotationManager {
     this._activeAnnotation = AnnotationFactory.createAnnotation({
       type,
       annotationDrawerContainer: this._annotationDrawerContainer,
-      pdfState: this._pdfState,
+      instances: {
+        events: this._pageVirtualization.events,
+        state: this._pageVirtualization.state,
+        instanceId: this._pageVirtualization.instanceId,
+        containerId: this._pageVirtualization.containerId,
+      },
       fillColor: config.fillColor ?? this._drawConfig.fillColor!,
       strokeColor: config.strokeColor ?? this._drawConfig.strokeColor!,
       strokeWidth: config.strokeWidth ?? this._drawConfig.strokeWidth!,
@@ -284,13 +299,18 @@ export class AnnotationManager {
    * (e.g., loading saved annotations).
    */
   private _drawShape(shapeConfig: ShapeConfig, revokeSelection: boolean) {
-    if (!this._annotationDrawerContainer || !this._pdfState) return;
+    if (!this._annotationDrawerContainer) return;
 
     // Create the shape
     const shape = AnnotationFactory.createAnnotation({
       type: shapeConfig.type,
       annotationDrawerContainer: this._annotationDrawerContainer,
-      pdfState: this._pdfState,
+      instances: {
+        events: this._pageVirtualization.events,
+        state: this._pageVirtualization.state,
+        instanceId: this._pageVirtualization.instanceId,
+        containerId: this._pageVirtualization.containerId,
+      },
       fillColor: shapeConfig.fillColor ?? this._drawConfig.fillColor!,
       strokeColor: shapeConfig.strokeColor ?? this._drawConfig.strokeColor!,
       strokeWidth: shapeConfig.strokeWidth ?? this._drawConfig.strokeWidth!,
@@ -468,7 +488,7 @@ export class AnnotationManager {
     if (this._selectionUnsubscribe) {
       this._selectionUnsubscribe();
     }
-    this._pdfState?.off('ANNOTATION_SELECTED', this._boundAnnotationSelection);
+    this.events.off('ANNOTATION_SELECTED', this._boundAnnotationSelection);
     // Optionally remove all shapes from DOM:
     // this._annotations.forEach(a => a.deleteAnnotation(true));
     // this._annotations = [];

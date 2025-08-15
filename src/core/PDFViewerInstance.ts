@@ -14,14 +14,16 @@
   limitations under the License.
 */
 
-import { PDFDocumentProxy } from 'pdfjs-dist';
+import { GlobalWorkerOptions, PDFDocumentProxy } from 'pdfjs-dist';
 import { LoadOptions } from '../types/webpdf.types';
 import { InstanceState } from './InstanceState';
 import { InstanceEventEmitter } from './InstanceEventEmitter';
 import { InstanceCanvasPool } from './InstanceCanvasPool';
 import { InstanceImageBitmapPool } from './InstanceImageBitmapPool';
-import { InstanceWorkerManager } from './InstanceWorkerManager';
 import { InstanceWebViewer } from './InstanceWebViewer';
+import { getPdfWorkerSrc } from '../utils/worker-factory';
+import PageElement from '../viewer/ui/PDFPageElement';
+import { InstanceWebUiUtils } from '../utils/web-ui-utils';
 
 /**
  * Manages a single, completely isolated PDF viewer instance.
@@ -36,12 +38,11 @@ export class PDFViewerInstance {
   private readonly _state: InstanceState;
   private readonly _events: InstanceEventEmitter;
   private readonly _canvasPool: InstanceCanvasPool;
-  private readonly _imageBitmapPool: InstanceImageBitmapPool;
-  private readonly _workerManager: InstanceWorkerManager;
 
   // PDF instance
   private _pdfDocument: PDFDocumentProxy | null = null;
   private _webViewer: InstanceWebViewer | null = null;
+  private _loadingTask: any | null = null;
   private _isDestroyed = false;
 
   constructor(containerId: string, options: LoadOptions) {
@@ -53,8 +54,7 @@ export class PDFViewerInstance {
     this._state = new InstanceState(this._instanceId, containerId);
     this._events = new InstanceEventEmitter(this._instanceId);
     this._canvasPool = new InstanceCanvasPool(this._instanceId);
-    this._imageBitmapPool = new InstanceImageBitmapPool(this._instanceId);
-    this._workerManager = new InstanceWorkerManager(this._instanceId);
+    this._ensureGlobalWorkerSetup();
   }
 
   /**
@@ -93,20 +93,6 @@ export class PDFViewerInstance {
   }
 
   /**
-   * Gets the instance image bitmap pool
-   */
-  get imageBitmapPool(): InstanceImageBitmapPool {
-    return this._imageBitmapPool;
-  }
-
-  /**
-   * Gets the instance worker manager
-   */
-  get workerManager(): InstanceWorkerManager {
-    return this._workerManager;
-  }
-
-  /**
    * Gets the PDF document instance
    */
   get pdfDocument(): PDFDocumentProxy | null {
@@ -128,6 +114,15 @@ export class PDFViewerInstance {
   }
 
   /**
+   * Ensures the global PDF.js worker is properly configured
+   */
+  private _ensureGlobalWorkerSetup(): void {
+    if (!GlobalWorkerOptions.workerSrc) {
+      GlobalWorkerOptions.workerSrc = getPdfWorkerSrc();
+    }
+  }
+
+  /**
    * Loads a PDF document into this instance
    */
   async load(): Promise<InstanceWebViewer> {
@@ -136,28 +131,63 @@ export class PDFViewerInstance {
     }
 
     try {
-      // Initialize worker for this instance
-      await this._workerManager.initialize();
+      const internalContainers = PageElement.containerCreation(this._containerId, this._state.scale, this._instanceId);
 
-      // Load PDF document
+      if (!internalContainers.parent || !internalContainers.pagesContainer) {
+        throw new Error('Failed to create container structure');
+      }
+
+      this._showInstanceLoading(internalContainers.parent);
+
       this._pdfDocument = await this._loadPDFDocument();
 
-      // Create web viewer
+      // Clear loading task reference after successful load
+      this._loadingTask = null;
+
       this._webViewer = new InstanceWebViewer(this._pdfDocument, this._options, this._containerId, this);
 
-      // Initialize the viewer
-      await this._webViewer.initialize();
+      await this._webViewer.initialize(internalContainers);
+
+      this._hideInstanceLoading();
 
       // Emit load complete event
       this._events.emit('pdfLoaded', { instanceId: this._instanceId });
 
       return this._webViewer;
     } catch (error) {
+      // Clean up loading task on error
+      if (this._loadingTask) {
+        try {
+          await this._loadingTask.destroy();
+        } catch (cleanupError) {
+          console.warn(`Error cleaning up loading task for instance ${this._instanceId}:`, cleanupError);
+        }
+        this._loadingTask = null;
+      }
+
+      // Hide loading UI on error
+      this._hideInstanceLoading();
+
       this._events.emit('pdfLoadError', {
         instanceId: this._instanceId,
         error: error as Error,
       });
       throw error;
+    }
+  }
+
+  /**
+   * Cancels the current loading operation if in progress
+   */
+  async cancelLoading(): Promise<void> {
+    if (this._loadingTask && !this._pdfDocument) {
+      try {
+        await this._loadingTask.destroy();
+        console.log(`Loading cancelled for PDF instance ${this._instanceId}`);
+      } catch (error) {
+        console.error(`Error cancelling loading for instance ${this._instanceId}:`, error);
+      }
+      this._loadingTask = null;
     }
   }
 
@@ -172,34 +202,45 @@ export class PDFViewerInstance {
     this._isDestroyed = true;
 
     try {
-      // Destroy web viewer
+      // Destroy web viewer first
       if (this._webViewer) {
         await this._webViewer.destroy();
         this._webViewer = null;
       }
 
-      // Destroy PDF document
+      // Handle PDF document cleanup
       if (this._pdfDocument) {
-        this._pdfDocument.destroy();
+        // pdfDocument.destroy() handles worker cleanup automatically
+        await this._pdfDocument.destroy();
         this._pdfDocument = null;
+        console.log(`PDF document destroyed for instance ${this._instanceId}`);
+      }
+      // If still loading, cancel the loading task
+      else if (this._loadingTask) {
+        await this._loadingTask.destroy();
+        this._loadingTask = null;
+        console.log(`Loading task destroyed for instance ${this._instanceId}`);
       }
 
       // Clean up instance services
-      await this._workerManager.destroy();
       this._canvasPool.destroy();
-      this._imageBitmapPool.destroy();
       this._state.destroy();
+
+      // Emit destroy event before cleaning up events
+      this._events.emit('instanceDestroyed', { instanceId: this._instanceId });
+
+      // Clean up event system last
       this._events.destroy();
 
-      // Emit destroy event
-      this._events.emit('instanceDestroyed', { instanceId: this._instanceId });
+      console.log(`PDF instance ${this._instanceId} fully destroyed`);
     } catch (error) {
       console.error(`Error destroying PDF instance ${this._instanceId}:`, error);
+      throw error;
     }
   }
 
   /**
-   * Loads the PDF document using the instance-specific worker
+   * Loads the PDF document using the global worker
    */
   private async _loadPDFDocument(): Promise<PDFDocumentProxy> {
     const { getDocument } = await import('pdfjs-dist');
@@ -215,13 +256,13 @@ export class PDFViewerInstance {
       cMapUrl: 'https://unpkg.com/pdfjs-dist@5.2.133/cmaps/',
       cMapPacked: true,
       standardFontDataUrl: 'https://unpkg.com/pdfjs-dist@5.2.133/standard_fonts/',
-      // Don't pass custom worker - let PDF.js use global worker configuration
     };
 
-    const loadingTask = getDocument(loadOptions as any);
+    // Store loading task for potential cleanup
+    this._loadingTask = getDocument(loadOptions as any);
 
     // Handle password protection
-    loadingTask.onPassword = (updatePassword: (pass: string) => void, reason: any) => {
+    this._loadingTask.onPassword = (updatePassword: (pass: string) => void, reason: any) => {
       this._events.emit('passwordRequired', {
         instanceId: this._instanceId,
         updatePassword,
@@ -230,15 +271,16 @@ export class PDFViewerInstance {
     };
 
     // Handle progress
-    loadingTask.onProgress = (progressData: any) => {
+    this._loadingTask.onProgress = (progressData: any) => {
       const percent = Math.round((progressData.loaded / progressData.total) * 100);
-      this._events.emit('loadProgress', {
-        instanceId: this._instanceId,
-        percent,
-      });
+      // this._events.emit('loadProgress', {
+      //   instanceId: this._instanceId,
+      //   percent,
+      // });
+      this._updateInstanceLoadingProgress(this._instanceId, percent);
     };
 
-    return await loadingTask.promise;
+    return await this._loadingTask.promise;
   }
 
   /**
@@ -246,5 +288,41 @@ export class PDFViewerInstance {
    */
   private _generateInstanceId(): string {
     return `pdf-instance-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Shows the loading UI for the instance.
+   * This method is responsible for creating and displaying the loading overlay.
+   */
+  private async _showInstanceLoading(parent: HTMLDivElement): Promise<void> {
+    const uiLoading = InstanceWebUiUtils.showLoading(this._instanceId, this._containerId);
+    this._state.uiLoading = uiLoading;
+    this._updateInstanceLoadingProgress(this._instanceId, 0);
+
+    if (parent && uiLoading.parentNode) {
+      parent.prepend(uiLoading.parentNode);
+    }
+  }
+
+  /**
+   * Updates the loading progress display
+   */
+  private _updateInstanceLoadingProgress(instanceId: string, percent: number): void {
+    const loadingElement = this._state.uiLoading;
+    if (loadingElement) {
+      InstanceWebUiUtils.updateLoadingProgress(loadingElement, this._containerId, percent, instanceId);
+    }
+  }
+
+  /**
+   * Hides the loading UI for the instance.
+   * This method is responsible for removing the loading overlay.
+   */
+  private async _hideInstanceLoading(): Promise<void> {
+    const loadingElement = this._state.uiLoading;
+    if (loadingElement) {
+      InstanceWebUiUtils.hideLoading(loadingElement, this._containerId, this._instanceId);
+    }
+    this._state.uiLoading = null;
   }
 }

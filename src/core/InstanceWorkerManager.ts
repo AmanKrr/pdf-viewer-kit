@@ -84,23 +84,12 @@ export class InstanceWorkerManager {
   }
 
   /**
-   * Sets up PDF.js global worker options
+   * Sets up PDF.js worker options for this specific instance
    */
   private async _setupPDFWorkerOptions(): Promise<void> {
-    const { GlobalWorkerOptions } = await import('pdfjs-dist');
-
-    // Only set worker source if not already set
-    if (!GlobalWorkerOptions.workerSrc) {
-      try {
-        // Try to use CDN worker
-        GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.2.133/build/pdf.worker.min.mjs';
-        console.log('Set PDF.js worker source to CDN');
-      } catch (error) {
-        console.warn('Failed to set CDN worker, falling back to local worker');
-        // Fallback to local worker
-        GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href;
-      }
-    }
+    // Don't modify global worker options - create instance-specific worker
+    // This prevents conflicts between multiple PDF instances
+    console.log(`Setting up instance-specific worker for ${this._instanceId}`);
   }
 
   /**
@@ -132,10 +121,17 @@ export class InstanceWorkerManager {
    */
   private async _createWorker(): Promise<Worker | null> {
     try {
-      // Let PDF.js handle worker creation by not specifying a custom worker
-      // This will use the global worker source we set up
-      console.log(`Using PDF.js global worker for instance ${this._instanceId}`);
-      return null; // PDF.js will create its own worker when needed
+      // Create a completely isolated worker for this instance
+      const { getDocument } = await import('pdfjs-dist');
+
+      // Create worker with instance-specific configuration
+      const workerSrc = 'https://unpkg.com/pdfjs-dist@5.2.133/build/pdf.worker.min.mjs';
+
+      // Create a new worker instance that won't interfere with others
+      const worker = new Worker(workerSrc, { type: 'module' });
+
+      console.log(`Created isolated worker for instance ${this._instanceId}`);
+      return worker;
     } catch (error) {
       console.error(`Failed to create worker for instance ${this._instanceId}:`, error);
       throw new Error(`Cannot create PDF worker for instance ${this._instanceId}`);

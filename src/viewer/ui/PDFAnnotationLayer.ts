@@ -62,7 +62,7 @@ export default class AnnotationLayer {
     }
 
     // Create container DIV for PDF.js annotations.
-    this._annotationLayerDiv = PageElement.createLayers(PDF_VIEWER_CLASSNAMES.AANNOTATION_LAYER, PDF_VIEWER_IDS.ANNOTATION_LAYER, this._viewport);
+    this._annotationLayerDiv = PageElement.createLayers(PDF_VIEWER_CLASSNAMES.AANNOTATION_LAYER, PDF_VIEWER_IDS.ANNOTATION_LAYER, this._viewport, webViewer.instanceId);
     this._pageWrapper.appendChild(this._annotationLayerDiv);
 
     // Instantiate the internal PDF.js AnnotationLayer.

@@ -19,6 +19,8 @@ import { LineConfig } from '../../types/geometry.types';
 import PdfState from '../ui/PDFState';
 import { Resizer } from './Resizer';
 import { Annotation } from './Annotation';
+import { InstanceEventEmitter } from '../../core/InstanceEventEmitter';
+import { InstanceState } from '../../core/InstanceState';
 
 /**
  * Annotation that renders and manages a line (<line> SVG element) on the PDF.
@@ -47,7 +49,12 @@ export class LineAnnotation extends Annotation {
   private _origY2 = 0;
   private _shapeInfo: LineConfig | null = null;
   private _pageNumber?: number;
-  private _pdfState: PdfState;
+  private _instances: {
+    events: InstanceEventEmitter;
+    state: InstanceState;
+    instanceId: string;
+    containerId: string;
+  };
   private _onDeleteKeyBound = this._onDeleteKey.bind(this);
   private _bindOnScaleChange = this._onScaleChange.bind(this);
 
@@ -60,15 +67,28 @@ export class LineAnnotation extends Annotation {
    * @param opacity     Opacity for line
    * @param id          Optional annotation ID
    */
-  constructor(container: HTMLElement, pdfState: PdfState, strokeColor: string, strokeWidth: number, strokeStyle: string, opacity: number, id?: string) {
-    super(container, pdfState, id);
-    this._pdfState = pdfState;
+  constructor(
+    container: HTMLElement,
+    instances: {
+      events: InstanceEventEmitter;
+      state: InstanceState;
+      instanceId: string;
+      containerId: string;
+    },
+    strokeColor: string,
+    strokeWidth: number,
+    strokeStyle: string,
+    opacity: number,
+    id?: string,
+  ) {
+    super(container, instances, id);
+    this._instances = instances;
     this._strokeColor = strokeColor;
     this._strokeWidth = strokeWidth;
     this._strokeStyle = strokeStyle;
     this._opacity = opacity;
     this._constraints = container.getBoundingClientRect();
-    pdfState.on('scaleChange', this._bindOnScaleChange);
+    this.events.on('scaleChange', this._bindOnScaleChange);
   }
 
   /**
@@ -77,7 +97,7 @@ export class LineAnnotation extends Annotation {
    */
   private _onScaleChange(_: any): void {
     this._constraints = this.__annotationDrawerContainer.getBoundingClientRect();
-    this._updateZoom(this._pdfState.scale);
+    this._updateZoom(this.state.scale);
   }
 
   /**
@@ -105,7 +125,7 @@ export class LineAnnotation extends Annotation {
     this.createSvgLine(x1 - minX, y1 - minY, x2 - minX, y2 - minY);
 
     this._captureOriginal();
-    this._updateZoom(this._pdfState.scale);
+    this._updateZoom(this.state.scale);
     this._setLineInfo();
   }
 
@@ -209,7 +229,7 @@ export class LineAnnotation extends Annotation {
     this.deselect();
     this.__svg.remove();
     if (!suppressEvent) {
-      this._pdfState.emit('ANNOTATION_DELETED', this.id);
+      this.events.emit('ANNOTATION_DELETED', this.id);
     }
   }
 
@@ -355,7 +375,7 @@ export class LineAnnotation extends Annotation {
     x2: number;
     y2: number;
   } {
-    const s = this._pdfState.scale || 1;
+    const s = this.state.scale || 1;
     const leftLogical = parseFloat(this.__svg.style.left) / s;
     const topLogical = parseFloat(this.__svg.style.top) / s;
 
@@ -396,7 +416,7 @@ export class LineAnnotation extends Annotation {
   private _onShapeUpdate(): void {
     this._captureOriginal();
     this._setLineInfo();
-    this._pdfState.emit('ANNOTATION_CREATED', this.getConfig());
+    this.events.emit('ANNOTATION_CREATED', this.getConfig());
   }
 
   /**

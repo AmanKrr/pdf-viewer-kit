@@ -173,12 +173,12 @@
 /* ========================== */
 
 /* Show loading container when PDF is loading */
-.pdf-loading #loading-container {
+.pdf-loading .pdf-loading-overlay {
   display: block;
 }
 
 /* The loading container covers the entire viewer while loading */
-#loading-container {
+.pdf-loading-overlay {
   position: absolute;
   top: 0;
   left: 0;

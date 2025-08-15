@@ -19,6 +19,8 @@ import { EllipseConfig } from '../../types/geometry.types';
 import PdfState from '../ui/PDFState';
 import { Resizer } from './Resizer';
 import { Annotation } from './Annotation';
+import { InstanceEventEmitter } from '../../core/InstanceEventEmitter';
+import { InstanceState } from '../../core/InstanceState';
 
 /**
  * An SVG ellipse annotation. Supports interactive drawing, programmatic creation,
@@ -47,7 +49,12 @@ export class EllipseAnnotation extends Annotation {
   private _origRY = 0;
   private _shapeInfo: EllipseConfig | null = null;
   private _pageNumber?: number;
-  private _pdfState: PdfState;
+  private _instances: {
+    events: InstanceEventEmitter;
+    state: InstanceState;
+    instanceId: string;
+    containerId: string;
+  };
   private _onDeleteKeyBound = this._onDeleteKey.bind(this);
   private _bindOnScaleChange = this._onScaleChange.bind(this);
 
@@ -60,9 +67,23 @@ export class EllipseAnnotation extends Annotation {
    * @param strokeStyle One of "solid" | "dashed" | "dotted"
    * @param id         Optional identifier
    */
-  constructor(container: HTMLElement, pdfState: PdfState, fillColor: string, strokeColor: string, strokeWidth: number, strokeStyle: string, opacity: number, id?: string) {
-    super(container, pdfState, id);
-    this._pdfState = pdfState;
+  constructor(
+    container: HTMLElement,
+    instances: {
+      events: InstanceEventEmitter;
+      state: InstanceState;
+      instanceId: string;
+      containerId: string;
+    },
+    fillColor: string,
+    strokeColor: string,
+    strokeWidth: number,
+    strokeStyle: string,
+    opacity: number,
+    id?: string,
+  ) {
+    super(container, instances, id);
+    this._instances = instances;
     this._fillColor = fillColor;
     this._strokeColor = strokeColor;
     this._strokeWidth = strokeWidth;
@@ -70,12 +91,12 @@ export class EllipseAnnotation extends Annotation {
     this._opacity = opacity;
     this._constraints = container.getBoundingClientRect();
 
-    pdfState.on('scaleChange', this._bindOnScaleChange);
+    this.events.on('scaleChange', this._bindOnScaleChange);
   }
 
   private _onScaleChange(event: any) {
     this._constraints = this.__annotationDrawerContainer.getBoundingClientRect();
-    this._updateZoom(this._pdfState.scale);
+    this._updateZoom(this.state.scale);
   }
 
   /**
@@ -102,7 +123,7 @@ export class EllipseAnnotation extends Annotation {
 
     this.createSvgEllipse(rx, ry, rx, ry);
     this._captureOriginal(1);
-    this._updateZoom(this.__pdfState?.scale!);
+    this._updateZoom(this.state.scale);
     this._setEllipseInfo();
   }
 
@@ -191,7 +212,7 @@ export class EllipseAnnotation extends Annotation {
     if (this.__svg) {
       this.deselect();
       this.__svg.remove();
-      if (!suppressEvent) this.__pdfState?.emit('ANNOTATION_DELETED', this.id);
+      if (!suppressEvent) this.events.emit('ANNOTATION_DELETED', this.id);
     }
   }
 
@@ -267,7 +288,7 @@ export class EllipseAnnotation extends Annotation {
    * @param scale Current scale factor
    */
   private _captureOriginal(scale = 0): void {
-    const s = scale || this.__pdfState?.scale || 1;
+    const s = scale || this.state.scale || 1;
     const bbox = (this.__svg as SVGGraphicsElement).getBBox();
     const left = parseFloat(this.__svg.style.left) / s;
     const top = parseFloat(this.__svg.style.top) / s;
@@ -324,7 +345,7 @@ export class EllipseAnnotation extends Annotation {
    * Computes current logical coordinates from SVG position and size.
    */
   private _logicalCoords(): { cx: number; cy: number; rx: number; ry: number } {
-    const s = this.__pdfState?.scale || 1;
+    const s = this.state.scale || 1;
     if (this._origRX) {
       return { cx: this._origCX, cy: this._origCY, rx: this._origRX, ry: this._origRY };
     }
@@ -360,6 +381,6 @@ export class EllipseAnnotation extends Annotation {
   private _onShapeUpdate(): void {
     this._captureOriginal();
     this._setEllipseInfo();
-    this.__pdfState?.emit('ANNOTATION_CREATED', this.getConfig());
+    this.events.emit('ANNOTATION_CREATED', this.getConfig());
   }
 }

@@ -20,6 +20,8 @@ import { ShapeType } from '../../types/geometry.types';
 import { RectangleAnnotation } from './RectangleAnnotation';
 import { EllipseAnnotation } from './EllipseAnnotation';
 import { LineAnnotation } from './LineAnnotation';
+import { InstanceEventEmitter } from '../../core/InstanceEventEmitter';
+import { InstanceState } from '../../core/InstanceState';
 
 /**
  * Options for creating a new annotation via AnnotationFactory.
@@ -30,7 +32,12 @@ export interface CreateAnnotationOptions {
   /** Container element into which the annotation SVG will be inserted */
   annotationDrawerContainer: HTMLElement;
   /** Shared PdfState instance for scale and event handling */
-  pdfState: PdfState;
+  instances: {
+    events: InstanceEventEmitter;
+    state: InstanceState;
+    instanceId: string;
+    containerId: string;
+  };
   /** Fill color for shapes (CSS color string) */
   fillColor: string;
   /** Stroke color for shapes (CSS color string) */
@@ -57,15 +64,15 @@ export class AnnotationFactory {
    * @throws Error if the specified shape type is not supported.
    */
   public static createAnnotation(options: CreateAnnotationOptions): IAnnotation {
-    const { type, annotationDrawerContainer, pdfState, fillColor, strokeColor, strokeWidth, strokeStyle, opacity, id } = options;
+    const { type, annotationDrawerContainer, instances, fillColor, strokeColor, strokeWidth, strokeStyle, opacity, id } = options;
 
     switch (type) {
       case 'rectangle':
-        return new RectangleAnnotation(annotationDrawerContainer, pdfState, fillColor, strokeColor, strokeWidth, strokeStyle, opacity, id);
+        return new RectangleAnnotation(annotationDrawerContainer, instances, fillColor, strokeColor, strokeWidth, strokeStyle, opacity, id);
       case 'ellipse':
-        return new EllipseAnnotation(annotationDrawerContainer, pdfState, fillColor, strokeColor, strokeWidth, strokeStyle, opacity, id);
+        return new EllipseAnnotation(annotationDrawerContainer, instances, fillColor, strokeColor, strokeWidth, strokeStyle, opacity, id);
       case 'line':
-        return new LineAnnotation(annotationDrawerContainer, pdfState, strokeColor, strokeWidth, strokeStyle, opacity, id);
+        return new LineAnnotation(annotationDrawerContainer, instances, strokeColor, strokeWidth, strokeStyle, opacity, id);
       default:
         throw new Error(`Unsupported shape type: ${type}`);
     }

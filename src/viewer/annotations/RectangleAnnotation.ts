@@ -19,6 +19,8 @@ import { RectangleConfig } from '../../types/geometry.types';
 import PdfState from '../ui/PDFState';
 import { Resizer } from './Resizer';
 import { Annotation } from './Annotation';
+import { InstanceEventEmitter } from '../../core/InstanceEventEmitter';
+import { InstanceState } from '../../core/InstanceState';
 
 /**
  * Rectangle annotation supporting interactive drawing, programmatic creation,
@@ -39,7 +41,12 @@ export class RectangleAnnotation extends Annotation {
   private _shapeInfo: RectangleConfig | null = null;
   private _pageNumber?: number;
   private _constraints: DOMRect;
-  private _pdfState: PdfState;
+  private _instances: {
+    events: InstanceEventEmitter;
+    state: InstanceState;
+    instanceId: string;
+    containerId: string;
+  };
   private _onDeleteKeyBound = this._onDeleteKey.bind(this);
   private _bindOnScaleChange = this._onScaleChange.bind(this);
 
@@ -61,9 +68,23 @@ export class RectangleAnnotation extends Annotation {
    * @param opacity     Opacity for rectangle
    * @param id          Optional annotation ID
    */
-  constructor(container: HTMLElement, pdfState: PdfState, fillColor: string, strokeColor: string, strokeWidth: number, strokeStyle: string, opacity: number, id?: string) {
-    super(container, pdfState, id);
-    this._pdfState = pdfState;
+  constructor(
+    container: HTMLElement,
+    instances: {
+      events: InstanceEventEmitter;
+      state: InstanceState;
+      instanceId: string;
+      containerId: string;
+    },
+    fillColor: string,
+    strokeColor: string,
+    strokeWidth: number,
+    strokeStyle: string,
+    opacity: number,
+    id?: string,
+  ) {
+    super(container, instances, id);
+    this._instances = instances;
     this._constraints = container.getBoundingClientRect();
     this._fillColor = fillColor;
     this._strokeColor = strokeColor;
@@ -71,12 +92,12 @@ export class RectangleAnnotation extends Annotation {
     this._strokeStyle = strokeStyle;
     this._opacity = opacity;
 
-    pdfState.on('scaleChange', this._bindOnScaleChange);
+    this.events.on('scaleChange', this._bindOnScaleChange);
   }
 
   private _onScaleChange(event: any) {
     this._constraints = this.__annotationDrawerContainer.getBoundingClientRect();
-    this._updateZoom(this._pdfState.scale);
+    this._updateZoom(this.state.scale);
   }
 
   /**
@@ -101,7 +122,7 @@ export class RectangleAnnotation extends Annotation {
 
     this._createSvgRect(width, height);
     this._maintainOriginalBounding(1);
-    this._updateZoom(this.__pdfState!.scale);
+    this._updateZoom(this.state.scale);
     this._setRectInfo();
   }
 
@@ -212,7 +233,7 @@ export class RectangleAnnotation extends Annotation {
       this.__svg.remove();
     }
     if (!suppressEvent) {
-      this.__pdfState?.emit('ANNOTATION_DELETED', this.id);
+      this.events.emit('ANNOTATION_DELETED', this.id);
     }
   }
 
@@ -354,7 +375,7 @@ export class RectangleAnnotation extends Annotation {
   /** Captures current un-scaled position and size for zoom adjustments. */
   private _maintainOriginalBounding(zoomLevel = 1): void {
     // Always normalize to scale=1 for consistency, regardless of current zoom
-    const currentScale = this.__pdfState?.scale || 1;
+    const currentScale = this.state.scale || 1;
 
     // Extract actual shape coordinates (not SVG container coordinates)
     const svgLeft = parseFloat(this.__svg.style.left) || 0;
@@ -437,7 +458,7 @@ export class RectangleAnnotation extends Annotation {
    * Returns coordinates of the visible shape at scale=1.
    */
   private _getLogicalCoordinates(): { x0: number; y0: number; x1: number; y1: number } {
-    const scale = this.__pdfState?.scale || 1;
+    const scale = this.state.scale || 1;
 
     if (this._originalWidth) {
       // Use captured original shape coordinates (already at scale=1)
@@ -488,7 +509,7 @@ export class RectangleAnnotation extends Annotation {
   private _onShapeUpdate(): void {
     this._maintainOriginalBounding();
     this._setRectInfo();
-    this.__pdfState?.emit('ANNOTATION_CREATED', this.getConfig());
+    this.events.emit('ANNOTATION_CREATED', this.getConfig());
   }
 
   /**

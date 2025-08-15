@@ -15,6 +15,7 @@ export class TextSelectionHandler {
   private static popperInstance: PopperInstance | null = null;
   private static initialized = false;
   private static containerId: string;
+  private static instanceId: string;
   private static currentSelectionRange: Range | null = null;
 
   // ─── Per-page instance state ───────────────────────
@@ -24,13 +25,22 @@ export class TextSelectionHandler {
   private readonly textDivs: HTMLElement[];
   private readonly viewport: PageViewport;
 
-  constructor(containerId: string, pageWrapper: HTMLElement, textLayerDiv: HTMLElement, annotationLayer: HTMLElement, textDivs: HTMLElement[], viewport: PageViewport) {
+  constructor(
+    containerId: string,
+    instanceId: string,
+    pageWrapper: HTMLElement,
+    textLayerDiv: HTMLElement,
+    annotationLayer: HTMLElement,
+    textDivs: HTMLElement[],
+    viewport: PageViewport,
+  ) {
     this.pageWrapper = pageWrapper;
     this.textLayerDiv = textLayerDiv;
     this.annotationLayer = annotationLayer;
     this.textDivs = textDivs;
     this.viewport = viewport;
     TextSelectionHandler.containerId = containerId;
+    TextSelectionHandler.instanceId = instanceId;
 
     TextSelectionHandler.handlers.add(this);
     TextSelectionHandler.initializeShared();
@@ -52,9 +62,9 @@ export class TextSelectionHandler {
       return;
     }
 
-    const mainViewerContainer = viewer.querySelector(`#${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}`);
+    const mainViewerContainer = viewer.querySelector(`#${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}-${TextSelectionHandler.instanceId}`);
     if (!mainViewerContainer) {
-      console.error(`TextSelectionHandler: Main viewer container "${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}" not found.`);
+      console.error(`TextSelectionHandler: Main viewer container "${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}-${TextSelectionHandler.instanceId}" not found.`);
       return;
     }
     mainViewerContainer.appendChild(TextSelectionHandler.toolbar);
@@ -93,9 +103,9 @@ export class TextSelectionHandler {
       return;
     }
 
-    const mainViewerContainer = viewer.querySelector(`#${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}`);
+    const mainViewerContainer = viewer.querySelector(`#${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}-${TextSelectionHandler.instanceId}`);
     if (!mainViewerContainer) {
-      console.error(`TextSelectionHandler: Main viewer container "${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}" not found.`);
+      console.error(`TextSelectionHandler: Main viewer container "${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}-${TextSelectionHandler.instanceId}" not found.`);
       return;
     }
     mainViewerContainer.removeEventListener('scroll', TextSelectionHandler.onScroll);

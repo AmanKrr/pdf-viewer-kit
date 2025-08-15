@@ -17,6 +17,7 @@
 import { debounce } from 'lodash';
 import { PDF_VIEWER_CLASSNAMES } from '../../constants/pdf-viewer-selectors';
 import { SearchOptions } from '../manager/SearchHighlighter';
+import WebViewer from './WebViewer';
 
 /**
  * SearchBar creates the search UI and wires events to perform a search,
@@ -31,7 +32,7 @@ import { SearchOptions } from '../manager/SearchHighlighter';
  * for further use (like updating the counter).
  */
 class SearchBar {
-  private _pdfState: any; // Replace with the actual type for PdfState
+  private _webViewer: WebViewer;
   private _container: HTMLElement | null = null;
   private _searchInputElement: HTMLInputElement | null = null;
   private _matchCounterElement: HTMLElement | null = null;
@@ -46,15 +47,15 @@ class SearchBar {
    * @param nextMatchCallback - A function to go to the next match.
    */
   constructor(
-    pdfState: any,
+    webViewer: WebViewer,
     searchCallback: (searchTerm: string, options: SearchOptions) => Promise<void>,
     prevMatchCallback: () => void,
     nextMatchCallback: () => void,
     getMatchStatus: () => { current: number; total: number },
   ) {
-    this._pdfState = pdfState;
+    this._webViewer = webViewer;
     // Get the parent container based on the containerId and viewer class.
-    const parentContainer = document.querySelector(`#${this._pdfState.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`);
+    const parentContainer = document.querySelector(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`);
     if (parentContainer) {
       // Create the main search container.
       const container = document.createElement('div');
@@ -131,9 +132,9 @@ class SearchBar {
           button.classList.toggle('active');
           // Perform the search with the updated options.
           const searchTerm = this._searchInputElement?.value || '';
-          const matchCase = document.querySelector(`#${this._pdfState.containerId} .a-option-button.active`)?.textContent === 'Aa';
-          const wholeWord = document.querySelector(`#${this._pdfState.containerId} .a-option-button.active`)?.textContent === 'ab';
-          const regex = document.querySelector(`#${this._pdfState.containerId} .a-option-button.active`)?.textContent === 'Regex';
+          const matchCase = document.querySelector(`#${this.containerId} .a-option-button.active`)?.textContent === 'Aa';
+          const wholeWord = document.querySelector(`#${this.containerId} .a-option-button.active`)?.textContent === 'ab';
+          const regex = document.querySelector(`#${this.containerId} .a-option-button.active`)?.textContent === 'Regex';
           this._debounceSearch(searchCallback, searchTerm, { matchCase, regex, wholeWord }, getMatchStatus);
         });
         // const label = document.createElement('label');
@@ -157,6 +158,26 @@ class SearchBar {
       parentContainer.appendChild(container);
       this._container = container;
     }
+  }
+
+  get instance() {
+    return this._webViewer;
+  }
+
+  get instanceId(): string {
+    return this._webViewer.instanceId;
+  }
+
+  get containerId() {
+    return this._webViewer.containerId;
+  }
+
+  get state() {
+    return this._webViewer.state;
+  }
+
+  get pdfDocument() {
+    return this._webViewer.pdfDocument;
   }
 
   private _debounceSearch = debounce(async (searchCallback, searchTerm: string, options: SearchOptions, getMatchStatusCallback: any) => {

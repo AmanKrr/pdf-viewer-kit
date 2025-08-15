@@ -18,6 +18,7 @@ import PdfState from './PDFState';
 import PageVirtualization from './PDFPageVirtualization';
 import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
 import { debounce } from 'lodash';
+import WebViewer from './WebViewer';
 
 interface ZoomOptions {
   /** Minimum permitted scale. */
@@ -33,7 +34,7 @@ interface ZoomOptions {
  * Debounces window resize to auto–fit width.
  */
 export default class ZoomHandler {
-  private _pdfState: PdfState;
+  private _webViewer: WebViewer;
   private _pageVirtualization: PageVirtualization;
   private _options: ZoomOptions;
   private _scrollableContainerElement: HTMLElement | null;
@@ -44,8 +45,8 @@ export default class ZoomHandler {
    * @param pageVirtualization Manages page measurements and rendering.
    * @param options            Optional zoom limits and step size.
    */
-  constructor(pdfState: PdfState, pageVirtualization: PageVirtualization, options?: ZoomOptions) {
-    this._pdfState = pdfState;
+  constructor(webViewer: WebViewer, pageVirtualization: PageVirtualization, options?: ZoomOptions) {
+    this._webViewer = webViewer;
     this._pageVirtualization = pageVirtualization;
     this._options = options ?? {
       minScale: 0.25,
@@ -54,7 +55,9 @@ export default class ZoomHandler {
     };
 
     // Cache the main scrollable container for performance
-    this._scrollableContainerElement = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} #${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}`);
+    this._scrollableContainerElement = document.querySelector<HTMLElement>(
+      `#${this._webViewer.containerId} #${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}-${this._webViewer.instanceId}`,
+    );
 
     // On window resize, refit width (debounced)
     // this._onWindowResize = debounce(() => this.fitWidth(), 100);
@@ -70,8 +73,8 @@ export default class ZoomHandler {
    * Increase zoom by one step, up to the maximum scale.
    */
   public async zoomIn(): Promise<void> {
-    if (this._pdfState.scale >= this._options.maxScale) return;
-    const currentScale = this._pdfState.scale;
+    if (this._webViewer.state.scale >= this._options.maxScale) return;
+    const currentScale = this._webViewer.state.scale;
     const base = this._snapToStep(currentScale);
     const target = Math.min(base + this._options.zoomStep, this._options.maxScale);
     await this.applyZoom(target);
@@ -81,8 +84,8 @@ export default class ZoomHandler {
    * Decrease zoom by one step, down to the minimum scale.
    */
   public async zoomOut(): Promise<void> {
-    if (this._pdfState.scale <= this._options.minScale) return;
-    const currentScale = this._pdfState.scale;
+    if (this._webViewer.state.scale <= this._options.minScale) return;
+    const currentScale = this._webViewer.state.scale;
     const base = this._snapToStep(currentScale);
     const target = Math.max(base - this._options.zoomStep, this._options.minScale);
     await this.applyZoom(target);
@@ -98,18 +101,18 @@ export default class ZoomHandler {
    * @param newScaleInput Desired scale value
    */
   public async applyZoom(newScaleInput: number): Promise<void> {
-    const oldScale = this._pdfState.scale;
+    const oldScale = this._webViewer.state.scale;
 
-    const page = this._pdfState.currentPage;
+    const page = this._webViewer.state.currentPage;
     const offset = this._getScrollOffsetRelativeToPage(page);
 
-    this._pdfState.scale = newScaleInput;
+    this._webViewer.state.scale = newScaleInput;
     this._applyCssScale(newScaleInput);
 
     await this._pageVirtualization.calculatePagePositions();
     this._adjustScrollPosition(page, offset, oldScale, newScaleInput);
 
-    this._pdfState.emit('scaleChange');
+    this._webViewer.events.emit('scaleChange');
   }
 
   /**
@@ -130,15 +133,15 @@ export default class ZoomHandler {
    */
   public async fitWidth(): Promise<void> {
     const { minScale, maxScale, zoomStep } = this._options;
-    const currScale = this._pdfState.scale;
+    const currScale = this._webViewer.state.scale;
 
-    const container = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`)!;
+    const container = document.querySelector<HTMLElement>(`#${this._webViewer.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}-${this._webViewer.instanceId}`)!;
     const containerWidth = container.getBoundingClientRect().width;
 
-    const pageCount = this._pdfState.pdfInstance.numPages;
+    const pageCount = this._webViewer.pdfDocument.numPages;
     let maxOrigWidth = 0;
     for (let i = 1; i <= pageCount; i++) {
-      const page = await this._pdfState.pdfInstance.getPage(i);
+      const page = await this._webViewer.pdfDocument.getPage(i);
       const vpAtCurr = page.getViewport({ scale: currScale });
       const origWidth = vpAtCurr.width / currScale;
       maxOrigWidth = Math.max(maxOrigWidth, origWidth);
@@ -207,7 +210,7 @@ export default class ZoomHandler {
    * @param scaleFactor New scale value.
    */
   private _applyCssScale(scaleFactor: number): void {
-    const container = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} #${PDF_VIEWER_IDS.MAIN_PAGE_VIEWER_CONTAINER}`);
+    const container = document.querySelector<HTMLElement>(`#${this._webViewer.containerId} #${PDF_VIEWER_IDS.MAIN_PAGE_VIEWER_CONTAINER}-${this._webViewer.instanceId}`);
     if (container) {
       container.style.setProperty('--scale-factor', String(scaleFactor));
     }

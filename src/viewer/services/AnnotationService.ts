@@ -15,7 +15,6 @@
 */
 
 import { EllipseConfig, LineConfig, RectangleConfig, ShapeConfig } from '../../types/geometry.types';
-import PdfState from '../ui/PDFState';
 import WebViewer from '../ui/WebViewer';
 import { AnnotationManager } from '../manager/AnnotationManager';
 import { ShapeAnno } from './AnnotationExportService';
@@ -30,7 +29,7 @@ export class AnnotationService {
   private _annotations: Map<number, ShapeConfig[]> = new Map();
   private _annotationManagers: Map<number, AnnotationManager> = new Map();
   private _goTo: (pageNumber: number) => void;
-  private _pdfState: PdfState;
+  private _webViewer: WebViewer;
   private _onCreated = (annotationData: ShapeConfig) => this._updateAnnotationMap(annotationData);
   private _onDeleted = (id: string) => this._deleteAnnotation(id);
 
@@ -38,12 +37,36 @@ export class AnnotationService {
    * @param pdfState  Shared PDF state, emits ANNOTATION_CREATED/DELETED events.
    * @param pdfViewer WebViewer for navigation (goToPage).
    */
-  constructor(pdfState: PdfState, pdfViewer: WebViewer) {
-    this._pdfState = pdfState;
-    this._goTo = pdfViewer.goToPage.bind(pdfViewer);
+  constructor(webViewer: WebViewer) {
+    this._webViewer = webViewer;
+    this._goTo = this._webViewer.goToPage.bind(webViewer);
 
-    pdfState.on('ANNOTATION_CREATED', this._onCreated);
-    pdfState.on('ANNOTATION_DELETED', this._onDeleted);
+    this.events.on('ANNOTATION_CREATED', this._onCreated);
+    this.events.on('ANNOTATION_DELETED', this._onDeleted);
+  }
+
+  get instance() {
+    return this._webViewer;
+  }
+
+  get instanceId(): string {
+    return this._webViewer.instanceId;
+  }
+
+  get containerId(): string {
+    return this._webViewer.containerId;
+  }
+
+  get state() {
+    return this._webViewer.state;
+  }
+
+  get pdfDocument() {
+    return this._webViewer.pdfDocument!;
+  }
+
+  get events() {
+    return this._webViewer.events;
   }
 
   /**
@@ -66,7 +89,7 @@ export class AnnotationService {
   public registerAnnotationManager(page: number, manager: AnnotationManager): void {
     this._annotationManagers.set(page, manager);
 
-    if (this._pdfState.isAnnotationEnabled && this._pdfState.isAnnotationConfigurationPropertiesEnabled) {
+    if (this.state.isAnnotationEnabled && this.state.isAnnotationConfigurationPropertiesEnabled) {
       manager._initAnnotation();
     }
 
@@ -88,7 +111,7 @@ export class AnnotationService {
     manager?.destroy();
     this._annotationManagers.delete(page);
 
-    if (this._pdfState.isAnnotationEnabled && this._pdfState.isAnnotationConfigurationPropertiesEnabled) {
+    if (this.state.isAnnotationEnabled && this.state.isAnnotationConfigurationPropertiesEnabled) {
       manager?._initAnnotationCleanup();
     }
   }
@@ -103,7 +126,7 @@ export class AnnotationService {
    */
   private _waitForPageContainer(page: number, timeoutMs = 5000): Promise<HTMLElement> {
     return new Promise((resolve, reject) => {
-      const id = `pageContainer-${page}`;
+      const id = `#pageContainer-${this.instanceId}-${page}[data-page-number="${page}"]`;
       const start = performance.now();
 
       const check = () => {
@@ -353,15 +376,15 @@ export class AnnotationService {
    */
   public exportShapes(): ShapeAnno[] {
     const configs = this._collectAllConfigs();
-    return toShapeAnnos(configs, this._pdfState.scale);
+    return toShapeAnnos(configs, this.state.scale);
   }
 
   /**
    * Removes event listeners and destroys all managers.
    */
   public destroy(): void {
-    this._pdfState.off('ANNOTATION_CREATED', this._onCreated);
-    this._pdfState.off('ANNOTATION_DELETED', this._onDeleted);
+    this.events.off('ANNOTATION_CREATED', this._onCreated);
+    this.events.off('ANNOTATION_DELETED', this._onDeleted);
 
     for (const manager of this._annotationManagers.values()) {
       manager.destroy();

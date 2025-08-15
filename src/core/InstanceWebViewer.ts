@@ -18,8 +18,6 @@ import { PDFDocumentProxy } from 'pdfjs-dist';
 import { LoadOptions, ViewerLoadOptions } from '../types/webpdf.types';
 import { PDFViewerInstance } from './PDFViewerInstance';
 import WebViewer from '../viewer/ui/WebViewer';
-import WebUiUtils from '../utils/web-ui-utils';
-import PageElement from '../viewer/ui/PDFPageElement';
 
 /**
  * Web viewer instance that integrates with the new multi-instance architecture.
@@ -75,27 +73,32 @@ export class InstanceWebViewer {
     return this._isDestroyed;
   }
 
+  private _query(selector: string): Element | null {
+    return document.querySelector(`#${this._containerId} ${selector}`);
+  }
+
+  private _queryAll(selector: string): NodeListOf<Element> {
+    return document.querySelectorAll(`#${this._containerId} ${selector}`);
+  }
+
+  private _scopedId(id: string): string {
+    return `${this._containerId}-${id}`;
+  }
+
   /**
    * Initializes the web viewer with the PDF document
    */
-  async initialize(): Promise<void> {
+  async initialize(internalContainers: { parent: HTMLDivElement; viewerContainer: HTMLDivElement; pagesContainer: HTMLDivElement; injectElementId: string }): Promise<void> {
     if (this._isDestroyed) {
       throw new Error('Cannot initialize destroyed InstanceWebViewer');
     }
 
     try {
-      // Create the necessary container elements for the PDF viewer
-      const internalContainers = PageElement.containerCreation(this._containerId, this._instance.state.scale);
+      const container = document.querySelector(`#${this._containerId} #${internalContainers.injectElementId}`)! as HTMLElement;
 
-      // Ensure the container exists
-      if (!internalContainers.parent || !internalContainers.pagesContainer) {
-        throw new Error('Failed to create container structure');
+      if (!container || !internalContainers || !internalContainers.parent) {
+        throw new Error('Container not found. PDFViewerInstance should create containers first.');
       }
-
-      // Display a loading spinner in the viewer container
-      const uiLoading = WebUiUtils.showLoading();
-      this._instance.state.uiLoading = uiLoading;
-      internalContainers.parent.prepend(uiLoading.parentNode!);
 
       // Convert LoadOptions to ViewerLoadOptions (remove password-related fields)
       const viewerOptions: ViewerLoadOptions = {
@@ -104,13 +107,10 @@ export class InstanceWebViewer {
       };
 
       // Initialize the WebViewer instance with the loaded PDF
-      this._webViewer = new WebViewer(this._pdfDocument, viewerOptions, internalContainers.parent, internalContainers.pagesContainer);
+      this._webViewer = new WebViewer(viewerOptions, this.instance, internalContainers.parent, container);
 
       // Wait for the viewer to be ready
       await this._webViewer.ready;
-
-      // Hide loading spinner
-      WebUiUtils.hideLoading(uiLoading, this._containerId);
 
       // Set up instance-specific event handling
       this._setupInstanceEvents();

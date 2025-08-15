@@ -90,5 +90,125 @@ class WebUiUtils {
     return params;
   }
 }
+class InstanceWebUiUtils {
+  /**
+   * Creates instance-scoped loading element
+   * @param instanceId - The unique instance identifier
+   * @param containerId - The container ID where loading will be shown
+   */
+  static showLoading(instanceId: string, containerId: string) {
+    // Create loading element with instance-specific ID
+    const loadingElement = document.createElement('div');
+    loadingElement.classList.add('loading');
+    loadingElement.setAttribute('data-instance', instanceId);
 
-export default WebUiUtils;
+    // Create spinner element
+    const spinner = document.createElement('div');
+    spinner.classList.add('spinner');
+    loadingElement.appendChild(spinner);
+
+    // Create container with instance-specific ID
+    const container = document.createElement('div');
+    container.setAttribute('id', `${PDF_VIEWER_IDS.LOADING_CONTAINER}-${instanceId}`);
+    container.setAttribute('data-instance', instanceId);
+    container.classList.add('pdf-loading-overlay');
+    container.appendChild(loadingElement);
+
+    return loadingElement;
+  }
+
+  /**
+   * Hides instance-scoped loading element
+   */
+  static hideLoading(loadingElement: HTMLElement, containerId: string, instanceId: string) {
+    const pdfContainer = document.querySelector(`#${containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`);
+    if (pdfContainer) {
+      pdfContainer.classList.remove(PDF_VIEWER_CLASSNAMES.PDF_LOADING);
+    }
+
+    // Remove the loading element
+    if (loadingElement && loadingElement.parentNode) {
+      loadingElement.parentNode.removeChild(loadingElement);
+    }
+  }
+
+  /**
+   * Updates loading progress for specific instance
+   */
+  static updateLoadingProgress(loadingElement: HTMLElement, containerId: string, percent: number | string = 0, instanceId: string) {
+    if (!loadingElement) return;
+
+    let progressText = loadingElement.querySelector('.loading-progress-per') as HTMLElement;
+    if (!progressText) {
+      progressText = document.createElement('div');
+      progressText.className = 'loading-progress-per';
+      progressText.setAttribute('data-instance', instanceId);
+
+      // Style for visibility
+      progressText.style.marginTop = '20px';
+      progressText.style.fontSize = '16px';
+      progressText.style.fontWeight = '600';
+      progressText.style.color = '#555';
+      progressText.style.textAlign = 'center';
+
+      loadingElement.appendChild(progressText);
+    }
+
+    // Update progress
+    let percentValue = typeof percent === 'string' ? parseFloat(percent) : percent;
+    if (isNaN(percentValue)) percentValue = 0;
+    percentValue = Math.max(0, Math.min(100, percentValue));
+    progressText.textContent = `Loading ${percentValue}%`;
+  }
+
+  /**
+   * Creates instance-scoped global UI element (like progress indicators)
+   */
+  static createGlobalElement(instanceId: string, elementType: string, className?: string): HTMLElement {
+    const elementId = `pdf-${elementType}-${instanceId}`;
+
+    // Remove any existing element for this instance
+    const existing = document.getElementById(elementId);
+    if (existing) {
+      existing.remove();
+    }
+
+    // Create new scoped element
+    const element = document.createElement('div');
+    element.id = elementId;
+    element.setAttribute('data-instance', instanceId);
+    element.setAttribute('data-pdf-element', elementType);
+
+    if (className) {
+      element.className = className;
+    }
+
+    return element;
+  }
+
+  /**
+   * Query string parser (no changes needed - doesn't interact with DOM)
+   */
+  static parseQueryString(query: any) {
+    const params = new Map();
+    for (const [key, value] of new URLSearchParams(query)) {
+      params.set(key.toLowerCase(), value);
+    }
+    return params;
+  }
+
+  /**
+   * Clean up all instance-specific UI elements
+   */
+  static cleanupInstance(instanceId: string): void {
+    // Remove all elements belonging to this instance
+    const instanceElements = document.querySelectorAll(`[data-instance="${instanceId}"]`);
+    instanceElements.forEach((element) => {
+      if (element.parentNode) {
+        element.parentNode.removeChild(element);
+      }
+    });
+  }
+}
+
+export { InstanceWebUiUtils, WebUiUtils };

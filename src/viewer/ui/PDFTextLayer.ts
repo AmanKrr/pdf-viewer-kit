@@ -33,14 +33,15 @@ class TextLayer {
   private _pdfJsInternalTextLayerInstance: PdfJsTextLayerInternal | null = null;
   private _selectionHandler: TextSelectionHandler | null = null;
   private _isDestroyed = false;
-  private _containerId: string;
+  private readonly _containerId: string;
+  private readonly _instanceId: string;
 
   /**
    * @param pageWrapper - Container element for this page's layers.
    * @param page - PDFPageProxy for accessing text content.
    * @param viewport - Viewport for coordinate mapping.
    */
-  constructor(containerId: string, pageWrapper: HTMLElement, page: PDFPageProxy, viewport: PageViewport) {
+  constructor(containerId: string, instanceId: string, pageWrapper: HTMLElement, page: PDFPageProxy, viewport: PageViewport) {
     if (!viewport) {
       reportError('TextLayer init: viewport is null or undefined', { pageNumber: page?.pageNumber });
     }
@@ -48,6 +49,7 @@ class TextLayer {
     this._page = page;
     this._viewport = viewport;
     this._containerId = containerId;
+    this._instanceId = instanceId;
   }
 
   /**
@@ -66,10 +68,10 @@ class TextLayer {
       throw new Error('TextLayer not properly initialized or already destroyed.');
     }
 
-    this._textLayerDiv = PageElement.createLayers(PDF_VIEWER_CLASSNAMES.ATEXT_LAYER, PDF_VIEWER_IDS.TEXT_LAYER, this._viewport);
+    this._textLayerDiv = PageElement.createLayers(PDF_VIEWER_CLASSNAMES.ATEXT_LAYER, PDF_VIEWER_IDS.TEXT_LAYER, this._viewport, this._instanceId);
     this._pageWrapper.appendChild(this._textLayerDiv);
 
-    this._annotationHostDiv = PageElement.createLayers(PDF_VIEWER_CLASSNAMES.AANNOTATION_DRAWING_LAYER, PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER, this._viewport);
+    this._annotationHostDiv = PageElement.createLayers(PDF_VIEWER_CLASSNAMES.AANNOTATION_DRAWING_LAYER, PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER, this._viewport, this._instanceId);
     this._pageWrapper.appendChild(this._annotationHostDiv);
 
     const textContent = await this._page.getTextContent();
@@ -105,6 +107,7 @@ class TextLayer {
 
     this._selectionHandler = new TextSelectionHandler(
       this._containerId,
+      this._instanceId,
       this._pageWrapper!,
       this._textLayerDiv!,
       this._annotationHostDiv!,

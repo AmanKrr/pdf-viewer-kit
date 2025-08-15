@@ -15,6 +15,7 @@
 */
 
 import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
+import { PDFViewerInstance } from '../../core/PDFViewerInstance';
 import { IAnnotation } from '../../interface/IAnnotation';
 import { ShapeType } from '../../types/geometry.types';
 import { ToolbarButtonConfig } from '../../types/toolbar.types';
@@ -48,7 +49,6 @@ export class AnnotationToolbar {
   private _isShapeDropdownOpen = false;
   private _isToolbarPropertiesContainerOpen = false;
 
-  private _pdfState: PdfState;
   private _viewer: WebViewer;
 
   private _onAnnotationCreated = this._handleAnnotationCreated.bind(this);
@@ -60,10 +60,29 @@ export class AnnotationToolbar {
    * @param viewer    The WebViewer instance containing PDF pages.
    * @param pdfState  Shared PDF state for events and configuration.
    */
-  constructor(viewer: WebViewer, pdfState: PdfState) {
+  constructor(viewer: WebViewer) {
     this._viewer = viewer;
-    this._pdfState = pdfState;
-    this._pdfState.on('ANNOTATION_CREATED', this._onAnnotationCreated);
+    this.events.on('ANNOTATION_CREATED', this._onAnnotationCreated);
+  }
+
+  get state() {
+    return this._viewer.state;
+  }
+
+  get instance() {
+    return this._viewer;
+  }
+
+  get containerId() {
+    return this._viewer.containerId;
+  }
+
+  get instanceId() {
+    return this._viewer.instanceId;
+  }
+
+  get events() {
+    return this._viewer.events;
   }
 
   /**
@@ -83,7 +102,7 @@ export class AnnotationToolbar {
    */
   public toogleAnnotationDrawing(): void {
     for (const page of this._viewer.visiblePageNumbers) {
-      const selector = `#${this._pdfState.containerId} #pageContainer-${page} #${PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER}`;
+      const selector = `#${this.containerId} [data-page-number="${page}"] #${PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER}-${this.instanceId}`;
       const container = document.querySelector<HTMLElement>(selector);
       if (!container) continue;
       if (this._isToolbarPropertiesContainerOpen) {
@@ -160,7 +179,7 @@ export class AnnotationToolbar {
     shapeMainButton.onclick = () => {
       if (this._selectedShape === 'none') return;
       this._isToolbarPropertiesContainerOpen = !this._isToolbarPropertiesContainerOpen;
-      this._pdfState.isAnnotationConfigurationPropertiesEnabled = this._isToolbarPropertiesContainerOpen;
+      this.state.isAnnotationConfigurationPropertiesEnabled = this._isToolbarPropertiesContainerOpen;
       shapeMainButton.parentElement?.classList.toggle('active');
       if (this._isToolbarPropertiesContainerOpen) {
         this._createToolbarPropertiesContainer();
@@ -194,7 +213,7 @@ export class AnnotationToolbar {
       item.style.cursor = 'pointer';
       item.onclick = () => {
         this._isToolbarPropertiesContainerOpen = true;
-        this._pdfState.isAnnotationConfigurationPropertiesEnabled = true;
+        this.state.isAnnotationConfigurationPropertiesEnabled = true;
         shapeMainButton.parentElement?.classList.add('active');
         if (!this._toolbarPropertiesContainer) {
           this._createToolbarPropertiesContainer();
@@ -217,7 +236,7 @@ export class AnnotationToolbar {
    * Insert toolbar elements into the PDF viewer DOM.
    */
   private _injectToolbarContainers(insertToolbar: boolean, insertProps: boolean): void {
-    const viewWrapper = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
+    const viewWrapper = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
     const pdfContainer = viewWrapper?.parentElement;
     if (!viewWrapper || !pdfContainer) return;
     if (insertToolbar) pdfContainer.insertBefore(this._toolbarContainer, viewWrapper);
@@ -237,7 +256,7 @@ export class AnnotationToolbar {
     // @ts-ignore
     this._toolbarPropertiesContainer = undefined;
     this._isToolbarPropertiesContainerOpen = false;
-    this._pdfState.isAnnotationConfigurationPropertiesEnabled = false;
+    this.state.isAnnotationConfigurationPropertiesEnabled = false;
   }
 
   /** Remove the shape dropdown from the DOM. */
@@ -359,7 +378,7 @@ export class AnnotationToolbar {
           {
             name: 'preventOverflow',
             options: {
-              boundary: document.querySelector(`#${this._pdfState.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`), // your viewer container
+              boundary: document.querySelector(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`), // your viewer container
               padding: 8,
             },
           },
@@ -447,7 +466,7 @@ export class AnnotationToolbar {
       if (!container.contains(ev.target as Node)) dropdown.style.display = 'none';
     });
 
-    const dropdownWrapper = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
+    const dropdownWrapper = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
     dropdownWrapper?.parentElement?.insertBefore(dropdown, dropdownWrapper);
     return container;
   }
@@ -566,7 +585,7 @@ export class AnnotationToolbar {
         updateThumb(initialValue);
       }
     });
-    const dropdownWrapper = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
+    const dropdownWrapper = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
     dropdownWrapper?.parentElement?.insertBefore(dropdown, dropdownWrapper);
     return container;
   }
@@ -604,7 +623,7 @@ export class AnnotationToolbar {
     const dropdown = document.createElement('div');
     dropdown.classList.add(PDF_VIEWER_CLASSNAMES.A_ANNOTATION_BORDER_DROPDOWN);
     dropdown.style.display = 'none';
-    const dropdownWrapper = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
+    const dropdownWrapper = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
     dropdownWrapper?.parentElement?.insertBefore(dropdown, dropdownWrapper);
 
     styles.forEach((style) => {
@@ -655,7 +674,7 @@ export class AnnotationToolbar {
         this._shapeDropdown.style.display = 'block';
         return;
       }
-      const viewWrapper = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
+      const viewWrapper = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
       const pdfContainer = viewWrapper?.parentElement;
       if (viewWrapper && pdfContainer) {
         this._isShapeDropdownOpen = true;
@@ -693,14 +712,14 @@ export class AnnotationToolbar {
 
   /** Cleanup toolbar and event handlers. */
   public destroy(): void {
-    this._pdfState.off('ANNOTATION_CREATED', this._onAnnotationCreated);
-    this._pdfState.isAnnotationEnabled = false;
-    const btn = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} .${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;
+    this.events.off('ANNOTATION_CREATED', this._onAnnotationCreated);
+    this.state.isAnnotationEnabled = false;
+    const btn = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;
     btn?.classList.remove('active');
     this._removeToolbarContainer();
     this._removeToolbarPropertiesContainer();
     this._removeShapeDropdown();
     this.toogleAnnotationDrawing();
-    this._pdfState.isAnnotationEnabled = false;
+    this.state.isAnnotationEnabled = false;
   }
 }

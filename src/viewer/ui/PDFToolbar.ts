@@ -25,11 +25,10 @@ import { AnnotationToolbar } from './PDFAnnotationToolbar';
  * Allows navigation, zoom, search, annotations, and download controls.
  */
 export class Toolbar implements IToolbar {
+  private _viewer: WebViewer;
   private _container!: HTMLElement;
   private _buttons: ToolbarButtonConfig[];
   private _opts: Required<ToolbarOptions>;
-  private _pdfState: PdfState;
-  private _viewer: WebViewer;
   private _annotationToolbar: AnnotationToolbar;
   private _searchBarOpen = false;
 
@@ -39,9 +38,8 @@ export class Toolbar implements IToolbar {
    * @param buttons   Optional custom button configurations.
    * @param options   ToolbarOptions to enable/disable features.
    */
-  constructor(viewer: WebViewer, pdfState: PdfState, buttons: ToolbarButtonConfig[] = [], options: ToolbarOptions = {}) {
+  constructor(viewer: WebViewer, buttons: ToolbarButtonConfig[] = [], options: ToolbarOptions = {}) {
     this._viewer = viewer;
-    this._pdfState = pdfState;
 
     this._opts = {
       showFirstPage: true,
@@ -58,7 +56,19 @@ export class Toolbar implements IToolbar {
     };
 
     this._buttons = buttons.length ? buttons : this._defaultButtons();
-    this._annotationToolbar = new AnnotationToolbar(this._viewer, this._pdfState);
+    this._annotationToolbar = new AnnotationToolbar(this._viewer);
+  }
+
+  get instanceId() {
+    return this._viewer.instanceId;
+  }
+
+  get containerId() {
+    return this._viewer.containerId;
+  }
+
+  get instance() {
+    return this._viewer.instance;
   }
 
   /**
@@ -144,7 +154,7 @@ export class Toolbar implements IToolbar {
     if (this._opts.showPageNumber) {
       buttons.push({
         id: 'pageNumber',
-        render: (viewer) => Toolbar._renderPageNumberControls(viewer),
+        render: (viewer) => this._renderPageNumberControls(viewer),
       });
     }
 
@@ -190,10 +200,10 @@ export class Toolbar implements IToolbar {
             this._viewer.search();
             this._searchBarOpen = false;
           }
-          this._pdfState.isAnnotationEnabled = !this._pdfState.isAnnotationEnabled;
-          const btn = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} .${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;
+          this._viewer.instance.state.isAnnotationEnabled = !this.instance.state.isAnnotationEnabled;
+          const btn = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;
           btn?.classList.toggle('active');
-          if (this._pdfState.isAnnotationEnabled) {
+          if (this.instance.state.isAnnotationEnabled) {
             this._annotationToolbar.render();
           } else {
             this._annotationToolbar.destroy();
@@ -203,21 +213,21 @@ export class Toolbar implements IToolbar {
       });
     }
 
-    if (this._opts.showDownload) {
-      buttons.push({
-        id: 'download',
-        iconClass: 'download-icon',
-        tooltip: 'Download PDF with Annotations',
-        onClick: async (viewer) => {
-          try {
-            await viewer.downloadPdf();
-          } catch (error) {
-            console.error('Download failed:', error);
-          }
-        },
-        breakBefore: !this._opts.showSearch || !this._opts.showAnnotation,
-      });
-    }
+    // if (this._opts.showDownload) {
+    //   buttons.push({
+    //     id: 'download',
+    //     iconClass: 'download-icon',
+    //     tooltip: 'Download PDF with Annotations',
+    //     onClick: async (viewer) => {
+    //       try {
+    //         await viewer.downloadPdf();
+    //       } catch (error) {
+    //         console.error('Download failed:', error);
+    //       }
+    //     },
+    //     breakBefore: !this._opts.showSearch || !this._opts.showAnnotation,
+    //   });
+    // }
 
     return buttons;
   }
@@ -226,8 +236,8 @@ export class Toolbar implements IToolbar {
    * Closes the annotation toolbar if open.
    */
   private _closeAnnotationToolbar(): void {
-    this._pdfState.isAnnotationEnabled = false;
-    const btn = document.querySelector<HTMLElement>(`#${this._pdfState.containerId} .${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;
+    this.instance.state.isAnnotationEnabled = false;
+    const btn = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;
     btn?.classList.toggle('active');
     this._annotationToolbar.destroy();
   }
@@ -285,14 +295,14 @@ export class Toolbar implements IToolbar {
    * @param viewer  The WebViewer instance.
    * @returns An HTMLElement containing page navigation controls.
    */
-  private static _renderPageNumberControls(viewer: WebViewer): HTMLElement {
+  private _renderPageNumberControls(viewer: WebViewer): HTMLElement {
     const inputContainer = document.createElement('div');
-    inputContainer.id = PDF_VIEWER_IDS.INPUT_PAGE_NUMBER;
+    inputContainer.id = `${PDF_VIEWER_IDS.INPUT_PAGE_NUMBER}-${this.instanceId}`;
     inputContainer.className = PDF_VIEWER_CLASSNAMES.A_PAGE_INPUT_CONTAINER;
 
     const inputField = document.createElement('input');
     inputField.type = 'number';
-    inputField.id = PDF_VIEWER_IDS.CURRENT_PAGE_INPUT;
+    inputField.id = `${PDF_VIEWER_IDS.CURRENT_PAGE_INPUT}-${this.instanceId}`;
     inputField.className = PDF_VIEWER_CLASSNAMES.A_CURRENT_PAGE_NUMBER_INPUT_FIELD;
     inputField.autocomplete = 'off';
     inputField.setAttribute('aria-label', 'Current page number');

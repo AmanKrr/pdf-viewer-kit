@@ -14,6 +14,8 @@
   limitations under the License.
 */
 
+import { InstanceEventEmitter } from '../../core/InstanceEventEmitter';
+import { InstanceState } from '../../core/InstanceState';
 import { IAnnotation } from '../../interface/IAnnotation';
 import { EllipseConfig, RectangleConfig } from '../../types/geometry.types';
 import PdfState from '../ui/PDFState';
@@ -34,7 +36,12 @@ export abstract class Annotation implements IAnnotation {
 
   protected __startX: number = 0;
   protected __startY: number = 0;
-  protected __pdfState: PdfState | null = null;
+  protected __instances: {
+    events: InstanceEventEmitter;
+    state: InstanceState;
+    instanceId: string;
+    containerId: string;
+  };
 
   /**
    * Creates a new annotation instance.
@@ -42,11 +49,20 @@ export abstract class Annotation implements IAnnotation {
    * @param {HTMLElement} annotationDrawerContainer - The container where the annotation is placed.
    * @param {PdfState} pdfState - The PdfState instance to manage annotation state.
    */
-  constructor(annotationDrawerContainer: HTMLElement, pdfState: PdfState, id?: string) {
+  constructor(
+    annotationDrawerContainer: HTMLElement,
+    instances: {
+      events: InstanceEventEmitter;
+      state: InstanceState;
+      instanceId: string;
+      containerId: string;
+    },
+    id?: string,
+  ) {
     this.annotationId = id ?? this.__generateUniqueId();
 
     this.__annotationDrawerContainer = annotationDrawerContainer;
-    this.__pdfState = pdfState;
+    this.__instances = instances;
 
     // Create a new SVG instance for this annotation
     this.__svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -60,6 +76,22 @@ export abstract class Annotation implements IAnnotation {
     this.__svg.style.pointerEvents = 'none';
 
     this.__annotationDrawerContainer.appendChild(this.__svg);
+  }
+
+  get instanceId(): string {
+    return this.__instances.instanceId;
+  }
+
+  get containerId(): string {
+    return this.__instances.containerId;
+  }
+
+  get state() {
+    return this.__instances.state;
+  }
+
+  get events() {
+    return this.__instances.events;
   }
 
   /**
@@ -86,8 +118,8 @@ export abstract class Annotation implements IAnnotation {
   public stopDrawing(): void {
     this.isDrawing = false;
 
-    if (this.__pdfState) {
-      const button = document.querySelector(`#${this.__pdfState.containerId} .a-annotation-container-icon`) as HTMLElement;
+    if (this.containerId) {
+      const button = document.querySelector(`#${this.containerId} .a-annotation-container-icon`) as HTMLElement;
       if (button && button.parentElement?.classList.contains('active')) {
         button.parentElement.classList.toggle('active');
       }
@@ -131,7 +163,7 @@ export abstract class Annotation implements IAnnotation {
     if (event) {
       event.stopPropagation();
     }
-    this.__pdfState?.emit('ANNOTATION_SELECTED', annotationData);
+    this.events?.emit('ANNOTATION_SELECTED', annotationData);
   }
 
   /**

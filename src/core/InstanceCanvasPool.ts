@@ -1,17 +1,6 @@
 /*
   Copyright 2025 Aman Kumar
-
-  Licensed under the Apache License, Version 2.0 (the "License");
-  you may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
-
-      http://www.apache.org/licenses/LICENSE-2.0
-
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  See the License for the specific language governing permissions and
-  limitations under the License.
+  Licensed under the Apache License, Version 2.0
 */
 
 /**
@@ -21,25 +10,29 @@ interface PooledCanvas {
   canvas: HTMLCanvasElement;
   context: CanvasRenderingContext2D;
   inUse: boolean;
-  width: number;
-  height: number;
-  lastUsed: number;
-  instanceId: string;
+  width: number; // Physical pixel width (bucketed)
+  height: number; // Physical pixel height (bucketed)
+  lastUsed: number; // Timestamp for LRU cleanup
+  instanceId: string; // Instance isolation tracking
 }
 
 /**
- * Canvas pool that is completely isolated to a single PDF instance.
- * Each instance has its own pool of canvases, preventing resource conflicts.
+ * Instance-isolated canvas pool with all the performance optimizations
+ * from the original implementation. Each PDF instance gets its own pool.
  */
 export class InstanceCanvasPool {
   private readonly _instanceId: string;
   private readonly _pool: PooledCanvas[] = [];
-  private readonly _maxPoolSize: number;
+  private _maxPoolSize: number;
   private _isDestroyed = false;
+  private _memoryPressureInterval: NodeJS.Timeout | null = null;
 
   constructor(instanceId: string, maxPoolSize: number = 10) {
     this._instanceId = instanceId;
     this._maxPoolSize = maxPoolSize;
+
+    // Set up instance-specific memory pressure handling
+    this._setupInstanceMemoryPressureHandling();
   }
 
   /**
@@ -49,124 +42,242 @@ export class InstanceCanvasPool {
     return this._instanceId;
   }
 
+  set maxPoolSize(poolSize: number) {
+    this._maxPoolSize = poolSize;
+  }
+
   /**
-   * Gets a canvas from the pool or creates a new one
+   * Rounds up dimension to the nearest power of 2 for bucketing.
+   * This improves canvas reuse rates by standardizing sizes.
+   */
+  private _getBucketSize(size: number): number {
+    // Minimum bucket size to avoid tiny canvases
+    if (size <= 64) return 64;
+    return Math.pow(2, Math.ceil(Math.log2(size)));
+  }
+
+  /**
+   * Resets canvas context to a clean, predictable state.
+   * This ensures consistent rendering between canvas reuses.
+   */
+  private _resetContextState(context: CanvasRenderingContext2D, ratio: number): void {
+    // Reset transformation matrix
+    context.setTransform(1, 0, 0, 1, 0, 0);
+
+    // Reset drawing state properties
+    context.globalAlpha = 1.0;
+    context.globalCompositeOperation = 'source-over';
+    context.fillStyle = '#000000';
+    context.strokeStyle = '#000000';
+    context.lineWidth = 1;
+    context.lineCap = 'butt';
+    context.lineJoin = 'miter';
+    context.miterLimit = 10;
+    context.shadowColor = 'rgba(0, 0, 0, 0)';
+    context.shadowBlur = 0;
+    context.shadowOffsetX = 0;
+    context.shadowOffsetY = 0;
+    context.font = '10px sans-serif';
+    context.textAlign = 'start';
+    context.textBaseline = 'alphabetic';
+
+    // Clear any existing paths
+    context.beginPath();
+
+    // 🔥 CRITICAL: Reapply device pixel ratio scaling
+    context.scale(ratio, ratio);
+  }
+
+  /**
+   * Acquires a canvas from the pool with full optimization
    */
   getCanvas(cssWidth: number, cssHeight: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
     if (this._isDestroyed) {
       throw new Error(`Cannot get canvas from destroyed pool for instance ${this._instanceId}`);
     }
 
-    // Try to find an available canvas of the right size
-    const availableCanvas = this._findAvailableCanvas(cssWidth, cssHeight);
-    if (availableCanvas) {
-      availableCanvas.inUse = true;
-      availableCanvas.lastUsed = Date.now();
-      this._resetContextState(availableCanvas.context, cssWidth, cssHeight);
-      return [availableCanvas.canvas, availableCanvas.context];
+    const ratio = window.devicePixelRatio || 1;
+    const requiredWidth = Math.ceil(cssWidth * ratio);
+    const requiredHeight = Math.ceil(cssHeight * ratio);
+
+    // Use bucketed dimensions for better reuse
+    const bucketedWidth = this._getBucketSize(requiredWidth);
+    const bucketedHeight = this._getBucketSize(requiredHeight);
+
+    // Look for an available canvas that's large enough
+    for (const pooledItem of this._pool) {
+      if (!pooledItem.inUse && pooledItem.width >= bucketedWidth && pooledItem.height >= bucketedHeight && pooledItem.instanceId === this._instanceId) {
+        pooledItem.inUse = true;
+        pooledItem.lastUsed = Date.now();
+
+        // Set the canvas to the exact required size for rendering
+        pooledItem.canvas.width = requiredWidth;
+        pooledItem.canvas.height = requiredHeight;
+        pooledItem.canvas.style.width = `${cssWidth}px`;
+        pooledItem.canvas.style.height = `${cssHeight}px`;
+
+        // Enhanced context state reset
+        this._resetContextState(pooledItem.context, ratio);
+        return [pooledItem.canvas, pooledItem.context];
+      }
     }
 
-    // Create a new canvas if pool isn't full
+    // No suitable canvas found, create a new one with bucketed dimensions
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d')!;
+
+    // Create canvas with bucketed dimensions but set actual required size
+    canvas.width = requiredWidth;
+    canvas.height = requiredHeight;
+    canvas.style.width = `${cssWidth}px`;
+    canvas.style.height = `${cssHeight}px`;
+
+    // Apply initial context state
+    this._resetContextState(context, ratio);
+
     if (this._pool.length < this._maxPoolSize) {
-      const newCanvas = this._createNewCanvas(cssWidth, cssHeight);
-      this._pool.push(newCanvas);
-      return [newCanvas.canvas, newCanvas.context];
+      // Store with bucketed dimensions for future matching
+      this._pool.push({
+        canvas,
+        context,
+        inUse: true,
+        width: bucketedWidth,
+        height: bucketedHeight,
+        lastUsed: Date.now(),
+        instanceId: this._instanceId, // ✅ Tag with instance ID
+      });
     }
 
-    // Reuse the least recently used canvas
-    const lruCanvas = this._findLRUCanvas();
-    if (lruCanvas) {
-      lruCanvas.inUse = true;
-      lruCanvas.lastUsed = Date.now();
-      lruCanvas.width = cssWidth;
-      lruCanvas.height = cssHeight;
-      lruCanvas.canvas.width = cssWidth;
-      lruCanvas.canvas.height = cssHeight;
-      this._resetContextState(lruCanvas.context, cssWidth, cssHeight);
-      return [lruCanvas.canvas, lruCanvas.context];
-    }
-
-    // Fallback: create a new canvas anyway
-    const fallbackCanvas = this._createNewCanvas(cssWidth, cssHeight);
-    this._pool.push(fallbackCanvas);
-    return [fallbackCanvas.canvas, fallbackCanvas.context];
+    return [canvas, context];
   }
 
   /**
-   * Returns a canvas to the pool
+   * Releases a canvas back to the pool
    */
   releaseCanvas(canvas: HTMLCanvasElement): void {
     if (this._isDestroyed) {
       return;
     }
 
-    const pooledCanvas = this._pool.find((pc) => pc.canvas === canvas);
-    if (pooledCanvas) {
-      pooledCanvas.inUse = false;
-      pooledCanvas.lastUsed = Date.now();
+    const pooledItem = this._pool.find(
+      (item) => item.canvas === canvas && item.instanceId === this._instanceId, // ✅ Instance isolation check
+    );
+
+    if (pooledItem) {
+      pooledItem.inUse = false;
+      pooledItem.lastUsed = Date.now();
+      // Clear the canvas to free up memory and prevent stale content
+      pooledItem.context.setTransform(1, 0, 0, 1, 0, 0); // Reset transform before clearing
+      pooledItem.context.clearRect(0, 0, pooledItem.canvas.width, pooledItem.canvas.height);
     }
+    // If canvas was not from pool (e.g., pool was full), it will be garbage collected
   }
 
   /**
-   * Shrinks the pool to free memory
+   * Shrinks the pool by removing unused canvases
+   * Uses LRU (Least Recently Used) strategy for removal.
    */
   shrinkPool(targetSize: number = Math.floor(this._maxPoolSize / 2)): void {
-    if (this._isDestroyed) {
+    if (this._isDestroyed || targetSize >= this._pool.length) {
       return;
     }
 
-    // Sort by last used time (oldest first)
-    this._pool.sort((a, b) => a.lastUsed - b.lastUsed);
+    // Get unused canvases from this instance sorted by last used time (oldest first)
+    const unusedCanvases = this._pool.filter((item) => !item.inUse && item.instanceId === this._instanceId).sort((a, b) => a.lastUsed - b.lastUsed);
 
-    // Remove unused canvases beyond target size
-    while (this._pool.length > targetSize) {
-      const canvas = this._pool.shift();
-      if (canvas && !canvas.inUse) {
-        // Clean up canvas
-        canvas.canvas.width = 0;
-        canvas.canvas.height = 0;
+    const canvasesToRemove = Math.max(0, this._pool.length - targetSize);
+    const toRemove = unusedCanvases.slice(0, Math.min(canvasesToRemove, unusedCanvases.length));
+
+    // Remove selected canvases from pool
+    toRemove.forEach((item) => {
+      const index = this._pool.indexOf(item);
+      if (index !== -1) {
+        // Help GC by nullifying references
+        (item.canvas as any) = null;
+        (item.context as any) = null;
+        this._pool.splice(index, 1);
       }
-    }
+    });
   }
 
   /**
-   * Handles memory pressure by aggressively cleaning up
+   * Automatically shrinks pool when memory pressure is detected
    */
   handleMemoryPressure(): void {
     if (this._isDestroyed) {
       return;
     }
 
-    // Release all unused canvases
-    this._pool.forEach((pooledCanvas) => {
-      if (!pooledCanvas.inUse) {
+    const instanceCanvases = this._pool.filter((item) => item.instanceId === this._instanceId);
+    const unusedCount = instanceCanvases.filter((item) => !item.inUse).length;
+
+    if (unusedCount > 3) {
+      // Aggressive shrinking under memory pressure for this instance
+      const targetSize = Math.max(2, Math.floor(this._maxPoolSize * 0.3));
+      this.shrinkPool(targetSize);
+    }
+
+    // Also immediately clean unused canvases from this instance
+    instanceCanvases.forEach((pooledCanvas) => {
+      if (!pooledCanvas.inUse && pooledCanvas.canvas) {
         pooledCanvas.canvas.width = 0;
         pooledCanvas.canvas.height = 0;
       }
     });
-
-    // Shrink pool aggressively
-    this.shrinkPool(Math.floor(this._maxPoolSize / 4));
   }
 
   /**
-   * Sets up periodic cleanup to prevent memory leaks
+   * Sets up automatic memory pressure detection
+   */
+  private _setupInstanceMemoryPressureHandling(): void {
+    // Modern browsers support memory pressure API
+    if ('memory' in performance && 'onmemorywarning' in window) {
+      const memoryWarningHandler = () => {
+        if (!this._isDestroyed) {
+          this.handleMemoryPressure();
+        }
+      };
+      window.addEventListener('memorywarning', memoryWarningHandler);
+
+      // Store handler for cleanup
+      (this as any)._memoryWarningHandler = memoryWarningHandler;
+    }
+
+    // Fallback: periodic cleanup based on pool size for this instance
+    this._memoryPressureInterval = setInterval(() => {
+      if (this._isDestroyed) {
+        return;
+      }
+
+      const instanceCanvases = this._pool.filter((item) => item.instanceId === this._instanceId);
+      const unusedCount = instanceCanvases.filter((item) => !item.inUse).length;
+
+      if (unusedCount > this._maxPoolSize * 0.7) {
+        this.shrinkPool();
+      }
+    }, 30000);
+  }
+
+  /**
+   * Instance-specific periodic cleanup setup
    */
   setupPeriodicCleanup(): void {
     if (this._isDestroyed) {
       return;
     }
 
-    // Clean up every 30 seconds
-    setInterval(() => {
+    // Clean up old unused canvases from this instance every 30 seconds
+    const cleanupInterval = setInterval(() => {
       if (!this._isDestroyed) {
         this._cleanupOldCanvases();
+      } else {
+        clearInterval(cleanupInterval);
       }
     }, 30000);
   }
 
   /**
-   * Gets pool statistics
+   * Returns pool statistics
    */
   getPoolStats(): {
     totalCanvases: number;
@@ -175,95 +286,18 @@ export class InstanceCanvasPool {
     memoryUsage: string;
     instanceId: string;
   } {
-    const totalCanvases = this._pool.length;
-    const inUseCanvases = this._pool.filter((pc) => pc.inUse).length;
-    const availableCanvases = totalCanvases - inUseCanvases;
-
-    // Estimate memory usage
-    const totalPixels = this._pool.reduce((sum, pc) => sum + pc.width * pc.height, 0);
-    const memoryBytes = totalPixels * 4; // 4 bytes per pixel (RGBA)
-    const memoryMB = (memoryBytes / (1024 * 1024)).toFixed(2);
+    const instanceCanvases = this._pool.filter((item) => item.instanceId === this._instanceId);
+    const inUse = instanceCanvases.filter((item) => item.inUse).length;
+    const totalPixels = instanceCanvases.reduce((sum, item) => sum + item.width * item.height, 0);
+    const estimatedMemoryMB = (totalPixels * 4) / (1024 * 1024); // 4 bytes per pixel (RGBA)
 
     return {
-      totalCanvases,
-      inUseCanvases,
-      availableCanvases,
-      memoryUsage: `${memoryMB} MB`,
+      totalCanvases: instanceCanvases.length,
+      inUseCanvases: inUse,
+      availableCanvases: instanceCanvases.length - inUse,
+      memoryUsage: `~${estimatedMemoryMB.toFixed(1)} MB`,
       instanceId: this._instanceId,
     };
-  }
-
-  /**
-   * Destroys this canvas pool and cleans up all resources
-   */
-  destroy(): void {
-    if (this._isDestroyed) {
-      return;
-    }
-
-    this._isDestroyed = true;
-
-    // Clean up all canvases
-    this._pool.forEach((pooledCanvas) => {
-      pooledCanvas.canvas.width = 0;
-      pooledCanvas.canvas.height = 0;
-    });
-
-    this._pool.length = 0;
-  }
-
-  /**
-   * Finds an available canvas of the right size
-   */
-  private _findAvailableCanvas(width: number, height: number): PooledCanvas | null {
-    return this._pool.find((pc) => !pc.inUse && pc.width === width && pc.height === height) || null;
-  }
-
-  /**
-   * Finds the least recently used canvas
-   */
-  private _findLRUCanvas(): PooledCanvas | null {
-    if (this._pool.length === 0) return null;
-
-    return this._pool.reduce((lru, current) => (current.lastUsed < lru.lastUsed ? current : lru));
-  }
-
-  /**
-   * Creates a new canvas for the pool
-   */
-  private _createNewCanvas(width: number, height: number): PooledCanvas {
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d')!;
-
-    canvas.width = width;
-    canvas.height = height;
-
-    return {
-      canvas,
-      context,
-      inUse: true,
-      width,
-      height,
-      lastUsed: Date.now(),
-      instanceId: this._instanceId,
-    };
-  }
-
-  /**
-   * Resets the canvas context state
-   */
-  private _resetContextState(context: CanvasRenderingContext2D, width: number, height: number): void {
-    context.setTransform(1, 0, 0, 1, 0, 0);
-    context.clearRect(0, 0, width, height);
-    context.fillStyle = '#000000';
-    context.strokeStyle = '#000000';
-    context.lineWidth = 1;
-    context.lineCap = 'butt';
-    context.lineJoin = 'miter';
-    context.miterLimit = 10;
-    context.font = '10px sans-serif';
-    context.textAlign = 'start';
-    context.textBaseline = 'alphabetic';
   }
 
   /**
@@ -273,13 +307,54 @@ export class InstanceCanvasPool {
     const now = Date.now();
     const maxAge = 60000; // 1 minute
 
-    this._pool.forEach((pooledCanvas, index) => {
-      if (!pooledCanvas.inUse && now - pooledCanvas.lastUsed > maxAge) {
+    // Clean up old canvases from this instance only
+    for (let i = this._pool.length - 1; i >= 0; i--) {
+      const pooledCanvas = this._pool[i];
+      if (pooledCanvas.instanceId === this._instanceId && !pooledCanvas.inUse && now - pooledCanvas.lastUsed > maxAge) {
         // Remove old unused canvas
         pooledCanvas.canvas.width = 0;
         pooledCanvas.canvas.height = 0;
-        this._pool.splice(index, 1);
+        (pooledCanvas.canvas as any) = null;
+        (pooledCanvas.context as any) = null;
+        this._pool.splice(i, 1);
       }
-    });
+    }
+  }
+
+  /**
+   * cleanup with readonly array handling
+   */
+  destroy(): void {
+    if (this._isDestroyed) {
+      return;
+    }
+
+    this._isDestroyed = true;
+
+    // Clean up memory pressure interval
+    if (this._memoryPressureInterval) {
+      clearInterval(this._memoryPressureInterval);
+      this._memoryPressureInterval = null;
+    }
+
+    // Clean up memory warning handler
+    if ((this as any)._memoryWarningHandler) {
+      window.removeEventListener('memorywarning', (this as any)._memoryWarningHandler);
+    }
+
+    // ✅ FIXED: Clean up all canvases from this instance using splice
+    for (let i = this._pool.length - 1; i >= 0; i--) {
+      const pooledItem = this._pool[i];
+      if (pooledItem.instanceId === this._instanceId) {
+        // Clean up the canvas
+        pooledItem.canvas.width = 0;
+        pooledItem.canvas.height = 0;
+        (pooledItem.canvas as any) = null;
+        (pooledItem.context as any) = null;
+
+        // Remove from pool array
+        this._pool.splice(i, 1);
+      }
+    }
   }
 }
