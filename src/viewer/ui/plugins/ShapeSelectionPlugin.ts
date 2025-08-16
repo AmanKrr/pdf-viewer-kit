@@ -211,12 +211,6 @@ export class ShapeSelectionPlugin extends BaseAnnotationToolbarPlugin {
     const dropdown = document.createElement('div');
     dropdown.classList.add(PDF_VIEWER_CLASSNAMES.A_ANNOTATION_SHAPE_DROPDOWN);
     dropdown.style.display = 'none';
-    dropdown.style.zIndex = '10000';
-    dropdown.style.background = '#fff';
-    dropdown.style.border = '1px solid #ccc';
-    dropdown.style.borderRadius = '4px';
-    dropdown.style.padding = '8px';
-    dropdown.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
 
     this.shapeOptions.forEach((shape) => {
       const item = this.createShapeOption(shape, context);
@@ -228,12 +222,7 @@ export class ShapeSelectionPlugin extends BaseAnnotationToolbarPlugin {
 
   private createShapeOption(shape: ShapeOption, context: AnnotationContext): HTMLDivElement {
     const item = document.createElement('div');
-    item.style.padding = '8px';
-    item.style.cursor = 'pointer';
-    item.style.display = 'flex';
-    item.style.alignItems = 'center';
-    item.style.marginRight = '8px';
-    item.style.borderRadius = '4px';
+    item.style.padding = '5px';
 
     item.innerHTML = `
       <span class="material-symbols-outlined">${shape.icon}</span>
@@ -409,17 +398,23 @@ export class ShapeSelectionPlugin extends BaseAnnotationToolbarPlugin {
         // Shape selected and drawing active - button is active
         this.shapeButton.style.cursor = 'pointer';
         this.shapeButton.style.opacity = '1';
-        this.shapeButton.style.background = '#e3f2fd'; // Light blue background to show active state
+        this.shapeButton.style.background = '#4b4b4b'; // Dark gray background to match arrow button active color
+        this.shapeButton.style.color = 'white'; // White text for active state
+        this.shapeButton.parentElement?.classList.add('active'); // Add CSS class for consistency
       } else if (hasShape && !this.isDrawingActive) {
         // Shape selected but drawing inactive - button is clickable to re-enable
         this.shapeButton.style.cursor = 'pointer';
         this.shapeButton.style.opacity = '1';
         this.shapeButton.style.background = ''; // Normal background
+        this.shapeButton.style.color = ''; // Reset text color
+        this.shapeButton.parentElement?.classList.remove('active'); // Remove CSS class
       } else {
         // No shape selected - button is inactive
         this.shapeButton.style.cursor = 'default';
         this.shapeButton.style.opacity = '0.6';
         this.shapeButton.style.background = '';
+        this.shapeButton.style.color = ''; // Reset text color
+        this.shapeButton.parentElement?.classList.remove('active'); // Remove CSS class
       }
     }
 

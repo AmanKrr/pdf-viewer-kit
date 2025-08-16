@@ -284,11 +284,19 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
 
         // Update Popper positioning
         popperInstance.update();
+
+        // Ensure thumb is properly positioned after dropdown becomes visible
+        // This fixes the issue where track.clientWidth was 0 when updateThumb was called
+        setTimeout(() => {
+          updateThumb(currentValue);
+        }, 0);
       }
     };
 
     document.addEventListener('click', (ev) => {
-      if (!container.contains(ev.target as Node)) {
+      // Check if click is outside both the container AND the dropdown
+      const target = ev.target as Node;
+      if (!container.contains(target) && !dropdown.contains(target)) {
         // Only hide dropdown if it's actually visible
         if (dropdown.style.display === '') {
           // Use the dropdown manager to properly track this dropdown as closed
@@ -412,7 +420,9 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
     };
 
     document.addEventListener('click', (ev) => {
-      if (!container.contains(ev.target as Node)) {
+      // Check if click is outside both the container AND the dropdown
+      const target = ev.target as Node;
+      if (!container.contains(target) && !dropdown.contains(target)) {
         // Only hide dropdown if it's actually visible
         if (dropdown.style.display === '') {
           // Use the dropdown manager to properly track this dropdown as closed

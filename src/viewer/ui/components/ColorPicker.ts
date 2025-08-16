@@ -193,7 +193,9 @@ export class ColorPicker extends ToolbarComponent {
 
     // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
-      if (!this.element.contains(e.target as Node)) {
+      // Check if click is outside both the color picker element AND the dropdown
+      const target = e.target as Node;
+      if (!this.element.contains(target) && !this.dropdown.contains(target)) {
         this.hideDropdown();
       }
     });
