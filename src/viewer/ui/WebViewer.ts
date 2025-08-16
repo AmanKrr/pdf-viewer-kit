@@ -30,6 +30,7 @@ import { DownloadManager } from '../manager/PDFDownloadManager';
 import { IToolbar } from '../../interface/IToolbar';
 import { InstanceWebViewer } from '../../core/InstanceWebViewer';
 import { PDFViewerInstance } from '../../core/PDFViewerInstance';
+import { AnnotationToolbarStateManager } from './AnnotationToolbarState';
 
 /**
  * Manages the PDF viewer instance and provides various functionalities, including:
@@ -54,6 +55,9 @@ class WebViewer {
   private _zoomHandler!: ZoomHandler;
   private _selectionManager!: SelectionManager;
   private _searchHighlighter!: SearchHighlighter;
+
+  // Annotation state management
+  private _annotationStateManager!: AnnotationToolbarStateManager;
 
   // Event handlers
   private _boundScrollHandler!: (event: Event) => void;
@@ -107,6 +111,13 @@ class WebViewer {
 
   get canvasPool() {
     return this._instance.canvasPool;
+  }
+
+  /**
+   * Gets the annotation state manager for UI-related annotation state
+   */
+  get annotationState() {
+    return this._annotationStateManager;
   }
 
   /**
@@ -165,6 +176,9 @@ class WebViewer {
   private _initializeComponents(): void {
     const instanceState = this._instance.state;
     const instanceEvents = this._instance.events;
+
+    // Initialize annotation state manager
+    this._annotationStateManager = new AnnotationToolbarStateManager();
 
     // Initialize selection manager
     this._selectionManager = new SelectionManager();

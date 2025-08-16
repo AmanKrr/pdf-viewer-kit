@@ -97,6 +97,9 @@ export class EllipseAnnotation extends Annotation {
   private _onScaleChange(event: any) {
     this._constraints = this.__annotationDrawerContainer.getBoundingClientRect();
     this._updateZoom(this.state.scale);
+
+    // Update stroke width to maintain visual consistency across zoom levels
+    this._updateStrokeWidthForZoom();
   }
 
   /**
@@ -146,11 +149,12 @@ export class EllipseAnnotation extends Annotation {
     const w = Math.abs(dx);
     const h = Math.abs(dy);
 
-    // Account for stroke width to prevent strokes from being cut off
-    const strokePadding = this._strokeWidth;
-    const svgWidth = w + strokePadding;
-    const svgHeight = h + strokePadding;
-    const strokeOffset = strokePadding / 2;
+    // Account for scaled stroke width to prevent strokes from being cut off
+    const scaledStrokeWidth = this._strokeWidth * (this.state.scale || 1);
+    const strokePadding = scaledStrokeWidth / 2;
+    const svgWidth = w + scaledStrokeWidth;
+    const svgHeight = h + scaledStrokeWidth;
+    const strokeOffset = strokePadding;
 
     this.__svg.style.left = `${left - strokeOffset}px`;
     this.__svg.style.top = `${top - strokeOffset}px`;
@@ -250,7 +254,9 @@ export class EllipseAnnotation extends Annotation {
     this.__element.setAttribute('ry', `${ry}`);
     this.__element.setAttribute('fill', this._fillColor);
     this.__element.setAttribute('stroke', this._strokeColor);
-    this.__element.setAttribute('stroke-width', `${this._strokeWidth}`);
+    // Scale stroke width based on current zoom level
+    const scaledStrokeWidth = this._strokeWidth * (this.state.scale || 1);
+    this.__element.setAttribute('stroke-width', `${scaledStrokeWidth}`);
     this.__element.setAttribute('stroke-dasharray', this._getStrokeDashArray());
     this.__element.setAttribute('opacity', this._opacity.toString());
     this.__svg.appendChild(this.__element);
@@ -262,8 +268,9 @@ export class EllipseAnnotation extends Annotation {
     this.__hitElementRect.setAttribute('ry', `${ry}`);
     this.__hitElementRect.setAttribute('fill', 'none');
     this.__hitElementRect.setAttribute('stroke', 'transparent');
-    // Use thicker stroke width for easier clicking (like the old working code)
-    this.__hitElementRect.style.strokeWidth = `${this._strokeWidth + 10}`;
+    // Use thicker stroke width for easier clicking, scaled by zoom level
+    const scaledHitStrokeWidth = (this._strokeWidth + 10) * (this.state.scale || 1);
+    this.__hitElementRect.style.strokeWidth = `${scaledHitStrokeWidth}`;
     this.__hitElementRect.style.cursor = 'pointer';
     this.__hitElementRect.style.pointerEvents = 'auto';
 
@@ -308,21 +315,30 @@ export class EllipseAnnotation extends Annotation {
     const rx = this._origRX * scale;
     const ry = this._origRY * scale;
 
-    this.__svg.style.left = `${cx - rx}px`;
-    this.__svg.style.top = `${cy - ry}px`;
-    this.__svg.setAttribute('width', `${rx * 2}`);
-    this.__svg.setAttribute('height', `${ry * 2}`);
+    // Calculate scaled stroke width to prevent clipping
+    const scaledStrokeWidth = this._strokeWidth * scale;
+    const strokePadding = scaledStrokeWidth / 2;
+
+    // SVG container sized to accommodate scaled stroke width
+    const svgWidth = rx * 2 + scaledStrokeWidth;
+    const svgHeight = ry * 2 + scaledStrokeWidth;
+
+    this.__svg.style.left = `${cx - rx - strokePadding}px`;
+    this.__svg.style.top = `${cy - ry - strokePadding}px`;
+    this.__svg.setAttribute('width', `${svgWidth}`);
+    this.__svg.setAttribute('height', `${svgHeight}`);
 
     const e = this.__element as SVGEllipseElement;
     const hit = this.__hitElementRect as SVGEllipseElement;
 
-    e.setAttribute('cx', `${rx}`);
-    e.setAttribute('cy', `${ry}`);
+    // Position elements with stroke padding offset
+    e.setAttribute('cx', `${rx + strokePadding}`);
+    e.setAttribute('cy', `${ry + strokePadding}`);
     e.setAttribute('rx', `${rx}`);
     e.setAttribute('ry', `${ry}`);
 
-    hit.setAttribute('cx', `${rx}`);
-    hit.setAttribute('cy', `${ry}`);
+    hit.setAttribute('cx', `${rx + strokePadding}`);
+    hit.setAttribute('cy', `${ry + strokePadding}`);
     hit.setAttribute('rx', `${rx}`);
     hit.setAttribute('ry', `${ry}`);
 
@@ -339,6 +355,51 @@ export class EllipseAnnotation extends Annotation {
     // Handle both capitalized and lowercase values from toolbar
     const style = this._strokeStyle.toLowerCase();
     return style === 'dashed' ? '5,5' : style === 'dotted' ? '2,2' : '0';
+  }
+
+  /**
+   * Updates stroke width for current zoom level without changing the base stroke width.
+   * This is called when zoom changes to maintain visual consistency.
+   */
+  private _updateStrokeWidthForZoom(): void {
+    if (this.__element) {
+      // Scale stroke width based on current zoom level
+      const scaledStrokeWidth = this._strokeWidth * (this.state.scale || 1);
+      this.__element.setAttribute('stroke-width', scaledStrokeWidth.toString());
+    }
+
+    if (this.__hitElementRect) {
+      // Scale hit area stroke width as well
+      const scaledHitStrokeWidth = (this._strokeWidth + 10) * (this.state.scale || 1);
+      this.__hitElementRect.style.strokeWidth = `${scaledHitStrokeWidth}`;
+    }
+
+    // Update SVG container size to accommodate scaled stroke width
+    if (this._origRX && this._origRY) {
+      const currentScale = this.state.scale || 1;
+      const scaledStrokeWidth = this._strokeWidth * currentScale;
+      const strokePadding = scaledStrokeWidth / 2;
+
+      const rx = this._origRX * currentScale;
+      const ry = this._origRY * currentScale;
+
+      const svgWidth = rx * 2 + scaledStrokeWidth;
+      const svgHeight = ry * 2 + scaledStrokeWidth;
+
+      this.__svg.setAttribute('width', `${svgWidth}`);
+      this.__svg.setAttribute('height', `${svgHeight}`);
+
+      // Update element positioning within the expanded SVG
+      if (this.__element) {
+        this.__element.setAttribute('cx', `${rx + strokePadding}`);
+        this.__element.setAttribute('cy', `${ry + strokePadding}`);
+      }
+
+      if (this.__hitElementRect) {
+        this.__hitElementRect.setAttribute('cx', `${rx + strokePadding}`);
+        this.__hitElementRect.setAttribute('cy', `${ry + strokePadding}`);
+      }
+    }
   }
 
   /**

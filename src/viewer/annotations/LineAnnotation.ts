@@ -98,6 +98,9 @@ export class LineAnnotation extends Annotation {
   private _onScaleChange(_: any): void {
     this._constraints = this.__annotationDrawerContainer.getBoundingClientRect();
     this._updateZoom(this.state.scale);
+
+    // Update stroke width to maintain visual consistency across zoom levels
+    this._updateStrokeWidthForZoom();
   }
 
   /**
@@ -157,11 +160,12 @@ export class LineAnnotation extends Annotation {
     const w = Math.abs(dx),
       h = Math.abs(dy);
 
-    // Account for stroke width to prevent strokes from being cut off
-    const strokePadding = this._strokeWidth;
-    const svgWidth = w + strokePadding;
-    const svgHeight = h + strokePadding;
-    const strokeOffset = strokePadding / 2;
+    // Account for scaled stroke width to prevent strokes from being cut off
+    const scaledStrokeWidth = this._strokeWidth * (this.state.scale || 1);
+    const strokePadding = scaledStrokeWidth / 2;
+    const svgWidth = w + scaledStrokeWidth;
+    const svgHeight = h + scaledStrokeWidth;
+    const strokeOffset = strokePadding;
 
     this.__svg.style.left = `${minX - strokeOffset}px`;
     this.__svg.style.top = `${minY - strokeOffset}px`;
@@ -272,7 +276,9 @@ export class LineAnnotation extends Annotation {
     el.setAttribute('x2', (x2 + strokeOffset).toString());
     el.setAttribute('y2', (y2 + strokeOffset).toString());
     el.setAttribute('stroke', this._strokeColor);
-    el.setAttribute('stroke-width', this._strokeWidth.toString());
+    // Scale stroke width based on current zoom level
+    const scaledStrokeWidth = this._strokeWidth * (this.state.scale || 1);
+    el.setAttribute('stroke-width', scaledStrokeWidth.toString());
     el.setAttribute('opacity', this._opacity.toString());
     if (this._strokeStyle === 'dashed') {
       el.setAttribute('stroke-dasharray', '5,5');
@@ -290,8 +296,9 @@ export class LineAnnotation extends Annotation {
     hit.setAttribute('x2', (x2 + strokeOffset).toString());
     hit.setAttribute('y2', (y2 + strokeOffset).toString());
     hit.setAttribute('stroke', 'transparent');
-    // Use a thinner hit area to minimize interference with text selection
-    hit.style.strokeWidth = `${this._strokeWidth + 2}`;
+    // Use a thinner hit area to minimize interference with text selection, scaled by zoom level
+    const scaledHitStrokeWidth = (this._strokeWidth + 2) * (this.state.scale || 1);
+    hit.style.strokeWidth = `${scaledHitStrokeWidth}`;
     hit.style.cursor = 'pointer';
 
     // For lines, we want to allow text selection behind them while still making them clickable
@@ -337,15 +344,23 @@ export class LineAnnotation extends Annotation {
     const w = Math.abs(x2a - x1a);
     const h = Math.abs(y2a - y1a);
 
-    this.__svg.style.left = `${minX}px`;
-    this.__svg.style.top = `${minY}px`;
-    this.__svg.setAttribute('width', `${w}`);
-    this.__svg.setAttribute('height', `${h}`);
+    // Calculate scaled stroke width to prevent clipping
+    const scaledStrokeWidth = this._strokeWidth * scale;
+    const strokePadding = scaledStrokeWidth / 2;
 
-    const r1x = x1a - minX;
-    const r1y = y1a - minY;
-    const r2x = x2a - minX;
-    const r2y = y2a - minY;
+    // SVG container sized to accommodate scaled stroke width
+    const svgWidth = w + scaledStrokeWidth;
+    const svgHeight = h + scaledStrokeWidth;
+
+    this.__svg.style.left = `${minX - strokePadding}px`;
+    this.__svg.style.top = `${minY - strokePadding}px`;
+    this.__svg.setAttribute('width', `${svgWidth}`);
+    this.__svg.setAttribute('height', `${svgHeight}`);
+
+    const r1x = x1a - minX + strokePadding;
+    const r1y = y1a - minY + strokePadding;
+    const r2x = x2a - minX + strokePadding;
+    const r2y = y2a - minY + strokePadding;
 
     const el = this.__element as SVGLineElement;
     el.setAttribute('x1', r1x.toString());
@@ -449,14 +464,84 @@ export class LineAnnotation extends Annotation {
     this._strokeWidth = newWidth;
 
     if (this.__element) {
-      this.__element.setAttribute('stroke-width', newWidth.toString());
+      // Scale stroke width based on current zoom level
+      const scaledStrokeWidth = newWidth * (this.state.scale || 1);
+      this.__element.setAttribute('stroke-width', scaledStrokeWidth.toString());
     }
 
     if (this.__hitElementRect) {
-      this.__hitElementRect.style.strokeWidth = `${newWidth + 10}`;
+      // Scale hit area stroke width as well
+      const scaledHitStrokeWidth = (newWidth + 10) * (this.state.scale || 1);
+      this.__hitElementRect.style.strokeWidth = `${scaledHitStrokeWidth}`;
     }
 
     this._setLineInfo();
+  }
+
+  /**
+   * Updates stroke width for current zoom level without changing the base stroke width.
+   * This is called when zoom changes to maintain visual consistency.
+   */
+  private _updateStrokeWidthForZoom(): void {
+    if (this.__element) {
+      // Scale stroke width based on current zoom level
+      const scaledStrokeWidth = this._strokeWidth * (this.state.scale || 1);
+      this.__element.setAttribute('stroke-width', scaledStrokeWidth.toString());
+    }
+
+    if (this.__hitElementRect) {
+      // Scale hit area stroke width as well
+      const scaledHitStrokeWidth = (this._strokeWidth + 10) * (this.state.scale || 1);
+      this.__hitElementRect.style.strokeWidth = `${scaledHitStrokeWidth}`;
+    }
+
+    // Update SVG container size to accommodate scaled stroke width
+    if (this._origX1 !== undefined && this._origY1 !== undefined && this._origX2 !== undefined && this._origY2 !== undefined) {
+      const currentScale = this.state.scale || 1;
+      const scaledStrokeWidth = this._strokeWidth * currentScale;
+      const strokePadding = scaledStrokeWidth / 2;
+
+      const x1a = this._origX1 * currentScale;
+      const y1a = this._origY1 * currentScale;
+      const x2a = this._origX2 * currentScale;
+      const y2a = this._origY2 * currentScale;
+
+      const minX = Math.min(x1a, x2a);
+      const minY = Math.min(y1a, y2a);
+      const w = Math.abs(x2a - x1a);
+      const h = Math.abs(y2a - y1a);
+
+      const svgWidth = w + scaledStrokeWidth;
+      const svgHeight = h + scaledStrokeWidth;
+
+      this.__svg.setAttribute('width', `${svgWidth}`);
+      this.__svg.setAttribute('height', `${svgHeight}`);
+
+      // Update element positioning within the expanded SVG
+      if (this.__element) {
+        const r1x = x1a - minX + strokePadding;
+        const r1y = y1a - minY + strokePadding;
+        const r2x = x2a - minX + strokePadding;
+        const r2y = y2a - minY + strokePadding;
+
+        this.__element.setAttribute('x1', r1x.toString());
+        this.__element.setAttribute('y1', r1y.toString());
+        this.__element.setAttribute('x2', r2x.toString());
+        this.__element.setAttribute('y2', r2y.toString());
+      }
+
+      if (this.__hitElementRect) {
+        const r1x = x1a - minX + strokePadding;
+        const r1y = y1a - minY + strokePadding;
+        const r2x = x2a - minX + strokePadding;
+        const r2y = y2a - minY + strokePadding;
+
+        this.__hitElementRect.setAttribute('x1', r1x.toString());
+        this.__hitElementRect.setAttribute('y1', r1y.toString());
+        this.__hitElementRect.setAttribute('x2', r2x.toString());
+        this.__hitElementRect.setAttribute('y2', r2y.toString());
+      }
+    }
   }
 
   /**

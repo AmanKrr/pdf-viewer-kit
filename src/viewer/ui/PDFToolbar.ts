@@ -55,7 +55,7 @@ export class Toolbar implements IToolbar {
     };
 
     this._buttons = buttons.length ? buttons : this._defaultButtons();
-    this._annotationToolbar = new AnnotationToolbar(this._viewer);
+    this._annotationToolbar = new AnnotationToolbar(this._viewer, this._viewer.annotationState);
   }
 
   get instanceId(): string {
@@ -209,14 +209,20 @@ export class Toolbar implements IToolbar {
             this._viewer.search();
             this._searchBarOpen = false;
           }
-          // Use the same state object that the annotation toolbar accesses
-          this._viewer.state.isAnnotationEnabled = !this._viewer.state.isAnnotationEnabled;
-          const btn = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;
-          btn?.classList.toggle('active');
-          if (this._viewer.state.isAnnotationEnabled) {
-            this._annotationToolbar.render();
-          } else {
-            this._annotationToolbar.destroy();
+          // Use annotation state manager for UI-related annotation state
+          const annotationState = this._viewer.annotationState;
+          if (annotationState) {
+            const newState = !annotationState.state.isAnnotationEnabled;
+            annotationState.setState({ isAnnotationEnabled: newState });
+
+            const btn = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;
+            btn?.classList.toggle('active');
+
+            if (newState) {
+              this._annotationToolbar.render();
+            } else {
+              this._annotationToolbar.destroy();
+            }
           }
         },
         breakBefore: !this._opts.showSearch,
@@ -247,7 +253,12 @@ export class Toolbar implements IToolbar {
    * Closes the annotation toolbar if open.
    */
   private _closeAnnotationToolbar(): void {
-    this._viewer.state.isAnnotationEnabled = false;
+    // Use annotation state manager for UI-related annotation state
+    const annotationState = this._viewer.annotationState;
+    if (annotationState) {
+      annotationState.setState({ isAnnotationEnabled: false });
+    }
+
     const btn = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;
     btn?.classList.toggle('active');
     this._annotationToolbar.destroy();

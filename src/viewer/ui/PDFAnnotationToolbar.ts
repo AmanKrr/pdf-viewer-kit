@@ -46,21 +46,13 @@ export class AnnotationToolbar {
 
   /**
    * @param viewer    The WebViewer instance containing PDF pages.
+   * @param stateManager The annotation state manager from WebViewer.
    */
-  constructor(viewer: WebViewer) {
+  constructor(viewer: WebViewer, stateManager: AnnotationToolbarStateManager) {
     this._viewer = viewer;
 
-    // Initialize state manager with default values
-    this._stateManager = new AnnotationToolbarStateManager({
-      drawConfig: {
-        strokeStyle: 'Solid',
-        strokeColor: 'red',
-        fillColor: 'transparent',
-        opacity: 1,
-        strokeWidth: 2,
-        type: 'rectangle',
-      },
-    });
+    // Use the shared state manager from WebViewer
+    this._stateManager = stateManager;
 
     // Initialize plugin manager
     this._pluginManager = new AnnotationToolbarPluginManager();
@@ -68,6 +60,14 @@ export class AnnotationToolbar {
     // Register default plugins
     this._pluginManager.registerPlugin(new ShapeSelectionPlugin());
     this._pluginManager.registerPlugin(new AnnotationPropertiesPlugin());
+
+    // Set the plugin context with the shared state manager
+    this._pluginManager.setContext({
+      viewer: this._viewer,
+      stateManager: this._stateManager,
+      containerId: this.containerId,
+      instanceId: this.instanceId,
+    });
 
     // Set up event listeners
     this.events.on('ANNOTATION_CREATED', this._onAnnotationCreated);
@@ -119,6 +119,11 @@ export class AnnotationToolbar {
       if (newShape !== 'none') {
         this._updateAnnotationDrawingForShape(newShape);
       }
+    });
+
+    // Update plugins when any state changes
+    this._stateManager.subscribe((prevState, newState) => {
+      this._updatePlugins();
     });
   }
 
@@ -172,6 +177,13 @@ export class AnnotationToolbar {
   }
 
   /**
+   * Update all plugins with current state
+   */
+  private _updatePlugins(): void {
+    this._pluginManager.updatePlugins();
+  }
+
+  /**
    * Registers or unregisters mouse-down listener for new annotations.
    */
   private _initAnnotationListeners(enable: boolean, pageNumber: number): void {
@@ -213,7 +225,7 @@ export class AnnotationToolbar {
     rightContainer.style.alignItems = 'center';
     this._toolbarContainer.appendChild(rightContainer);
 
-    // Set up plugin context
+    // Update plugin context with current state
     this._pluginManager.setContext({
       viewer: this._viewer,
       stateManager: this._stateManager,
@@ -308,8 +320,11 @@ export class AnnotationToolbar {
     // Deactivate plugins (don't destroy them completely, so they can be reactivated)
     this._pluginManager.deactivate();
 
-    // Update viewer state
-    this.state.isAnnotationEnabled = false;
+    // Update viewer state through annotation state manager
+    const annotationState = this._viewer.annotationState;
+    if (annotationState) {
+      annotationState.setState({ isAnnotationEnabled: false });
+    }
 
     // Clean up UI
     const btn = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;

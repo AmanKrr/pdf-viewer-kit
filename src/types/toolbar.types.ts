@@ -51,7 +51,8 @@ export type ToolbarAction =
   | 'search'
   | 'thumbnail'
   | 'annotation'
-  | 'download';
+  | 'download'
+  | 'custom';
 
 /**
  * Event data for toolbar button interactions

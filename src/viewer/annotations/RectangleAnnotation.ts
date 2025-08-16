@@ -98,6 +98,9 @@ export class RectangleAnnotation extends Annotation {
   private _onScaleChange(event: any) {
     this._constraints = this.__annotationDrawerContainer.getBoundingClientRect();
     this._updateZoom(this.state.scale);
+
+    // Update stroke width to maintain visual consistency across zoom levels
+    this._updateStrokeWidthForZoom();
   }
 
   /**
@@ -155,16 +158,17 @@ export class RectangleAnnotation extends Annotation {
     const width = clampedX - this.__startX;
     const height = clampedY - this.__startY;
 
-    // Account for stroke width to prevent strokes from being cut off
-    const strokePadding = this._strokeWidth;
-    const svgWidth = Math.abs(width) + strokePadding;
-    const svgHeight = Math.abs(height) + strokePadding;
+    // Account for scaled stroke width to prevent strokes from being cut off
+    const scaledStrokeWidth = this._strokeWidth * (this.state.scale || 1);
+    const strokePadding = scaledStrokeWidth / 2;
+    const svgWidth = Math.abs(width) + scaledStrokeWidth;
+    const svgHeight = Math.abs(height) + scaledStrokeWidth;
 
     this.__svg.setAttribute('width', svgWidth.toString());
     this.__svg.setAttribute('height', svgHeight.toString());
 
     // Position the shape element with stroke offset to center it in the expanded SVG
-    const strokeOffset = strokePadding / 2;
+    const strokeOffset = strokePadding;
     this.__element.setAttribute('x', strokeOffset.toString());
     this.__element.setAttribute('y', strokeOffset.toString());
     this.__element.setAttribute('width', `${Math.abs(width)}`);
@@ -268,11 +272,12 @@ export class RectangleAnnotation extends Annotation {
    * @param width    Rectangle width
    */
   private _createSvgRect(width: number = 0, height: number = 0): void {
-    // Account for stroke width to prevent strokes from being cut off
-    const strokePadding = this._strokeWidth;
-    const svgWidth = Math.abs(width) + strokePadding;
-    const svgHeight = Math.abs(height) + strokePadding;
-    const strokeOffset = strokePadding / 2;
+    // Account for scaled stroke width to prevent strokes from being cut off
+    const initialScaledStrokeWidth = this._strokeWidth * (this.state.scale || 1);
+    const strokePadding = initialScaledStrokeWidth / 2;
+    const svgWidth = Math.abs(width) + initialScaledStrokeWidth;
+    const svgHeight = Math.abs(height) + initialScaledStrokeWidth;
+    const strokeOffset = strokePadding;
 
     this.__element = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     this.__element.id = this.annotationId;
@@ -282,7 +287,9 @@ export class RectangleAnnotation extends Annotation {
     this.__element.setAttribute('height', Math.abs(height).toString());
     this.__element.setAttribute('fill', this._fillColor);
     this.__element.setAttribute('stroke', this._strokeColor);
-    this.__element.setAttribute('stroke-width', `${this._strokeWidth}`);
+    // Scale stroke width based on current zoom level
+    const scaledStrokeWidth = this._strokeWidth * (this.state.scale || 1);
+    this.__element.setAttribute('stroke-width', `${scaledStrokeWidth}`);
     this.__element.setAttribute('stroke-dasharray', this._getStrokeDashArray());
     this.__element.setAttribute('opacity', this._opacity.toString());
     this.__element.style.pointerEvents = 'none';
@@ -294,8 +301,9 @@ export class RectangleAnnotation extends Annotation {
     this.__hitElementRect.setAttribute('height', Math.abs(height).toString());
     this.__hitElementRect.setAttribute('fill', 'none');
     this.__hitElementRect.setAttribute('stroke', 'transparent');
-    // Use thicker stroke width for easier clicking (like the old working code)
-    this.__hitElementRect.style.strokeWidth = `${this._strokeWidth + 10}`;
+    // Use thicker stroke width for easier clicking, scaled by zoom level
+    const scaledHitStrokeWidth = (this._strokeWidth + 10) * (this.state.scale || 1);
+    this.__hitElementRect.style.strokeWidth = `${scaledHitStrokeWidth}`;
     this.__hitElementRect.style.cursor = 'pointer';
     this.__hitElementRect.style.pointerEvents = 'auto';
     this.__svg.appendChild(this.__element);
@@ -320,9 +328,10 @@ export class RectangleAnnotation extends Annotation {
     const isTransparent = this._fillColor === 'transparent' || this._fillColor === 'rgba(0,0,0,0)' || this._opacity === 0;
 
     if (isTransparent && !this._resizer) {
-      // Unselected transparent shape: minimal hit area (just stroke width)
+      // Unselected transparent shape: minimal hit area (just scaled stroke width)
       // This minimizes interference with text selection while keeping it clickable
-      const strokeOffset = this._strokeWidth / 2;
+      const scaledStrokeWidth = this._strokeWidth * (this.state.scale || 1);
+      const strokeOffset = scaledStrokeWidth / 2;
 
       // For unselected transparent shapes, create a hit area that covers just the stroke boundary
       // This ensures it's clickable while minimizing text interference
@@ -333,8 +342,8 @@ export class RectangleAnnotation extends Annotation {
       const currentHeight = parseFloat(this.__svg.getAttribute('height') || '0');
 
       // Ensure the hit area covers the stroke boundary
-      const hitWidth = Math.max(this._strokeWidth, currentWidth - this._strokeWidth);
-      const hitHeight = Math.max(this._strokeWidth, currentHeight - this._strokeWidth);
+      const hitWidth = Math.max(scaledStrokeWidth, currentWidth - scaledStrokeWidth);
+      const hitHeight = Math.max(scaledStrokeWidth, currentHeight - scaledStrokeWidth);
 
       this.__hitElementRect.setAttribute('width', `${hitWidth}`);
       this.__hitElementRect.setAttribute('height', `${hitHeight}`);
@@ -383,9 +392,12 @@ export class RectangleAnnotation extends Annotation {
     const shapeWidth = parseFloat(this.__element?.getAttribute('width') || '0');
     const shapeHeight = parseFloat(this.__element?.getAttribute('height') || '0');
 
-    // Store actual shape coordinates at scale=1 (shape is inset by padding from SVG)
-    this._originalLeft = (svgLeft + 0) / currentScale;
-    this._originalTop = (svgTop + 0) / currentScale;
+    // Calculate stroke padding at current scale
+    const currentStrokePadding = (this._strokeWidth * currentScale) / 2;
+
+    // Store actual shape coordinates at scale=1 (shape is inset by stroke padding from SVG)
+    this._originalLeft = (svgLeft + currentStrokePadding) / currentScale;
+    this._originalTop = (svgTop + currentStrokePadding) / currentScale;
     this._originalWidth = shapeWidth / currentScale;
     this._originalHeight = shapeHeight / currentScale;
   }
@@ -400,30 +412,33 @@ export class RectangleAnnotation extends Annotation {
     const shapeTop = this._originalTop * zoomFactor;
     const shapeWidth = this._originalWidth * zoomFactor;
     const shapeHeight = this._originalHeight * zoomFactor;
-    const pad = 0 * zoomFactor;
 
-    // Always use consistent padding (no size checks)
-    const svgWidth = shapeWidth + pad * 2;
-    const svgHeight = shapeHeight + pad * 2;
+    // Calculate scaled stroke width to prevent clipping
+    const scaledStrokeWidth = this._strokeWidth * zoomFactor;
+    const strokePadding = scaledStrokeWidth / 2;
 
-    // SVG container positioned to accommodate padding
-    this.__svg.style.left = `${shapeLeft - pad}px`;
-    this.__svg.style.top = `${shapeTop - pad}px`;
+    // SVG container sized to accommodate scaled stroke width
+    const svgWidth = shapeWidth + scaledStrokeWidth;
+    const svgHeight = shapeHeight + scaledStrokeWidth;
+
+    // SVG container positioned to accommodate stroke padding
+    this.__svg.style.left = `${shapeLeft - strokePadding}px`;
+    this.__svg.style.top = `${shapeTop - strokePadding}px`;
     this.__svg.setAttribute('width', `${svgWidth}`);
     this.__svg.setAttribute('height', `${svgHeight}`);
 
     if (this.__element) {
-      // Shape element positioned at padding offset within SVG
-      this.__element.setAttribute('x', `${pad}`);
-      this.__element.setAttribute('y', `${pad}`);
+      // Shape element positioned at stroke padding offset within SVG
+      this.__element.setAttribute('x', `${strokePadding}`);
+      this.__element.setAttribute('y', `${strokePadding}`);
       this.__element.setAttribute('width', `${shapeWidth}`);
       this.__element.setAttribute('height', `${shapeHeight}`);
     }
 
     if (this.__hitElementRect) {
       // Hit element matches shape element exactly
-      this.__hitElementRect.setAttribute('x', `${pad}`);
-      this.__hitElementRect.setAttribute('y', `${pad}`);
+      this.__hitElementRect.setAttribute('x', `${strokePadding}`);
+      this.__hitElementRect.setAttribute('y', `${strokePadding}`);
       this.__hitElementRect.setAttribute('width', `${shapeWidth}`);
       this.__hitElementRect.setAttribute('height', `${shapeHeight}`);
     }
@@ -441,6 +456,51 @@ export class RectangleAnnotation extends Annotation {
     // Handle both capitalized and lowercase values from toolbar
     const style = this._strokeStyle.toLowerCase();
     return style === 'dashed' ? '5,5' : style === 'dotted' ? '2,2' : '0';
+  }
+
+  /**
+   * Updates stroke width for current zoom level without changing the base stroke width.
+   * This is called when zoom changes to maintain visual consistency.
+   */
+  private _updateStrokeWidthForZoom(): void {
+    if (this.__element) {
+      // Scale stroke width based on current zoom level
+      const scaledStrokeWidth = this._strokeWidth * (this.state.scale || 1);
+      this.__element.setAttribute('stroke-width', scaledStrokeWidth.toString());
+    }
+
+    if (this.__hitElementRect) {
+      // Scale hit area stroke width as well
+      const scaledHitStrokeWidth = (this._strokeWidth + 10) * (this.state.scale || 1);
+      this.__hitElementRect.style.strokeWidth = `${scaledHitStrokeWidth}`;
+    }
+
+    // Update SVG container size to accommodate scaled stroke width
+    if (this._originalWidth && this._originalHeight) {
+      const currentScale = this.state.scale || 1;
+      const scaledStrokeWidth = this._strokeWidth * currentScale;
+      const strokePadding = scaledStrokeWidth / 2;
+
+      const shapeWidth = this._originalWidth * currentScale;
+      const shapeHeight = this._originalHeight * currentScale;
+
+      const svgWidth = shapeWidth + scaledStrokeWidth;
+      const svgHeight = shapeHeight + scaledStrokeWidth;
+
+      this.__svg.setAttribute('width', `${svgWidth}`);
+      this.__svg.setAttribute('height', `${svgHeight}`);
+
+      // Update shape positioning within the expanded SVG
+      if (this.__element) {
+        this.__element.setAttribute('x', `${strokePadding}`);
+        this.__element.setAttribute('y', `${strokePadding}`);
+      }
+
+      if (this.__hitElementRect) {
+        this.__hitElementRect.setAttribute('x', `${strokePadding}`);
+        this.__hitElementRect.setAttribute('y', `${strokePadding}`);
+      }
+    }
   }
 
   /**
@@ -475,13 +535,14 @@ export class RectangleAnnotation extends Annotation {
     const svgTop = parseFloat(this.__svg.style.top) / scale;
     const shapeWidth = parseFloat(this.__element?.getAttribute('width') || '0') / scale;
     const shapeHeight = parseFloat(this.__element?.getAttribute('height') || '0') / scale;
-    const pad = 0 / scale;
+    const scaledStrokeWidth = this._strokeWidth; // At scale=1
+    const strokePadding = scaledStrokeWidth / 2;
 
     return {
-      x0: svgLeft + pad, // Shape left = SVG left + padding
-      y0: svgTop + pad, // Shape top = SVG top + padding
-      x1: svgLeft + pad + shapeWidth, // Shape right
-      y1: svgTop + pad + shapeHeight, // Shape bottom
+      x0: svgLeft + strokePadding, // Shape left = SVG left + stroke padding
+      y0: svgTop + strokePadding, // Shape top = SVG top + stroke padding
+      x1: svgLeft + strokePadding + shapeWidth, // Shape right
+      y1: svgTop + strokePadding + shapeHeight, // Shape bottom
     };
   }
 
@@ -540,11 +601,15 @@ export class RectangleAnnotation extends Annotation {
     this._strokeWidth = newWidth;
 
     if (this.__element) {
-      this.__element.setAttribute('stroke-width', newWidth.toString());
+      // Scale stroke width based on current zoom level
+      const scaledStrokeWidth = newWidth * (this.state.scale || 1);
+      this.__element.setAttribute('stroke-width', scaledStrokeWidth.toString());
     }
 
     if (this.__hitElementRect) {
-      this.__hitElementRect.style.strokeWidth = `${newWidth + 10}`;
+      // Scale hit area stroke width as well
+      const scaledHitStrokeWidth = (newWidth + 10) * (this.state.scale || 1);
+      this.__hitElementRect.style.strokeWidth = `${scaledHitStrokeWidth}`;
     }
 
     this._setRectInfo();

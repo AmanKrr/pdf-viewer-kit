@@ -32,10 +32,6 @@ export class InstanceState {
   private _isLoading: boolean = true;
   private _currentPage: number = 1;
   private _uiLoading: HTMLElement | null = null;
-  private _isAnnotationEnabled: boolean = false;
-  private _isAnnotationConfigurationPropertiesEnabled: boolean = false;
-  private _isInteractiveModeDisabled: boolean = false;
-  private _rotation: number = 0;
   private _totalPages: number = 0;
 
   constructor(instanceId: string, containerId: string) {
@@ -159,92 +155,6 @@ export class InstanceState {
    */
   set uiLoading(element: HTMLElement | null) {
     this._uiLoading = element;
-  }
-
-  /**
-   * Gets the annotation enabled state
-   */
-  get isAnnotationEnabled(): boolean {
-    return this._isAnnotationEnabled;
-  }
-
-  /**
-   * Sets the annotation enabled state
-   */
-  set isAnnotationEnabled(value: boolean) {
-    if (this._isAnnotationEnabled !== value) {
-      this._isAnnotationEnabled = value;
-
-      this._events.emit('annotationModeChange', {
-        instanceId: this._instanceId,
-        enabled: value,
-      });
-    }
-  }
-
-  /**
-   * Gets the annotation configuration properties enabled state
-   */
-  get isAnnotationConfigurationPropertiesEnabled(): boolean {
-    return this._isAnnotationConfigurationPropertiesEnabled;
-  }
-
-  /**
-   * Sets the annotation configuration properties enabled state
-   */
-  set isAnnotationConfigurationPropertiesEnabled(value: boolean) {
-    if (this._isAnnotationConfigurationPropertiesEnabled !== value) {
-      this._isAnnotationConfigurationPropertiesEnabled = value;
-
-      this._events.emit('annotationPropertiesChange', {
-        instanceId: this._instanceId,
-        enabled: value,
-      });
-    }
-  }
-
-  /**
-   * Gets the interactive mode disabled state
-   */
-  get isInteractiveModeDisabled(): boolean {
-    return this._isInteractiveModeDisabled;
-  }
-
-  /**
-   * Sets the interactive mode disabled state
-   */
-  set isInteractiveModeDisabled(value: boolean) {
-    if (this._isInteractiveModeDisabled !== value) {
-      this._isInteractiveModeDisabled = value;
-
-      this._events.emit('interactiveModeChanged', {
-        instanceId: this._instanceId,
-        disabled: value,
-      });
-    }
-  }
-
-  /**
-   * Gets the rotation angle
-   */
-  get rotation(): number {
-    return this._rotation;
-  }
-
-  /**
-   * Sets the rotation angle
-   */
-  set rotation(value: number) {
-    if (this._rotation !== value) {
-      const oldRotation = this._rotation;
-      this._rotation = value;
-
-      this._events.emit('rotationChange', {
-        instanceId: this._instanceId,
-        oldRotation,
-        newRotation: value,
-      });
-    }
   }
 
   /**

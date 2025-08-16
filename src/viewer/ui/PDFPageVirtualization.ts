@@ -1367,7 +1367,9 @@ class PageVirtualization {
         pageInfo.annotationLayer = new AnnotationLayer(pageInfo.pageWrapperDiv, pageInfo.pdfPageProxy, viewport);
         await pageInfo.annotationLayer.createAnnotationLayer(this._webViewer, this._pdfDocument, annotationHostDiv);
 
-        if (this.state.isAnnotationEnabled && this.state.isAnnotationConfigurationPropertiesEnabled) {
+        // Use annotation state manager for UI-related annotation state
+        const annotationState = this._webViewer.annotationState;
+        if (annotationState?.state.isAnnotationEnabled) {
           if (annotationHostDiv) {
             (annotationHostDiv as HTMLElement).style.cursor = 'crosshair';
             (annotationHostDiv as HTMLElement).style.pointerEvents = 'all';

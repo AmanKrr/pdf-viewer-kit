@@ -89,7 +89,9 @@ export class AnnotationService {
   public registerAnnotationManager(page: number, manager: AnnotationManager): void {
     this._annotationManagers.set(page, manager);
 
-    if (this.state.isAnnotationEnabled && this.state.isAnnotationConfigurationPropertiesEnabled) {
+    // Use annotation state manager for UI-related annotation state
+    const annotationState = this._webViewer.annotationState;
+    if (annotationState?.state.isAnnotationEnabled) {
       manager._initAnnotation();
     }
 
@@ -111,7 +113,9 @@ export class AnnotationService {
     manager?.destroy();
     this._annotationManagers.delete(page);
 
-    if (this.state.isAnnotationEnabled && this.state.isAnnotationConfigurationPropertiesEnabled) {
+    // Use annotation state manager for UI-related annotation state
+    const annotationState = this._webViewer.annotationState;
+    if (annotationState?.state.isAnnotationEnabled) {
       manager?._initAnnotationCleanup();
     }
   }
