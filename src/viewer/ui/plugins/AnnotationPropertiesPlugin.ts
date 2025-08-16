@@ -44,6 +44,14 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
     AnnotationPropertiesPlugin.currentlyOpenDropdown = dropdown;
   }
 
+  // Simple method to close a specific dropdown
+  public static closeDropdown(dropdown: HTMLElement): void {
+    if (AnnotationPropertiesPlugin.currentlyOpenDropdown === dropdown) {
+      AnnotationPropertiesPlugin.currentlyOpenDropdown = null;
+    }
+    dropdown.style.display = 'none';
+  }
+
   constructor() {
     super('annotation-properties', '1.0.0');
   }
@@ -257,26 +265,15 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
       console.log('Clicked: ', isVisible);
 
       if (isVisible) {
-        // Hide dropdown
-        dropdown.style.display = 'none';
+        // Hide dropdown using the dropdown manager
+        AnnotationPropertiesPlugin.closeDropdown(dropdown);
 
         // Clean up Popper instance
         if (popperInstance) {
           popperInstance.destroy();
           popperInstance = undefined;
         }
-
-        // COMMENTED OUT: Clear this dropdown as active if it was the active one - might be interfering
-        // if (AnnotationPropertiesPlugin.activeDropdown === dropdown) {
-        //   AnnotationPropertiesPlugin.activeDropdown = null;
-        // }
       } else {
-        // COMMENTED OUT: Close any other active dropdowns first - this might be interfering
-        // if (AnnotationPropertiesPlugin.activeDropdown && AnnotationPropertiesPlugin.activeDropdown !== dropdown) {
-        //   AnnotationPropertiesPlugin.activeDropdown.style.display = 'none';
-        //   AnnotationPropertiesPlugin.activeDropdown = null;
-        // }
-
         // Show dropdown with Popper.js positioning
         dropdown.style.display = 'block';
         console.log('here i am');
@@ -306,18 +303,14 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
       if (!container.contains(ev.target as Node)) {
         // Only hide dropdown if it's actually visible
         if (dropdown.style.display === 'block') {
-          dropdown.style.display = 'none';
+          // Use the dropdown manager to properly track this dropdown as closed
+          AnnotationPropertiesPlugin.closeDropdown(dropdown);
 
           // Clean up Popper instance
           if (popperInstance) {
             popperInstance.destroy();
             popperInstance = undefined;
           }
-
-          // COMMENTED OUT: Clear this dropdown as active if it was the active one - might be interfering
-          // if (AnnotationPropertiesPlugin.activeDropdown === dropdown) {
-          //   AnnotationPropertiesPlugin.activeDropdown = null;
-          // }
         }
       }
     });
@@ -420,26 +413,15 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
       const isVisible = dropdown.style.display === 'block';
 
       if (isVisible) {
-        // Hide dropdown
-        dropdown.style.display = 'none';
+        // Hide dropdown using the dropdown manager
+        AnnotationPropertiesPlugin.closeDropdown(dropdown);
 
         // Clean up Popper instance
         if (popperInstance) {
           popperInstance.destroy();
           popperInstance = undefined;
         }
-
-        // COMMENTED OUT: Clear this dropdown as active if it was the active one - might be interfering
-        // if (AnnotationPropertiesPlugin.activeDropdown === dropdown) {
-        //   AnnotationPropertiesPlugin.activeDropdown = null;
-        // }
       } else {
-        // COMMENTED OUT: Close any other active dropdowns first - this might be interfering
-        // if (AnnotationPropertiesPlugin.activeDropdown && AnnotationPropertiesPlugin.activeDropdown !== dropdown) {
-        //   AnnotationPropertiesPlugin.activeDropdown.style.display = 'none';
-        //   AnnotationPropertiesPlugin.activeDropdown = null;
-        // }
-
         // Show dropdown with Popper.js positioning
         dropdown.style.display = 'block';
 
@@ -468,18 +450,14 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
       if (!container.contains(ev.target as Node)) {
         // Only hide dropdown if it's actually visible
         if (dropdown.style.display === 'block') {
-          dropdown.style.display = 'none';
+          // Use the dropdown manager to properly track this dropdown as closed
+          AnnotationPropertiesPlugin.closeDropdown(dropdown);
 
           // Clean up Popper instance
           if (popperInstance) {
             popperInstance.destroy();
             popperInstance = undefined;
           }
-
-          // COMMENTED OUT: Clear this dropdown as active if it was the active one - might be interfering
-          // if (AnnotationPropertiesPlugin.activeDropdown === dropdown) {
-          //   AnnotationPropertiesPlugin.activeDropdown = null;
-          // }
         }
       }
     });

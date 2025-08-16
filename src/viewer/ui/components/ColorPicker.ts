@@ -275,8 +275,10 @@ export class ColorPicker extends ToolbarComponent {
   }
 
   private hideDropdown(): void {
-    // Hide dropdown
-    this.dropdown.style.display = 'none';
+    // Use the dropdown manager to properly track this dropdown as closed
+    AnnotationPropertiesPlugin.closeDropdown(this.dropdown);
+
+    // Reset internal state
     this.isDropdownOpen = false;
 
     // Clean up Popper instance
@@ -284,11 +286,6 @@ export class ColorPicker extends ToolbarComponent {
       this.popperInstance.destroy();
       this.popperInstance = undefined;
     }
-
-    // Use the simple dropdown manager instead
-    // if (AnnotationPropertiesPlugin.activeDropdown === this.dropdown) {
-    //   AnnotationPropertiesPlugin.activeDropdown = null;
-    // }
   }
 
   private selectColor(color: string): void {
