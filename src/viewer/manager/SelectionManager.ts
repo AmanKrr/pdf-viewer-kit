@@ -31,6 +31,10 @@ export class SelectionManager {
   private interactiveEffectsManager: InteractiveEffectsManager;
   private isDrawingInProgress: boolean = false;
 
+  // Global click handler for deselection
+  private containerId?: string;
+  private globalClickHandler?: (event: Event) => void;
+
   constructor() {
     this.interactiveEffectsManager = InteractiveEffectsManager.getInstance();
     this._setupTextSelectionDetection();
@@ -121,6 +125,64 @@ export class SelectionManager {
     if (!this.isDrawingInProgress) {
       this.interactiveEffectsManager.enableInteractiveEffects();
     }
+  }
+
+  /**
+   * Sets up the global click handler for deselection.
+   * This should be called once during initialization.
+   */
+  public setupGlobalClickHandler(containerId: string): void {
+    this.containerId = containerId;
+    this._addGlobalClickHandler();
+  }
+
+  /**
+   * Removes the global click handler.
+   * This should be called during cleanup.
+   */
+  public removeGlobalClickHandler(): void {
+    if (this.globalClickHandler) {
+      const container = document.querySelector(`#${this.containerId}`);
+      if (container) {
+        container.removeEventListener('click', this.globalClickHandler, false);
+      }
+      this.globalClickHandler = undefined;
+    }
+  }
+
+  /**
+   * Sets up the global click handler for deselection.
+   */
+  private _addGlobalClickHandler(): void {
+    if (!this.containerId) return;
+
+    const container = document.querySelector(`#${this.containerId}`);
+    if (!container) return;
+
+    this.globalClickHandler = (event: Event) => {
+      // Check if the click target is part of an annotation
+      const target = event.target as HTMLElement;
+      const isAnnotationClick =
+        target.closest('[annotation-id]') ||
+        target.closest('.a-annotation-layer') ||
+        target.closest('.a-annotation-toolbar-container') ||
+        target.closest('svg') ||
+        target.tagName === 'svg' ||
+        target.hasAttribute('annotation-id') ||
+        // Check if target is a resizer handle or overlay
+        target.hasAttribute('data-resizer-handle') ||
+        target.closest('[data-resizer-overlay]');
+
+      // If click is not on an annotation and we have a selection, deselect
+      // But only if we're not in the middle of drawing
+      if (!isAnnotationClick && this.selectedShape && !this.isDrawingInProgress) {
+        this.setSelected(null);
+      }
+    };
+
+    // Use bubble phase instead of capture to run after other handlers
+    // This prevents the race condition where deselection happens before selection is set
+    container.addEventListener('click', this.globalClickHandler, false);
   }
 
   /**

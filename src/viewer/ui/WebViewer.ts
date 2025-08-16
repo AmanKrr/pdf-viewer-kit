@@ -64,7 +64,6 @@ class WebViewer {
   // Event handlers
   private _boundScrollHandler!: (event: Event) => void;
   private _intersectionObserver?: IntersectionObserver;
-  private _globalClickHandler?: (event: Event) => void;
 
   // DOM elements
   private _parentContainer!: HTMLElement;
@@ -256,7 +255,6 @@ class WebViewer {
   private _setupEventHandlers(): void {
     this._boundScrollHandler = this._onScroll.bind(this);
     this._addInstanceEvents();
-    // this._addGlobalClickHandler();
   }
 
   /**
@@ -308,42 +306,9 @@ class WebViewer {
     if (mainViewer && this._options.toolbarOptions?.showThumbnail) {
       mainViewer.addEventListener('scroll', this._boundScrollHandler);
     }
-  }
 
-  /**
-   * Adds global click handler to detect clicks outside of annotations for deselection.
-   */
-  private _addGlobalClickHandler() {
-    const container = document.querySelector(`#${this.containerId}`);
-    if (!container) return;
-
-    const handleGlobalClick = (event: Event) => {
-      // Check if the click target is part of an annotation
-      const target = event.target as HTMLElement;
-      const isAnnotationClick =
-        target.closest('[annotation-id]') ||
-        target.closest('.a-annotation-layer') ||
-        target.closest('.a-annotation-toolbar-container') ||
-        target.closest('svg') ||
-        target.tagName === 'svg' ||
-        target.hasAttribute('annotation-id') ||
-        // Check if target is a resizer handle or overlay
-        target.hasAttribute('data-resizer-handle') ||
-        target.closest('[data-resizer-overlay]');
-
-      // If click is not on an annotation and we have a selection, deselect
-      // But only if we're not in the middle of drawing
-      if (!isAnnotationClick && this._selectionManager.getSelected() && !this._selectionManager.isDrawingActive()) {
-        this._selectionManager.setSelected(null);
-      }
-    };
-
-    // Use bubble phase instead of capture to run after other handlers
-    // This prevents the race condition where deselection happens before selection is set
-    container.addEventListener('click', handleGlobalClick, false);
-
-    // Store the handler for cleanup
-    this._globalClickHandler = handleGlobalClick;
+    // Set up global click handler in SelectionManager
+    this._selectionManager.setupGlobalClickHandler(this.containerId);
   }
 
   private _onScroll = debounce((event: Event) => {
@@ -714,12 +679,7 @@ class WebViewer {
 
   public destroy(): void {
     // Remove event listeners
-    if (this._globalClickHandler) {
-      const container = document.querySelector(`#${this.containerId}`);
-      if (container) {
-        container.removeEventListener('click', this._globalClickHandler);
-      }
-    }
+    // Global click handler is now managed by SelectionManager
 
     // Remove scroll handler
     if (this._boundScrollHandler) {
