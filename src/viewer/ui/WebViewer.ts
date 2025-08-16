@@ -31,6 +31,7 @@ import { IToolbar } from '../../interface/IToolbar';
 import { InstanceWebViewer } from '../../core/InstanceWebViewer';
 import { PDFViewerInstance } from '../../core/PDFViewerInstance';
 import { AnnotationToolbarStateManager } from './AnnotationToolbarState';
+import { scrollElementIntoView } from '../../utils/web-ui-utils';
 
 /**
  * Manages the PDF viewer instance and provides various functionalities, including:
@@ -55,6 +56,7 @@ class WebViewer {
   private _zoomHandler!: ZoomHandler;
   private _selectionManager!: SelectionManager;
   private _searchHighlighter!: SearchHighlighter;
+  private _searchBar!: SearchBar;
 
   // Annotation state management
   private _annotationStateManager!: AnnotationToolbarStateManager;
@@ -187,7 +189,7 @@ class WebViewer {
     this._searchHighlighter = new SearchHighlighter(this);
 
     // Initialize search bar
-    new SearchBar(
+    this._searchBar = new SearchBar(
       this,
       async (searchTerm, options) => {
         await this._searchHighlighter.search(searchTerm, options);
@@ -195,6 +197,10 @@ class WebViewer {
       this._searchHighlighter.prevMatch.bind(this._searchHighlighter),
       this._searchHighlighter.nextMatch.bind(this._searchHighlighter),
       this._searchHighlighter.getMatchStatus.bind(this._searchHighlighter),
+      () => {
+        // Cleanup search state when search bar is closed
+        this._searchHighlighter.removeHighlights();
+      },
     );
 
     // Initialize page virtualization
@@ -356,7 +362,15 @@ class WebViewer {
     const thumbnailToBeActive = document.querySelector(`#${this.containerId} .thumbnail[data-page-number="${pageNumber}"]`);
     if (thumbnailToBeActive) {
       thumbnailToBeActive.classList.add('thumbnail-active');
-      thumbnailToBeActive.scrollIntoView({ block: 'center', behavior: 'smooth' });
+
+      // Find the thumbnail sidebar container to scroll within
+      const thumbnailSidebar = document.querySelector(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_SIDEBAR_CONTAINER}`);
+      if (thumbnailSidebar) {
+        scrollElementIntoView(thumbnailToBeActive, { block: 'center', container: thumbnailSidebar });
+      } else {
+        // Fallback to default behavior
+        scrollElementIntoView(thumbnailToBeActive, { block: 'center' });
+      }
     }
   }
 
@@ -594,9 +608,15 @@ class WebViewer {
    * Toggles the visibility of the search box in the viewer.
    */
   public search(): void {
+    // Use the SearchBar's show/hide methods which handle focus automatically
     const searchContainer = document.querySelector(`#${this.containerId} .a-search-container`);
     if (searchContainer) {
-      searchContainer.classList.toggle('a-search-hidden');
+      const isHidden = searchContainer.classList.contains('a-search-hidden');
+      if (isHidden) {
+        this._searchBar.show();
+      } else {
+        this._searchBar.hide();
+      }
     }
   }
 

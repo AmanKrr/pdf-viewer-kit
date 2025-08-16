@@ -21,6 +21,7 @@ import { Resizer } from './Resizer';
 import { Annotation } from './Annotation';
 import { InstanceEventEmitter } from '../../core/InstanceEventEmitter';
 import { InstanceState } from '../../core/InstanceState';
+import { scrollElementIntoView } from '../../utils/web-ui-utils';
 
 /**
  * Annotation that renders and manages a line (<line> SVG element) on the PDF.
@@ -247,7 +248,9 @@ export class LineAnnotation extends Annotation {
 
   /** Scroll annotation into center of view. */
   public scrollToView(): void {
-    this.__svg.scrollIntoView({ block: 'center' });
+    if (this.__svg) {
+      scrollElementIntoView(this.__svg, { block: 'center' });
+    }
   }
 
   /** Return current annotation config for serialization or events. */

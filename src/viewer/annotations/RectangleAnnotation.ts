@@ -21,6 +21,7 @@ import { Resizer } from './Resizer';
 import { Annotation } from './Annotation';
 import { InstanceEventEmitter } from '../../core/InstanceEventEmitter';
 import { InstanceState } from '../../core/InstanceState';
+import { scrollElementIntoView } from '../../utils/web-ui-utils';
 
 /**
  * Rectangle annotation supporting interactive drawing, programmatic creation,
@@ -255,7 +256,9 @@ export class RectangleAnnotation extends Annotation {
    * Scrolls the annotation into view (centered in viewport).
    */
   public scrollToView(): void {
-    this.__svg?.scrollIntoView({ block: 'center' });
+    if (this.__svg) {
+      scrollElementIntoView(this.__svg, { block: 'center' });
+    }
   }
 
   /**

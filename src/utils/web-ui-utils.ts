@@ -211,4 +211,135 @@ class InstanceWebUiUtils {
   }
 }
 
+/**
+ * Scrolls an element into view with better control to prevent unnecessary page jumps.
+ * Only scrolls if the element is not fully visible in the viewport.
+ * Uses container-aware scrolling to avoid affecting the main page.
+ *
+ * @param element - The element to scroll into view
+ * @param options - Scroll options
+ * @param options.block - Vertical alignment: 'start', 'center', 'end', 'nearest'
+ * @param options.inline - Horizontal alignment: 'start', 'center', 'end', 'nearest'
+ * @param options.force - Whether to force scrolling even if element is already visible
+ * @param options.container - Optional container to scroll within (defaults to element's scrollable parent)
+ */
+export function scrollElementIntoView(
+  element: Element,
+  options: {
+    block?: 'start' | 'center' | 'end' | 'nearest';
+    inline?: 'start' | 'center' | 'end' | 'nearest';
+    force?: boolean;
+    container?: Element;
+  } = {},
+): void {
+  const { block = 'nearest', inline = 'nearest', force = false, container } = options;
+
+  if (!element || !element.getBoundingClientRect) {
+    return;
+  }
+
+  // Find the scrollable container (either provided or auto-detected)
+  const scrollContainer = container || findScrollableParent(element);
+
+  if (!scrollContainer) {
+    // Fallback to native scrollIntoView if no scrollable container found
+    element.scrollIntoView({ behavior: 'instant', block, inline });
+    return;
+  }
+
+  // Get element position relative to the scroll container
+  const elementRect = element.getBoundingClientRect();
+  const containerRect = scrollContainer.getBoundingClientRect();
+
+  // Calculate if element is visible within the container
+  const isVisibleInContainer =
+    elementRect.top >= containerRect.top && elementRect.bottom <= containerRect.bottom && elementRect.left >= containerRect.left && elementRect.right <= containerRect.right;
+
+  // Only scroll if forced or not visible in container
+  if (!force && isVisibleInContainer) {
+    return;
+  }
+
+  // Calculate scroll position to bring element into view
+  let scrollTop = scrollContainer.scrollTop;
+  let scrollLeft = scrollContainer.scrollLeft;
+
+  if (block === 'center') {
+    // Center the element vertically in the container
+    const elementHeight = elementRect.height;
+    const containerHeight = containerRect.height;
+    const elementTop = elementRect.top - containerRect.top;
+    scrollTop += elementTop - containerHeight / 2 + elementHeight / 2;
+  } else if (block === 'start') {
+    // Align element to top of container
+    const elementTop = elementRect.top - containerRect.top;
+    scrollTop += elementTop;
+  } else if (block === 'end') {
+    // Align element to bottom of container
+    const elementHeight = elementRect.height;
+    const containerHeight = containerRect.height;
+    const elementTop = elementRect.top - containerRect.top;
+    scrollTop += elementTop - containerHeight + elementHeight;
+  } else if (block === 'nearest') {
+    // Only scroll if element is not visible
+    if (elementRect.top < containerRect.top) {
+      scrollTop += elementRect.top - containerRect.top;
+    } else if (elementRect.bottom > containerRect.bottom) {
+      scrollTop += elementRect.bottom - containerRect.bottom;
+    }
+  }
+
+  if (inline === 'center') {
+    // Center the element horizontally in the container
+    const elementWidth = elementRect.width;
+    const containerWidth = containerRect.width;
+    const elementLeft = elementRect.left - containerRect.left;
+    scrollLeft += elementLeft - containerWidth / 2 + elementWidth / 2;
+  } else if (inline === 'start') {
+    // Align element to left of container
+    const elementLeft = elementRect.left - containerRect.left;
+    scrollLeft += elementLeft;
+  } else if (inline === 'end') {
+    // Align element to right of container
+    const elementWidth = elementRect.width;
+    const containerWidth = containerRect.width;
+    const elementLeft = elementRect.left - containerRect.left;
+    scrollLeft += elementLeft - containerWidth + elementWidth;
+  } else if (inline === 'nearest') {
+    // Only scroll if element is not visible
+    if (elementRect.left < containerRect.left) {
+      scrollLeft += elementRect.left - containerRect.left;
+    } else if (elementRect.right > containerRect.right) {
+      scrollLeft += elementRect.right - containerRect.right;
+    }
+  }
+
+  // Apply the scroll position
+  scrollContainer.scrollTo({
+    top: scrollTop,
+    left: scrollLeft,
+    behavior: 'instant',
+  });
+}
+
+/**
+ * Finds the nearest scrollable parent element
+ */
+function findScrollableParent(element: Element): Element | null {
+  let parent = element.parentElement;
+
+  while (parent) {
+    const style = window.getComputedStyle(parent);
+    const overflow = style.overflow + style.overflowX + style.overflowY;
+
+    if (overflow.includes('scroll') || overflow.includes('auto')) {
+      return parent;
+    }
+
+    parent = parent.parentElement;
+  }
+
+  return null;
+}
+
 export { InstanceWebUiUtils, WebUiUtils };

@@ -21,6 +21,7 @@ import { Resizer } from './Resizer';
 import { Annotation } from './Annotation';
 import { InstanceEventEmitter } from '../../core/InstanceEventEmitter';
 import { InstanceState } from '../../core/InstanceState';
+import { scrollElementIntoView } from '../../utils/web-ui-utils';
 
 /**
  * An SVG ellipse annotation. Supports interactive drawing, programmatic creation,
@@ -230,7 +231,9 @@ export class EllipseAnnotation extends Annotation {
 
   /** Scrolls this annotation into view (centered). */
   public scrollToView(): void {
-    this.__svg?.scrollIntoView({ block: 'center' });
+    if (this.__svg) {
+      scrollElementIntoView(this.__svg, { block: 'center' });
+    }
   }
 
   /** Retrieves the current annotation configuration. */

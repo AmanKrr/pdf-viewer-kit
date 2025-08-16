@@ -19,6 +19,7 @@ import PdfState from '../ui/PDFState';
 import SearchIndexManager from './SearchIndexManager';
 import WebViewer from '../ui/WebViewer';
 import { PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
+import { scrollElementIntoView } from '../../utils/web-ui-utils';
 
 export interface SearchOptions {
   matchCase: boolean;
@@ -304,7 +305,15 @@ class SearchHighlighter {
         // Remove active class from all highlights on that page.
         highlights.forEach((el) => el.classList.remove('a-active-highlight'));
         targetElement.classList.add('a-active-highlight');
-        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Find the main viewer container to scroll within
+        const mainViewerContainer = document.querySelector(`#${this.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`);
+        if (mainViewerContainer) {
+          scrollElementIntoView(targetElement, { block: 'center', container: mainViewerContainer });
+        } else {
+          // Fallback to default behavior
+          scrollElementIntoView(targetElement, { block: 'center' });
+        }
       }
     });
   }

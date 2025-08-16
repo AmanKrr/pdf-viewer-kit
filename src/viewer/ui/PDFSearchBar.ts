@@ -38,13 +38,16 @@ class SearchBar {
   private _matchCounterElement: HTMLElement | null = null;
   private _upButtonElement: HTMLButtonElement | null = null;
   private _downButtonElement: HTMLButtonElement | null = null;
+  private _cleanupCallback?: () => void;
 
   /**
    * Creates and inserts the search bar into the viewer.
-   * @param pdfState - The PDF state object with containerId property.
+   * @param webViewer - The WebViewer instance.
    * @param searchCallback - A function to perform the search.
    * @param prevMatchCallback - A function to go to the previous match.
    * @param nextMatchCallback - A function to go to the next match.
+   * @param getMatchStatus - A function to get current match status.
+   * @param cleanupCallback - A function to cleanup search state when closing.
    */
   constructor(
     webViewer: WebViewer,
@@ -52,8 +55,10 @@ class SearchBar {
     prevMatchCallback: () => void,
     nextMatchCallback: () => void,
     getMatchStatus: () => { current: number; total: number },
+    cleanupCallback?: () => void,
   ) {
     this._webViewer = webViewer;
+    this._cleanupCallback = cleanupCallback;
     // Get the parent container based on the containerId and viewer class.
     const parentContainer = document.querySelector(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`);
     if (parentContainer) {
@@ -73,8 +78,38 @@ class SearchBar {
       // When input changes, perform a search with default options.
       input.oninput = async (e: Event) => {
         const target = e.target as HTMLInputElement;
-        await this._debounceSearch(searchCallback, target.value, { matchCase: false, regex: false, wholeWord: false }, getMatchStatus);
+        const searchTerm = target.value.trim();
+
+        if (searchTerm === '') {
+          // If input is empty, cleanup search state
+          if (this._cleanupCallback) {
+            this._cleanupCallback();
+          }
+          this.updateMatchCounter(0, 0);
+        } else {
+          // Perform search with the term
+          await this._debounceSearch(searchCallback, searchTerm, { matchCase: false, regex: false, wholeWord: false }, getMatchStatus);
+        }
       };
+
+      // Add keyboard shortcuts
+      input.addEventListener('keydown', (e: KeyboardEvent) => {
+        switch (e.key) {
+          case 'Enter':
+            e.preventDefault();
+            // Go to next search result
+            nextMatchCallback();
+            const { current, total } = getMatchStatus();
+            this.updateMatchCounter(current, total);
+            break;
+          case 'Escape':
+            e.preventDefault();
+            // Hide the search bar
+            this.hide();
+            break;
+        }
+      });
+
       // Save a reference.
       this._searchInputElement = input;
 
@@ -130,8 +165,19 @@ class SearchBar {
         button.addEventListener('click', () => {
           // Toggle the button's active state.
           button.classList.toggle('active');
-          // Perform the search with the updated options.
+
+          // Only perform search if there's actual text to search for
           const searchTerm = this._searchInputElement?.value || '';
+          if (searchTerm.trim() === '') {
+            // If no search term, cleanup and reset counter
+            if (this._cleanupCallback) {
+              this._cleanupCallback();
+            }
+            this.updateMatchCounter(0, 0);
+            return;
+          }
+
+          // Perform the search with the updated options.
           const matchCase = document.querySelector(`#${this.containerId} .a-option-button.active`)?.textContent === 'Aa';
           const wholeWord = document.querySelector(`#${this.containerId} .a-option-button.active`)?.textContent === 'ab';
           const regex = document.querySelector(`#${this.containerId} .a-option-button.active`)?.textContent === 'Regex';
@@ -192,15 +238,36 @@ class SearchBar {
   public show(): void {
     if (this._container) {
       this._container.classList.remove('a-search-hidden');
+
+      // Auto-focus the search input when the search bar is shown
+      if (this._searchInputElement) {
+        // Use setTimeout to ensure the element is visible before focusing
+        setTimeout(() => {
+          this._searchInputElement?.focus();
+        }, 0);
+      }
     }
   }
 
   /**
-   * Hides the search bar.
+   * Hides the search bar and cleans up search state.
    */
   public hide(): void {
     if (this._container) {
       this._container.classList.add('a-search-hidden');
+
+      // Clear search input
+      if (this._searchInputElement) {
+        this._searchInputElement.value = '';
+      }
+
+      // Reset match counter
+      this.updateMatchCounter(0, 0);
+
+      // Call cleanup callback to remove highlights and reset search state
+      if (this._cleanupCallback) {
+        this._cleanupCallback();
+      }
     }
   }
 
@@ -211,7 +278,7 @@ class SearchBar {
    */
   public updateMatchCounter(current: number, total: number): void {
     if (this._matchCounterElement) {
-      this._matchCounterElement.textContent = `${current} / ${total}`;
+      this._matchCounterElement.textContent = `${current}/${total}`;
     }
   }
 }
