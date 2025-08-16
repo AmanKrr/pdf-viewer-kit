@@ -104,6 +104,14 @@ export class EllipseAnnotation extends Annotation {
   }
 
   /**
+   * Get current stroke padding (half of scaled stroke width)
+   */
+  private _getStrokePadding(): number {
+    const scaledStrokeWidth = this._strokeWidth * (this.state.scale || 1);
+    return scaledStrokeWidth / 2;
+  }
+
+  /**
    * Programmatically draws an ellipse (no pointer events).
    * @param cx         Logical center-x
    * @param cy         Logical center-y
@@ -113,10 +121,15 @@ export class EllipseAnnotation extends Annotation {
    */
   public draw(cx: number, cy: number, rx: number, ry: number, pageNumber: number, interactive: boolean): void {
     this._interactive = interactive;
-    const left = cx - rx;
-    const top = cy - ry;
-    const width = rx * 2;
-    const height = ry * 2;
+
+    // Calculate stroke padding
+    const strokePadding = this._getStrokePadding();
+
+    // Position SVG to accommodate stroke
+    const left = cx - rx - strokePadding;
+    const top = cy - ry - strokePadding;
+    const width = rx * 2 + strokePadding * 2;
+    const height = ry * 2 + strokePadding * 2;
 
     this.isDrawing = false;
     this.__svg.style.left = `${left}px`;
@@ -125,7 +138,8 @@ export class EllipseAnnotation extends Annotation {
     this.__svg.setAttribute('height', `${height}`);
     this._pageNumber = pageNumber;
 
-    this.createSvgEllipse(rx, ry, rx, ry);
+    // Create ellipse centered in the SVG with stroke padding
+    this.createSvgEllipse(rx + strokePadding, ry + strokePadding, rx, ry);
     this._captureOriginal(1);
     this._updateZoom(this.state.scale);
     this._setEllipseInfo();
@@ -151,21 +165,19 @@ export class EllipseAnnotation extends Annotation {
     const h = Math.abs(dy);
 
     // Account for scaled stroke width to prevent strokes from being cut off
-    const scaledStrokeWidth = this._strokeWidth * (this.state.scale || 1);
-    const strokePadding = scaledStrokeWidth / 2;
-    const svgWidth = w + scaledStrokeWidth;
-    const svgHeight = h + scaledStrokeWidth;
-    const strokeOffset = strokePadding;
+    const strokePadding = this._getStrokePadding();
+    const svgWidth = w + strokePadding * 2;
+    const svgHeight = h + strokePadding * 2;
 
-    this.__svg.style.left = `${left - strokeOffset}px`;
-    this.__svg.style.top = `${top - strokeOffset}px`;
+    this.__svg.style.left = `${left - strokePadding}px`;
+    this.__svg.style.top = `${top - strokePadding}px`;
     this.__svg.setAttribute('width', svgWidth.toString());
     this.__svg.setAttribute('height', svgHeight.toString());
 
     const rx = w / 2;
     const ry = h / 2;
-    const cx = rx + strokeOffset;
-    const cy = ry + strokeOffset;
+    const cx = rx + strokePadding;
+    const cy = ry + strokePadding;
 
     (this.__element as SVGEllipseElement).setAttribute('cx', `${cx}`);
     (this.__element as SVGEllipseElement).setAttribute('cy', `${cy}`);
@@ -264,14 +276,13 @@ export class EllipseAnnotation extends Annotation {
    * Creates the visible ellipse and an invisible, thicker hit-test ellipse.
    */
   private createSvgEllipse(cx = 0, cy = 0, rx = 0, ry = 0): void {
-    // Account for stroke width to prevent strokes from being cut off
-    const strokePadding = this._strokeWidth;
-    const strokeOffset = strokePadding / 2;
+    // Use consistent stroke padding calculation
+    const strokePadding = this._getStrokePadding();
 
     this.__element = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
     this.__element.id = this.annotationId;
-    this.__element.setAttribute('cx', `${cx + strokeOffset}`);
-    this.__element.setAttribute('cy', `${cy + strokeOffset}`);
+    this.__element.setAttribute('cx', `${cx || strokePadding}`);
+    this.__element.setAttribute('cy', `${cy || strokePadding}`);
     this.__element.setAttribute('rx', `${rx}`);
     this.__element.setAttribute('ry', `${ry}`);
     this.__element.setAttribute('fill', this._fillColor);
@@ -284,8 +295,8 @@ export class EllipseAnnotation extends Annotation {
     this.__svg.appendChild(this.__element);
 
     this.__hitElementRect = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
-    this.__hitElementRect.setAttribute('cx', `${cx + strokeOffset}`);
-    this.__hitElementRect.setAttribute('cy', `${cy + strokeOffset}`);
+    this.__hitElementRect.setAttribute('cx', `${cx || strokePadding}`);
+    this.__hitElementRect.setAttribute('cy', `${cy || strokePadding}`);
     this.__hitElementRect.setAttribute('rx', `${rx}`);
     this.__hitElementRect.setAttribute('ry', `${ry}`);
     this.__hitElementRect.setAttribute('fill', 'none');
@@ -318,13 +329,19 @@ export class EllipseAnnotation extends Annotation {
    */
   private _captureOriginal(scale = 0): void {
     const s = scale || this.state.scale || 1;
-    const bbox = (this.__svg as SVGGraphicsElement).getBBox();
-    const left = parseFloat(this.__svg.style.left) / s;
-    const top = parseFloat(this.__svg.style.top) / s;
-    this._origRX = bbox.width / 2 / s;
-    this._origRY = bbox.height / 2 / s;
-    this._origCX = left + this._origRX + 10;
-    this._origCY = top + this._origRY + 10;
+    const strokePadding = this._getStrokePadding() / s; // Convert back to logical units
+
+    // Get SVG position and dimensions
+    const svgLeft = parseFloat(this.__svg.style.left) / s;
+    const svgTop = parseFloat(this.__svg.style.top) / s;
+    const svgWidth = parseFloat(this.__svg.getAttribute('width') || '0') / s;
+    const svgHeight = parseFloat(this.__svg.getAttribute('height') || '0') / s;
+
+    // Calculate logical center and radii accounting for stroke padding
+    this._origRX = (svgWidth - strokePadding * 2) / 2;
+    this._origRY = (svgHeight - strokePadding * 2) / 2;
+    this._origCX = svgLeft + this._origRX + strokePadding;
+    this._origCY = svgTop + this._origRY + strokePadding;
   }
 
   /**
@@ -332,18 +349,17 @@ export class EllipseAnnotation extends Annotation {
    * @param scale New scale factor
    */
   private _updateZoom(scale: number): void {
+    const strokePadding = this._getStrokePadding();
+
+    // Calculate scaled dimensions
     const cx = this._origCX * scale;
     const cy = this._origCY * scale;
     const rx = this._origRX * scale;
     const ry = this._origRY * scale;
 
-    // Calculate scaled stroke width to prevent clipping
-    const scaledStrokeWidth = this._strokeWidth * scale;
-    const strokePadding = scaledStrokeWidth / 2;
-
     // SVG container sized to accommodate scaled stroke width
-    const svgWidth = rx * 2 + scaledStrokeWidth;
-    const svgHeight = ry * 2 + scaledStrokeWidth;
+    const svgWidth = rx * 2 + strokePadding * 2;
+    const svgHeight = ry * 2 + strokePadding * 2;
 
     this.__svg.style.left = `${cx - rx - strokePadding}px`;
     this.__svg.style.top = `${cy - ry - strokePadding}px`;
@@ -396,32 +412,8 @@ export class EllipseAnnotation extends Annotation {
       this.__hitElementRect.style.strokeWidth = `${scaledHitStrokeWidth}`;
     }
 
-    // Update SVG container size to accommodate scaled stroke width
-    if (this._origRX && this._origRY) {
-      const currentScale = this.state.scale || 1;
-      const scaledStrokeWidth = this._strokeWidth * currentScale;
-      const strokePadding = scaledStrokeWidth / 2;
-
-      const rx = this._origRX * currentScale;
-      const ry = this._origRY * currentScale;
-
-      const svgWidth = rx * 2 + scaledStrokeWidth;
-      const svgHeight = ry * 2 + scaledStrokeWidth;
-
-      this.__svg.setAttribute('width', `${svgWidth}`);
-      this.__svg.setAttribute('height', `${svgHeight}`);
-
-      // Update element positioning within the expanded SVG
-      if (this.__element) {
-        this.__element.setAttribute('cx', `${rx + strokePadding}`);
-        this.__element.setAttribute('cy', `${ry + strokePadding}`);
-      }
-
-      if (this.__hitElementRect) {
-        this.__hitElementRect.setAttribute('cx', `${rx + strokePadding}`);
-        this.__hitElementRect.setAttribute('cy', `${ry + strokePadding}`);
-      }
-    }
+    // Update the entire zoom layout to ensure consistency
+    this._updateZoom(this.state.scale || 1);
   }
 
   /**
@@ -429,15 +421,22 @@ export class EllipseAnnotation extends Annotation {
    */
   private _logicalCoords(): { cx: number; cy: number; rx: number; ry: number } {
     const s = this.state.scale || 1;
-    if (this._origRX) {
+    if (this._origRX && this._origRY) {
       return { cx: this._origCX, cy: this._origCY, rx: this._origRX, ry: this._origRY };
     }
-    const bbox = (this.__svg as SVGGraphicsElement).getBBox();
-    const left = parseFloat(this.__svg.style.left) / s;
-    const top = parseFloat(this.__svg.style.top) / s;
-    const rx = bbox.width / 2 / s;
-    const ry = bbox.height / 2 / s;
-    return { cx: left + rx + 10, cy: top + ry + 10, rx, ry };
+
+    const strokePadding = this._getStrokePadding() / s; // Convert to logical units
+    const svgLeft = parseFloat(this.__svg.style.left) / s;
+    const svgTop = parseFloat(this.__svg.style.top) / s;
+    const svgWidth = parseFloat(this.__svg.getAttribute('width') || '0') / s;
+    const svgHeight = parseFloat(this.__svg.getAttribute('height') || '0') / s;
+
+    const rx = (svgWidth - strokePadding * 2) / 2;
+    const ry = (svgHeight - strokePadding * 2) / 2;
+    const cx = svgLeft + rx + strokePadding;
+    const cy = svgTop + ry + strokePadding;
+
+    return { cx, cy, rx, ry };
   }
 
   /** Updates `_shapeInfo` for serialization or event emission. */

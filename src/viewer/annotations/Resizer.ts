@@ -51,7 +51,7 @@ export class Resizer {
   private _overlayLine!: SVGLineElement;
 
   /**
-   * @param svg The annotation’s SVG container.
+   * @param svg The annotation's SVG container.
    * @param element The inner <rect> or <ellipse> element to be resized.
    * @param onShapeUpdate Callback invoked after resize or drag completes.
    * @param constraints Bounding rectangle for drag/resize constraints.
@@ -80,11 +80,24 @@ export class Resizer {
 
     if (this._kind === 'ellipse') {
       const el = element as SVGEllipseElement;
-      this._origCX = +el.getAttribute('cx')!;
-      this._origCY = +el.getAttribute('cy')!;
-      this._origRX = +el.getAttribute('rx')!;
-      this._origRY = +el.getAttribute('ry')!;
-      this._marginLeft = this._marginTop = this._marginRight = this._marginBottom = 0;
+      const svgWidth = parseFloat(this._svg.getAttribute('width') || '0');
+      const svgHeight = parseFloat(this._svg.getAttribute('height') || '0');
+      const cx = parseFloat(el.getAttribute('cx') || '0');
+      const cy = parseFloat(el.getAttribute('cy') || '0');
+      const rx = parseFloat(el.getAttribute('rx') || '0');
+      const ry = parseFloat(el.getAttribute('ry') || '0');
+
+      // For ellipse, margins are the stroke padding (distance from ellipse edge to SVG edge)
+      this._marginLeft = cx - rx;
+      this._marginTop = cy - ry;
+      this._marginRight = svgWidth - (cx + rx);
+      this._marginBottom = svgHeight - (cy + ry);
+
+      // Store original ellipse parameters
+      this._origCX = cx;
+      this._origCY = cy;
+      this._origRX = rx;
+      this._origRY = ry;
     }
 
     this._createOverlay();
@@ -114,6 +127,26 @@ export class Resizer {
       this._marginTop = rectY;
       this._marginRight = svgWidth - (rectX + rectWidth);
       this._marginBottom = svgHeight - (rectY + rectHeight);
+    }
+
+    if (this._kind === 'ellipse') {
+      const el = this._element as SVGEllipseElement;
+      const cx = parseFloat(el.getAttribute('cx') || '0');
+      const cy = parseFloat(el.getAttribute('cy') || '0');
+      const rx = parseFloat(el.getAttribute('rx') || '0');
+      const ry = parseFloat(el.getAttribute('ry') || '0');
+
+      // Update margins for ellipse based on current position
+      this._marginLeft = cx - rx;
+      this._marginTop = cy - ry;
+      this._marginRight = svgWidth - (cx + rx);
+      this._marginBottom = svgHeight - (cy + ry);
+
+      // Update original values
+      this._origCX = cx;
+      this._origCY = cy;
+      this._origRX = rx;
+      this._origRY = ry;
     }
 
     const left = parseFloat(this._svg.style.left) || 0;
@@ -368,7 +401,7 @@ export class Resizer {
     const origX2 = parseFloat(this._element.getAttribute('x2')!);
     const origY2 = parseFloat(this._element.getAttribute('y2')!);
 
-    // container’s absolute position on the page
+    // container's absolute position on the page
     const initialLeft = parseFloat(this._svg.style.left) || 0;
     const initialTop = parseFloat(this._svg.style.top) || 0;
 
@@ -453,7 +486,7 @@ export class Resizer {
     const startX = event.clientX;
     const startY = event.clientY;
 
-    // 2) Read the SVG’s current translate:
+    // 2) Read the SVG's current translate:
     const initialLeft = parseFloat(this._svg.style.left) || 0;
     const initialTop = parseFloat(this._svg.style.top) || 0;
     const currentWidth = parseFloat(this._svg.getAttribute('width') || '0')!;
@@ -503,7 +536,7 @@ export class Resizer {
   }
 
   /**
-   * Called when the overlay’s outline is pressed to drag the annotation.
+   * Called when the overlay's outline is pressed to drag the annotation.
    */
   private _onDragStart(event: MouseEvent): void {
     if (this._isResizing) return;
@@ -620,28 +653,58 @@ export class Resizer {
       }
     }
 
-    // Constrain left edge:
-    if (newLeft + this._marginLeft < 0) {
-      const offset = -(newLeft + this._marginLeft);
-      newLeft += offset;
-      newWidth -= offset;
-    }
-
-    // Constrain top edge:
-    if (newTop + this._marginTop < 0) {
-      const offset = -(newTop + this._marginTop);
-      newTop += offset;
-      newHeight -= offset;
-    }
-
-    if (this._constraints) {
-      // Constrain right edge: inner rect's right must be within container width.
-      if (newLeft + newWidth - this._marginRight > this._constraints.width) {
-        newWidth = this._constraints.width - newLeft + this._marginRight;
+    // For ellipse, we need to ensure the constraints account for stroke padding
+    if (this._kind === 'ellipse') {
+      // The margins already account for stroke padding, so we can use them directly
+      // Constrain left edge:
+      if (newLeft + this._marginLeft < 0) {
+        const offset = -(newLeft + this._marginLeft);
+        newLeft += offset;
+        newWidth -= offset;
       }
-      // Constrain bottom edge: inner rect's bottom must be within container height.
-      if (newTop + newHeight - this._marginBottom > this._constraints.height) {
-        newHeight = this._constraints.height - newTop + this._marginBottom;
+
+      // Constrain top edge:
+      if (newTop + this._marginTop < 0) {
+        const offset = -(newTop + this._marginTop);
+        newTop += offset;
+        newHeight -= offset;
+      }
+
+      if (this._constraints) {
+        // Constrain right edge: ellipse's right edge must be within container width.
+        if (newLeft + newWidth - this._marginRight > this._constraints.width) {
+          newWidth = this._constraints.width - newLeft + this._marginRight;
+        }
+        // Constrain bottom edge: ellipse's bottom edge must be within container height.
+        if (newTop + newHeight - this._marginBottom > this._constraints.height) {
+          newHeight = this._constraints.height - newTop + this._marginBottom;
+        }
+      }
+    } else {
+      // Original rect logic
+      // Constrain left edge:
+      if (newLeft + this._marginLeft < 0) {
+        const offset = -(newLeft + this._marginLeft);
+        newLeft += offset;
+        newWidth -= offset;
+      }
+
+      // Constrain top edge:
+      if (newTop + this._marginTop < 0) {
+        const offset = -(newTop + this._marginTop);
+        newTop += offset;
+        newHeight -= offset;
+      }
+
+      if (this._constraints) {
+        // Constrain right edge: inner rect's right must be within container width.
+        if (newLeft + newWidth - this._marginRight > this._constraints.width) {
+          newWidth = this._constraints.width - newLeft + this._marginRight;
+        }
+        // Constrain bottom edge: inner rect's bottom must be within container height.
+        if (newTop + newHeight - this._marginBottom > this._constraints.height) {
+          newHeight = this._constraints.height - newTop + this._marginBottom;
+        }
       }
     }
 
@@ -653,14 +716,14 @@ export class Resizer {
   }
 
   /**
-   * Adjusts an ellipse’s cx, cy, rx, ry after resize.
+   * Adjusts an ellipse's cx, cy, rx, ry after resize.
    */
   private _updateEllipse(newWidth: number, newHeight: number) {
-    const minR = MIN_SHAPE_SIZE / 2;
-    const rx = Math.max(newWidth / 2, minR);
-    const ry = Math.max(newHeight / 2, minR);
-    const cx = rx;
-    const cy = ry;
+    // Calculate new ellipse parameters based on SVG dimensions and margins
+    const rx = Math.max((newWidth - this._marginLeft - this._marginRight) / 2, MIN_SHAPE_SIZE / 2);
+    const ry = Math.max((newHeight - this._marginTop - this._marginBottom) / 2, MIN_SHAPE_SIZE / 2);
+    const cx = this._marginLeft + rx;
+    const cy = this._marginTop + ry;
 
     const ell = this._element as SVGEllipseElement;
     ell.setAttribute('cx', `${cx}`);
@@ -669,14 +732,17 @@ export class Resizer {
     ell.setAttribute('ry', `${ry}`);
 
     /* hit-area sibling (if any) */
-    ell.nextElementSibling?.setAttribute('cx', `${cx}`);
-    ell.nextElementSibling?.setAttribute('cy', `${cy}`);
-    ell.nextElementSibling?.setAttribute('rx', `${rx}`);
-    ell.nextElementSibling?.setAttribute('ry', `${ry}`);
+    const hitElement = ell.nextElementSibling as SVGEllipseElement;
+    if (hitElement) {
+      hitElement.setAttribute('cx', `${cx}`);
+      hitElement.setAttribute('cy', `${cy}`);
+      hitElement.setAttribute('rx', `${rx}`);
+      hitElement.setAttribute('ry', `${ry}`);
+    }
   }
 
   /**
-   * Updates the svg container’s absolute position and size—and then adjusts the inner rect.
+   * Updates the svg container's absolute position and size—and then adjusts the inner rect.
    *
    * The inner rect is always placed using the stored margins:
    *   - x = marginLeft
@@ -685,7 +751,7 @@ export class Resizer {
    *   - height = (svg height) – (marginTop + marginBottom)
    */
   private _updateSvgAndRect(newLeft: number, newTop: number, newWidth: number, newHeight: number): void {
-    // Update the svg container’s position (via CSS) and its dimensions.
+    // Update the svg container's position (via CSS) and its dimensions.
     this._svg.style.left = newLeft + 'px';
     this._svg.style.top = newTop + 'px';
     this._svg.setAttribute('width', newWidth.toString());
