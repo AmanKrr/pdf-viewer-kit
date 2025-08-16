@@ -1,4 +1,4 @@
-import { PDFLinkService } from '../viewer/services/LS';
+import { PDFLinkService } from '../viewer/services/link.service';
 import { PDFDocumentProxy } from 'pdfjs-dist';
 
 /**

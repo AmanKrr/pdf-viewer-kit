@@ -14,8 +14,8 @@
   limitations under the License.
 */
 
-import { PDFViewerInstance } from '../core/PDFViewerInstance';
-import { PDFViewerManager } from '../core/PDFViewerManager';
+import { PDFViewerInstance } from '../core/viewer-instance.core';
+import { PDFViewerManager } from '../core/viewer-manager.core';
 import { LoadOptions } from '../types/webpdf.types';
 
 class PdfViewerKit {

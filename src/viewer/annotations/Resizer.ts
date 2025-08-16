@@ -14,9 +14,7 @@
   limitations under the License.
 */
 
-import { IAnnotation } from '../../interface/IAnnotation';
 import { MIN_SHAPE_SIZE } from '../../constants/geometry-constants';
-import PdfState from '../ui/PDFState';
 
 type Kind = 'rect' | 'ellipse' | 'line';
 

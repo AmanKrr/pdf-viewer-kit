@@ -14,11 +14,10 @@
   limitations under the License.
 */
 
-import { InstanceEventEmitter } from '../../core/InstanceEventEmitter';
-import { InstanceState } from '../../core/InstanceState';
+import { InstanceEventEmitter } from '../../core/event-emitter.core';
+import { InstanceState } from '../../core/viewer-state.core';
 import { IAnnotation } from '../../interface/IAnnotation';
 import { EllipseConfig, RectangleConfig } from '../../types/geometry.types';
-import PdfState from '../ui/PDFState';
 
 /**
  * Abstract base class for handling annotations in a PDF viewer.

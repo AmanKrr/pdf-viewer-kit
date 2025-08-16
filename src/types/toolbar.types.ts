@@ -1,4 +1,4 @@
-import WebViewer from '../viewer/ui/WebViewer';
+import WebViewer from '../viewer/ui/web-viewer';
 
 /**
  * Contract for a pluggable toolbar implementation.

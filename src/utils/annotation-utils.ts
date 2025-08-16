@@ -15,7 +15,7 @@
 */
 
 import { RectangleConfig, EllipseConfig, LineConfig } from '../types/geometry.types';
-import { RectangleAnno, EllipseAnno, LineAnno, ShapeAnno } from '../viewer/services/AnnotationExportService';
+import { RectangleAnno, EllipseAnno, LineAnno, ShapeAnno } from '../viewer/services/annotation-export.service';
 
 /**
  * Normalizes rectangle coordinates to ensure proper positioning.
