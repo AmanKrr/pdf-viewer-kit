@@ -193,6 +193,27 @@ export class RectangleAnnotation extends Annotation {
    */
   public stopDrawing(): void {
     super.stopDrawing();
+
+    // Check if the user actually created a meaningful shape (not just a click)
+    const currentWidth = parseFloat(this.__element?.getAttribute('width') || '0');
+    const currentHeight = parseFloat(this.__element?.getAttribute('height') || '0');
+    const minSize = 5; // Minimum size in pixels to consider it a valid shape
+
+    if (currentWidth < minSize || currentHeight < minSize) {
+      // User just clicked without dragging - mark this annotation as invalid
+      // and remove the DOM elements to clean up the visual artifacts
+      this._isValidAnnotation = false;
+
+      // Remove the SVG elements from DOM to clean up visual artifacts
+      if (this.__svg && this.__svg.parentElement) {
+        this.__svg.remove();
+      }
+
+      this._enableTextSelection();
+      return;
+    }
+
+    this._isValidAnnotation = true;
     this._maintainOriginalBounding();
     this._setRectInfo();
     this.select();
@@ -306,7 +327,7 @@ export class RectangleAnnotation extends Annotation {
     this.__hitElementRect.setAttribute('stroke', 'transparent');
     // Use thicker stroke width for easier clicking, scaled by zoom level
     const scaledHitStrokeWidth = (this._strokeWidth + 10) * (this.state.scale || 1);
-    this.__hitElementRect.style.strokeWidth = `${scaledHitStrokeWidth}`;
+    this.__hitElementRect.setAttribute('stroke-width', `${scaledHitStrokeWidth}`);
     this.__hitElementRect.style.cursor = 'pointer';
     this.__hitElementRect.style.pointerEvents = 'auto';
     this.__svg.appendChild(this.__element);

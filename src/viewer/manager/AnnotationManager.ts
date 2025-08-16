@@ -237,7 +237,18 @@ export class AnnotationManager {
     if (!this._activeAnnotation) return;
     this._activeAnnotation.stopDrawing();
     this._removeListeners();
-    this._onAnnotationSelection(this._activeAnnotation.getConfig());
+
+    // Check if the annotation is valid before processing it
+    if (this._activeAnnotation.isValidAnnotation) {
+      this._onAnnotationSelection(this._activeAnnotation.getConfig());
+    } else {
+      // Remove invalid annotation from the annotations array
+      const index = this._annotations.indexOf(this._activeAnnotation);
+      if (index > -1) {
+        this._annotations.splice(index, 1);
+      }
+    }
+
     this._activeAnnotation = null; // Reset so another shape can be drawn next time
     this.setPointerEvent('none');
   }

@@ -11,6 +11,9 @@ export interface IAnnotation {
   /** True while the user is actively drawing this annotation. */
   readonly isDrawing: boolean;
 
+  /** True if this annotation is valid and should be kept. */
+  readonly isValidAnnotation: boolean;
+
   /**
    * Begin drawing the annotation.
    *

@@ -185,6 +185,25 @@ export class EllipseAnnotation extends Annotation {
    */
   public stopDrawing(): void {
     super.stopDrawing();
+
+    // Check if the user actually created a meaningful shape (not just a click)
+    const currentRx = parseFloat((this.__element as SVGEllipseElement)?.getAttribute('rx') || '0');
+    const currentRy = parseFloat((this.__element as SVGEllipseElement)?.getAttribute('ry') || '0');
+    const minSize = 5; // Minimum size in pixels to consider it a valid shape
+
+    if (currentRx < minSize || currentRy < minSize) {
+      // User just clicked without dragging - mark this annotation as invalid
+      // and remove the DOM elements to clean up the visual artifacts
+      this._isValidAnnotation = false;
+
+      // Remove the SVG elements from DOM to clean up visual artifacts
+      if (this.__svg && this.__svg.parentElement) {
+        this.__svg.remove();
+      }
+
+      return;
+    }
+
     this._captureOriginal();
     this._setEllipseInfo();
     this.select();

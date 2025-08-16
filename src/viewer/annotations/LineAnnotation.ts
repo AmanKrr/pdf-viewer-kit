@@ -198,6 +198,30 @@ export class LineAnnotation extends Annotation {
    */
   public stopDrawing(): void {
     super.stopDrawing();
+
+    // Check if the user actually created a meaningful shape (not just a click)
+    const currentX1 = parseFloat((this.__element as SVGLineElement)?.getAttribute('x1') || '0');
+    const currentY1 = parseFloat((this.__element as SVGLineElement)?.getAttribute('y1') || '0');
+    const currentX2 = parseFloat((this.__element as SVGLineElement)?.getAttribute('x2') || '0');
+    const currentY2 = parseFloat((this.__element as SVGLineElement)?.getAttribute('y2') || '0');
+
+    // Calculate the actual line length
+    const lineLength = Math.sqrt(Math.pow(currentX2 - currentX1, 2) + Math.pow(currentY2 - currentY1, 2));
+    const minSize = 5; // Minimum size in pixels to consider it a valid shape
+
+    if (lineLength < minSize) {
+      // User just clicked without dragging - mark this annotation as invalid
+      // and remove the DOM elements to clean up the visual artifacts
+      this._isValidAnnotation = false;
+
+      // Remove the SVG elements from DOM to clean up visual artifacts
+      if (this.__svg && this.__svg.parentElement) {
+        this.__svg.remove();
+      }
+
+      return;
+    }
+
     this._captureOriginal();
     this._setLineInfo();
     this.select();

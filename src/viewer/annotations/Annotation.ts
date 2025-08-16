@@ -33,6 +33,7 @@ export abstract class Annotation implements IAnnotation {
   protected __element: SVGElement | null = null;
   protected __hitElementRect: SVGElement | null = null;
   public isDrawing: boolean = false;
+  protected _isValidAnnotation: boolean = true; // Flag to indicate if annotation should be kept
 
   protected __startX: number = 0;
   protected __startY: number = 0;
@@ -92,6 +93,11 @@ export abstract class Annotation implements IAnnotation {
 
   get events() {
     return this.__instances.events;
+  }
+
+  /** Check if this annotation is valid and should be kept. */
+  get isValidAnnotation(): boolean {
+    return this._isValidAnnotation;
   }
 
   /**
