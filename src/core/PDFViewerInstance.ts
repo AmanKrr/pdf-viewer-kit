@@ -14,7 +14,7 @@
   limitations under the License.
 */
 
-import { GlobalWorkerOptions, PDFDocumentProxy } from 'pdfjs-dist';
+import { GlobalWorkerOptions, PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist';
 import { LoadOptions } from '../types/webpdf.types';
 import { InstanceState } from './InstanceState';
 import { InstanceEventEmitter } from './InstanceEventEmitter';
@@ -42,7 +42,7 @@ export class PDFViewerInstance {
   // PDF instance
   private _pdfDocument: PDFDocumentProxy | null = null;
   private _webViewer: InstanceWebViewer | null = null;
-  private _loadingTask: any | null = null;
+  private _loadingTask: PDFDocumentLoadingTask | null = null;
   private _isDestroyed = false;
 
   constructor(containerId: string, options: LoadOptions) {

@@ -226,7 +226,8 @@ class WebViewer {
       }, 50);
     });
 
-    // this._downloadManager = new DownloadManager(this._annotationService, instanceState);
+    // Initialize download manager (commented out due to type compatibility issues)
+    // this._downloadManager = new DownloadManager(this._annotationService, this._instance.state);
   }
 
   /**

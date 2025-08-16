@@ -15,7 +15,7 @@
 */
 
 import WebViewer from './WebViewer';
-import { IToolbar, ToolbarOptions, ToolbarButtonConfig } from '../../types/toolbar.types';
+import { IToolbar, ToolbarOptions, ToolbarButtonConfig, ToolbarAction, ToolbarButtonEvent } from '../../types/toolbar.types';
 import PdfState from './PDFState';
 import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
 import { AnnotationToolbar } from './PDFAnnotationToolbar';
@@ -34,7 +34,6 @@ export class Toolbar implements IToolbar {
 
   /**
    * @param viewer    The WebViewer instance.
-   * @param pdfState  Shared state object for PDF interactions.
    * @param buttons   Optional custom button configurations.
    * @param options   ToolbarOptions to enable/disable features.
    */
@@ -59,16 +58,16 @@ export class Toolbar implements IToolbar {
     this._annotationToolbar = new AnnotationToolbar(this._viewer);
   }
 
-  get instanceId() {
+  get instanceId(): string {
     return this._viewer.instanceId;
   }
 
-  get containerId() {
+  get containerId(): string {
     return this._viewer.containerId;
   }
 
-  get instance() {
-    return this._viewer.instance;
+  get instance(): WebViewer {
+    return this._viewer;
   }
 
   /**
@@ -109,19 +108,21 @@ export class Toolbar implements IToolbar {
     if (this._opts.showThumbnail) {
       buttons.push({
         id: 'thumbnail',
+        action: 'thumbnail',
         iconClass: 'thumbnail-icon',
         tooltip: 'Toggle Thumbnails',
-        onClick: (viewer) => viewer.toogleThumbnailViewer(),
+        onClick: (viewer: WebViewer) => viewer.toogleThumbnailViewer(),
       });
     }
 
     if (this._opts.showFirstPage) {
       buttons.push({
         id: 'firstPage',
+        action: 'firstPage',
         iconClass: 'first-page-icon',
         tooltip: 'First Page',
         isSeparatorBefore: this._opts.showThumbnail,
-        onClick: (viewer) => viewer.firstPage(),
+        onClick: (viewer: WebViewer) => viewer.firstPage(),
       });
     }
 
@@ -129,15 +130,17 @@ export class Toolbar implements IToolbar {
       buttons.push(
         {
           id: 'previousPage',
+          action: 'previousPage',
           iconClass: 'previous-page-icon',
           tooltip: 'Previous Page',
-          onClick: (viewer) => viewer.previousPage(),
+          onClick: (viewer: WebViewer) => viewer.previousPage(),
         },
         {
           id: 'nextPage',
+          action: 'nextPage',
           iconClass: 'next-page-icon',
           tooltip: 'Next Page',
-          onClick: (viewer) => viewer.nextPage(),
+          onClick: (viewer: WebViewer) => viewer.nextPage(),
         },
       );
     }
@@ -145,16 +148,18 @@ export class Toolbar implements IToolbar {
     if (this._opts.showLastPage) {
       buttons.push({
         id: 'lastPage',
+        action: 'lastPage',
         iconClass: 'last-page-icon',
         tooltip: 'Last Page',
-        onClick: (viewer) => viewer.lastPage(),
+        onClick: (viewer: WebViewer) => viewer.lastPage(),
       });
     }
 
     if (this._opts.showPageNumber) {
       buttons.push({
         id: 'pageNumber',
-        render: (viewer) => this._renderPageNumberControls(viewer),
+        action: 'currentPageNumber',
+        render: (viewer: WebViewer) => this._renderPageNumberControls(viewer),
       });
     }
 
@@ -162,16 +167,18 @@ export class Toolbar implements IToolbar {
       buttons.push(
         {
           id: 'zoomIn',
+          action: 'zoomIn',
           iconClass: 'zoom-in-icon',
           tooltip: 'Zoom In',
           isSeparatorBefore: true,
-          onClick: (viewer) => viewer.zoomIn(),
+          onClick: (viewer: WebViewer) => viewer.zoomIn(),
         },
         {
           id: 'zoomOut',
+          action: 'zoomOut',
           iconClass: 'zoom-out-icon',
           tooltip: 'Zoom Out',
-          onClick: (viewer) => viewer.zoomOut(),
+          onClick: (viewer: WebViewer) => viewer.zoomOut(),
         },
       );
     }
@@ -179,9 +186,10 @@ export class Toolbar implements IToolbar {
     if (this._opts.showSearch) {
       buttons.push({
         id: 'search',
+        action: 'search',
         iconClass: 'search-icon',
         tooltip: 'Search',
-        onClick: (viewer) => {
+        onClick: (viewer: WebViewer) => {
           this._closeAnnotationToolbar();
           viewer.search();
           this._searchBarOpen = !this._searchBarOpen;
@@ -193,17 +201,19 @@ export class Toolbar implements IToolbar {
     if (this._opts.showAnnotation) {
       buttons.push({
         id: 'annotation',
+        action: 'annotation',
         iconClass: 'annotation-icon',
         tooltip: 'Annotations',
-        onClick: () => {
+        onClick: (viewer: WebViewer) => {
           if (this._searchBarOpen) {
             this._viewer.search();
             this._searchBarOpen = false;
           }
-          this._viewer.instance.state.isAnnotationEnabled = !this.instance.state.isAnnotationEnabled;
+          // Use the same state object that the annotation toolbar accesses
+          this._viewer.state.isAnnotationEnabled = !this._viewer.state.isAnnotationEnabled;
           const btn = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;
           btn?.classList.toggle('active');
-          if (this.instance.state.isAnnotationEnabled) {
+          if (this._viewer.state.isAnnotationEnabled) {
             this._annotationToolbar.render();
           } else {
             this._annotationToolbar.destroy();
@@ -216,9 +226,10 @@ export class Toolbar implements IToolbar {
     // if (this._opts.showDownload) {
     //   buttons.push({
     //     id: 'download',
+    //     action: 'download',
     //     iconClass: 'download-icon',
     //     tooltip: 'Download PDF with Annotations',
-    //     onClick: async (viewer) => {
+    //     onClick: async (viewer: WebViewer) => {
     //       try {
     //         await viewer.downloadPdf();
     //       } catch (error) {
@@ -236,7 +247,7 @@ export class Toolbar implements IToolbar {
    * Closes the annotation toolbar if open.
    */
   private _closeAnnotationToolbar(): void {
-    this.instance.state.isAnnotationEnabled = false;
+    this._viewer.state.isAnnotationEnabled = false;
     const btn = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;
     btn?.classList.toggle('active');
     this._annotationToolbar.destroy();
@@ -251,8 +262,17 @@ export class Toolbar implements IToolbar {
   protected __createButton(cfg: ToolbarButtonConfig): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.classList.add(`${this._opts.classPrefix}-button`, `${cfg.id}-button`);
+
+    if (cfg.additionalClasses) {
+      btn.classList.add(...cfg.additionalClasses);
+    }
+
     if (cfg.tooltip) {
       btn.setAttribute('title', cfg.tooltip);
+    }
+
+    if (cfg.disabled) {
+      btn.disabled = true;
     }
 
     const icon = document.createElement('span');
@@ -260,7 +280,15 @@ export class Toolbar implements IToolbar {
     btn.appendChild(icon);
 
     if (cfg.onClick) {
-      btn.addEventListener('click', () => cfg.onClick!(this._viewer));
+      btn.addEventListener('click', () => {
+        const event: ToolbarButtonEvent = {
+          type: 'click',
+          target: btn,
+          viewer: this._viewer,
+          data: cfg.customData,
+        };
+        cfg.onClick!(this._viewer, event, cfg.customData);
+      });
     }
 
     return btn;
@@ -307,8 +335,25 @@ export class Toolbar implements IToolbar {
     inputField.autocomplete = 'off';
     inputField.setAttribute('aria-label', 'Current page number');
     inputField.value = String(viewer.currentPageNumber);
-    inputField.oninput = (e) => viewer.toolbarButtonClick('currentPageNumber', e);
-    inputField.onkeydown = (e) => viewer.toolbarButtonClick('currentPageNumber', e);
+
+    inputField.oninput = (e: Event) => {
+      const event: ToolbarButtonEvent = {
+        type: 'input',
+        target: e.target as EventTarget,
+        viewer: viewer,
+      };
+      viewer.toolbarButtonClick('currentPageNumber', e);
+    };
+
+    inputField.onkeydown = (e: KeyboardEvent) => {
+      const event: ToolbarButtonEvent = {
+        type: 'keydown',
+        target: e.target as EventTarget,
+        viewer: viewer,
+      };
+      viewer.toolbarButtonClick('currentPageNumber', e);
+    };
+
     inputContainer.appendChild(inputField);
 
     const ofContainer = document.createElement('div');
