@@ -101,7 +101,7 @@ export class ShapeSelectionPlugin extends BaseAnnotationToolbarPlugin {
     };
     context.viewer.events.on('ANNOTATION_CREATED', this._boundAnnotationCreatedHandler);
 
-    // Add click outside handler to close dropdown - BIND PROPERLY
+    // Add click outside handler to close dropdown
     this._boundClickOutsideHandler = this._handleClickOutside.bind(this);
     document.addEventListener('click', this._boundClickOutsideHandler);
   }
@@ -127,7 +127,7 @@ export class ShapeSelectionPlugin extends BaseAnnotationToolbarPlugin {
     this.arrowButton = this.createArrowButton(context);
     shapeButtonContainer.appendChild(this.arrowButton);
 
-    // Create shape dropdown and append to .a-pdf-viewer (old working logic)
+    // Create shape dropdown and append to .a-pdf-viewer
     this.shapeDropdown = this.createShapeDropdown(context);
 
     // Get the .a-pdf-viewer container for appending dropdowns
@@ -194,8 +194,6 @@ export class ShapeSelectionPlugin extends BaseAnnotationToolbarPlugin {
     button.style.opacity = '1';
 
     button.addEventListener('click', (e) => {
-      console.log('ShapeSelectionPlugin: Arrow button clicked!', 'Current dropdown state:', this.isDropdownOpen);
-
       // CRITICAL: Prevent event propagation and default behavior
       e.preventDefault();
       e.stopPropagation();
@@ -213,14 +211,12 @@ export class ShapeSelectionPlugin extends BaseAnnotationToolbarPlugin {
     const dropdown = document.createElement('div');
     dropdown.classList.add(PDF_VIEWER_CLASSNAMES.A_ANNOTATION_SHAPE_DROPDOWN);
     dropdown.style.display = 'none';
-    // Popper.js will handle positioning
     dropdown.style.zIndex = '10000';
     dropdown.style.background = '#fff';
     dropdown.style.border = '1px solid #ccc';
     dropdown.style.borderRadius = '4px';
     dropdown.style.padding = '8px';
     dropdown.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-    dropdown.style.minWidth = '150px';
 
     this.shapeOptions.forEach((shape) => {
       const item = this.createShapeOption(shape, context);
@@ -273,10 +269,6 @@ export class ShapeSelectionPlugin extends BaseAnnotationToolbarPlugin {
   }
 
   private toggleShapeDropdown(): void {
-    console.log('ShapeSelectionPlugin: toggleShapeDropdown called, current state:', this.isDropdownOpen);
-    console.log('ShapeSelectionPlugin: Shape dropdown element:', this.shapeDropdown);
-    console.log('ShapeSelectionPlugin: Shape dropdown display style:', this.shapeDropdown?.style.display);
-
     if (this.isDropdownOpen) {
       this.hideShapeDropdown();
     } else {
@@ -336,8 +328,6 @@ export class ShapeSelectionPlugin extends BaseAnnotationToolbarPlugin {
     if (this.popperInstance) {
       this.popperInstance.update();
     }
-
-    console.log('ShapeSelectionPlugin: Dropdown shown, new state:', this.isDropdownOpen);
   }
 
   private hideShapeDropdown(): void {
@@ -359,8 +349,6 @@ export class ShapeSelectionPlugin extends BaseAnnotationToolbarPlugin {
     if (ShapeSelectionPlugin.currentlyOpenDropdown === this.shapeDropdown) {
       ShapeSelectionPlugin.currentlyOpenDropdown = null;
     }
-
-    console.log('ShapeSelectionPlugin: Dropdown hidden, new state:', this.isDropdownOpen);
   }
 
   private updateShapeButton(shape: ShapeType | 'none'): void {
@@ -410,7 +398,6 @@ export class ShapeSelectionPlugin extends BaseAnnotationToolbarPlugin {
    */
   private updateButtonStates(): void {
     if (!this.context) {
-      console.log('ShapeSelectionPlugin: No context available for updateButtonStates');
       return;
     }
 

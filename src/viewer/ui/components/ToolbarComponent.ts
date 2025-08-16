@@ -25,10 +25,7 @@ export abstract class ToolbarComponent {
   protected isVisible = false;
   protected isDestroyed = false;
 
-  constructor() {
-    // Don't create element here, wait until render() is called
-    // this.element = this.createElement();
-  }
+  constructor() {}
 
   /**
    * Create the component's DOM element

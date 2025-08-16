@@ -76,7 +76,7 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
     // Set initial display state based on current state
     this.propertiesContainer.style.display = context.stateManager.state.propertiesOpen ? 'flex' : 'none';
 
-    // Get the .a-pdf-viewer container for appending dropdowns (your old working logic)
+    // Get the .a-pdf-viewer container for appending dropdowns
     const pdfViewerContainer = document.querySelector<HTMLElement>(`#${context.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`);
     if (!pdfViewerContainer) {
       console.error('PDF viewer container not found');
@@ -106,7 +106,7 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
     });
     this.propertiesContainer.appendChild(fillColorPicker.getElement());
 
-    // Add opacity slider - append dropdown to .a-pdf-viewer (your old working logic)
+    // Add opacity slider
     const opacityContainer = this.createSliderControl(
       'Opacity',
       0,
@@ -114,11 +114,11 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
       context.stateManager.state.drawConfig.opacity,
       (v) => `${Math.round(v * 100)}%`,
       (v) => context.stateManager.updateDrawConfig({ opacity: v }),
-      pdfViewerContainer, // Pass the container for dropdown injection
+      pdfViewerContainer,
     );
     this.propertiesContainer.appendChild(opacityContainer);
 
-    // Add thickness slider - append dropdown to .a-pdf-viewer (your old working logic)
+    // Add thickness slider
     const thicknessContainer = this.createSliderControl(
       'Thickness',
       1,
@@ -126,15 +126,15 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
       context.stateManager.state.drawConfig.strokeWidth,
       (v) => `${Math.round(v)} pt`,
       (v) => context.stateManager.updateDrawConfig({ strokeWidth: v }),
-      pdfViewerContainer, // Pass the container for dropdown injection
+      pdfViewerContainer,
     );
     this.propertiesContainer.appendChild(thicknessContainer);
 
-    // Add border style dropdown - append dropdown to .a-pdf-viewer (old working logic)
+    // Add border style dropdown
     const borderContainer = this.createBorderStyleControl(
       context.stateManager.state.drawConfig.strokeStyle,
       (style) => context.stateManager.updateDrawConfig({ strokeStyle: style }),
-      pdfViewerContainer, // Pass the container for dropdown injection
+      pdfViewerContainer,
     );
     this.propertiesContainer.appendChild(borderContainer);
 
@@ -149,7 +149,7 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
     initialValue: number,
     displayValueFn: (v: number) => string,
     onValueChange: (v: number) => void,
-    pdfViewerContainer: HTMLElement, // New parameter for dropdown injection
+    pdfViewerContainer: HTMLElement,
   ): HTMLElement {
     const container = document.createElement('div');
     container.classList.add(PDF_VIEWER_CLASSNAMES.A_ANNOTATION_SHAPE_PROPERTIES);
@@ -177,16 +177,7 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
     const dropdown = document.createElement('div');
     dropdown.classList.add(PDF_VIEWER_CLASSNAMES.A_ANNOTATION_DROPDOWN_SLIDER_CONTAINER);
     dropdown.style.display = 'none';
-    // Popper.js will handle positioning
-    // dropdown.style.position = 'absolute'; // REMOVED - Popper.js handles positioning
-    dropdown.style.zIndex = '10000';
-    dropdown.style.background = '#fff';
-    dropdown.style.border = '1px solid #ccc';
-    dropdown.style.borderRadius = '4px';
-    dropdown.style.padding = '8px';
-    dropdown.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-    dropdown.style.minWidth = '160px';
-    dropdown.style.pointerEvents = 'auto';
+    // dropdown.style.zIndex = '10000';
 
     const track = document.createElement('div');
     track.style.position = 'relative';
@@ -261,8 +252,8 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
     };
 
     button.onclick = () => {
-      const isVisible = dropdown.style.display === 'block';
-      console.log('Clicked: ', isVisible);
+      // already class hace display flex no need to give block
+      const isVisible = dropdown.style.display === '';
 
       if (isVisible) {
         // Hide dropdown using the dropdown manager
@@ -275,8 +266,8 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
         }
       } else {
         // Show dropdown with Popper.js positioning
-        dropdown.style.display = 'block';
-        console.log('here i am');
+        // already class hace display flex no need to give block
+        dropdown.style.display = '';
 
         // Close any previously open dropdown and set this one as open
         AnnotationPropertiesPlugin.setDropdownOpen(dropdown);
@@ -293,16 +284,13 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
 
         // Update Popper positioning
         popperInstance.update();
-
-        // COMMENTED OUT: Register this dropdown as the active one - might be interfering
-        // AnnotationPropertiesPlugin.setActiveDropdown(dropdown);
       }
     };
 
     document.addEventListener('click', (ev) => {
       if (!container.contains(ev.target as Node)) {
         // Only hide dropdown if it's actually visible
-        if (dropdown.style.display === 'block') {
+        if (dropdown.style.display === '') {
           // Use the dropdown manager to properly track this dropdown as closed
           AnnotationPropertiesPlugin.closeDropdown(dropdown);
 
@@ -315,9 +303,6 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
       }
     });
 
-    // Append dropdown to .a-pdf-viewer (old working logic)
-    // container.appendChild(dropdown); // REMOVED - now appended to .a-pdf-viewer
-
     // Inject dropdown directly to .a-pdf-viewer container
     if (pdfViewerContainer) {
       pdfViewerContainer.appendChild(dropdown);
@@ -326,11 +311,7 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
     return container;
   }
 
-  private createBorderStyleControl(
-    initialStyle: string,
-    onSelect: (style: 'Solid' | 'Dashed' | 'Dotted') => void,
-    pdfViewerContainer: HTMLElement, // New parameter for dropdown injection
-  ): HTMLElement {
+  private createBorderStyleControl(initialStyle: string, onSelect: (style: 'Solid' | 'Dashed' | 'Dotted') => void, pdfViewerContainer: HTMLElement): HTMLElement {
     const styles: Array<'Solid' | 'Dashed' | 'Dotted'> = ['Solid', 'Dashed', 'Dotted'];
 
     const container = document.createElement('div');
@@ -353,23 +334,13 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
     btn.style.background = '#2e2e2e';
     btn.style.color = '#fff';
     btn.style.padding = '4px 8px';
-    btn.style.minWidth = '65px';
     btn.textContent = initialStyle;
     container.appendChild(btn);
 
     const dropdown = document.createElement('div');
     dropdown.classList.add(PDF_VIEWER_CLASSNAMES.A_ANNOTATION_BORDER_DROPDOWN);
     dropdown.style.display = 'none';
-    // Popper.js will handle positioning
-    // dropdown.style.position = 'absolute'; // REMOVED - Popper.js handles positioning
-    dropdown.style.zIndex = '10000';
-    dropdown.style.background = '#fff';
-    dropdown.style.border = '1px solid #ccc';
-    dropdown.style.borderRadius = '4px';
-    dropdown.style.padding = '8px';
-    dropdown.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-    dropdown.style.minWidth = '80px';
-    dropdown.style.pointerEvents = 'auto';
+    // dropdown.style.zIndex = '10000';
 
     let popperInstance: PopperInstance | undefined;
 
@@ -390,11 +361,6 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
           popperInstance = undefined;
         }
 
-        // COMMENTED OUT: Clear this dropdown as active if it was the active one - might be interfering
-        // if (AnnotationPropertiesPlugin.activeDropdown === dropdown) {
-        //   AnnotationPropertiesPlugin.activeDropdown = null;
-        // }
-
         onSelect(style);
       };
 
@@ -410,7 +376,8 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
     });
 
     btn.onclick = () => {
-      const isVisible = dropdown.style.display === 'block';
+      // already class have display flex no need to give block
+      const isVisible = dropdown.style.display === '';
 
       if (isVisible) {
         // Hide dropdown using the dropdown manager
@@ -423,7 +390,8 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
         }
       } else {
         // Show dropdown with Popper.js positioning
-        dropdown.style.display = 'block';
+        // already class hace display flex no need to give block
+        dropdown.style.display = '';
 
         // Close any previously open dropdown and set this one as open
         AnnotationPropertiesPlugin.setDropdownOpen(dropdown);
@@ -440,16 +408,13 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
 
         // Update Popper positioning
         popperInstance.update();
-
-        // COMMENTED OUT: Register this dropdown as the active one - might be interfering
-        // AnnotationPropertiesPlugin.setActiveDropdown(dropdown);
       }
     };
 
     document.addEventListener('click', (ev) => {
       if (!container.contains(ev.target as Node)) {
         // Only hide dropdown if it's actually visible
-        if (dropdown.style.display === 'block') {
+        if (dropdown.style.display === '') {
           // Use the dropdown manager to properly track this dropdown as closed
           AnnotationPropertiesPlugin.closeDropdown(dropdown);
 
@@ -461,9 +426,6 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
         }
       }
     });
-
-    // Append dropdown to .a-pdf-viewer (old working logic)
-    // container.appendChild(dropdown); // REMOVED - now appended to .a-pdf-viewer
 
     // Inject dropdown directly to .a-pdf-viewer container
     if (pdfViewerContainer) {

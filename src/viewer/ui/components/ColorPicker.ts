@@ -89,15 +89,12 @@ export class ColorPicker extends ToolbarComponent {
     const dropdown = document.createElement('div');
     dropdown.classList.add(PDF_VIEWER_CLASSNAMES.A_ANNOTATION_COLOR_PICKER);
     dropdown.style.display = 'none';
-    // Popper.js will handle positioning
-    // dropdown.style.position = 'absolute'; // REMOVED - Popper.js handles positioning
     dropdown.style.zIndex = '10000';
     dropdown.style.background = '#fff';
     dropdown.style.border = '1px solid #ccc';
     dropdown.style.borderRadius = '4px';
     dropdown.style.padding = '8px';
     dropdown.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-    dropdown.style.minWidth = '200px';
     dropdown.style.pointerEvents = 'auto';
 
     const swatches = ['#FF0000', '#FF9900', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF', '#FF00FF', '#FFFFFF', '#C0C0C0', '#000000'];
@@ -178,7 +175,7 @@ export class ColorPicker extends ToolbarComponent {
   }
 
   private injectDropdown(): void {
-    // Use the old working logic: append to .a-pdf-viewer container
+    // Append to .a-pdf-viewer container
     const pdfViewerContainer = document.querySelector<HTMLElement>(`#${this.config.containerId} .a-pdf-viewer`);
     if (pdfViewerContainer) {
       pdfViewerContainer.appendChild(this.dropdown);
@@ -198,8 +195,6 @@ export class ColorPicker extends ToolbarComponent {
     document.addEventListener('click', (e) => {
       if (!this.element.contains(e.target as Node)) {
         this.hideDropdown();
-        // Use the simple dropdown manager instead
-        // AnnotationPropertiesPlugin.closeActiveDropdown();
       }
     });
 
@@ -228,9 +223,6 @@ export class ColorPicker extends ToolbarComponent {
   }
 
   private showDropdown(): void {
-    // Use the simple dropdown manager to close any previously open dropdown
-    // This will be handled by the AnnotationPropertiesPlugin
-
     // Also ensure our own dropdown is properly reset
     this.isDropdownOpen = false;
 
