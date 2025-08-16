@@ -1,10 +1,35 @@
-// TextSelectionHandler.ts
+/*
+  Copyright 2025 Aman Kumar
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
 import { PageViewport } from 'pdfjs-dist';
 import { createPopper, Instance as PopperInstance, VirtualElement } from '@popperjs/core';
 import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
 
+/**
+ * Types of text annotations that can be applied to selected text.
+ */
 type AnnotationType = 'highlight' | 'underline' | 'strike' | 'squiggle';
 
+/**
+ * Handles text selection and annotation creation in the PDF viewer.
+ *
+ * Manages text selection events, displays annotation toolbar, and creates
+ * text-based annotations like highlights, underlines, etc. Uses a shared
+ * static state for global event handling and toolbar management.
+ */
 export class TextSelectionHandler {
   // ─── Static (shared) state ──────────────────────────
   private static toolbar: HTMLElement;
@@ -25,6 +50,17 @@ export class TextSelectionHandler {
   private readonly textDivs: HTMLElement[];
   private readonly viewport: PageViewport;
 
+  /**
+   * Creates a new text selection handler for a specific page.
+   *
+   * @param containerId - The container ID where the handler operates
+   * @param instanceId - The PDF viewer instance ID
+   * @param pageWrapper - The page wrapper element
+   * @param textLayerDiv - The text layer div element
+   * @param annotationLayer - The annotation layer element
+   * @param textDivs - Array of text div elements
+   * @param viewport - The PDF page viewport
+   */
   constructor(
     containerId: string,
     instanceId: string,
@@ -47,6 +83,10 @@ export class TextSelectionHandler {
   }
 
   // ─── Shared toolbar + listeners setup ──────────────
+  /**
+   * Initializes shared static state and event listeners.
+   * Only runs once for the first handler instance.
+   */
   private static initializeShared() {
     if (TextSelectionHandler.initialized) return;
     TextSelectionHandler.buildToolbar();
@@ -78,6 +118,9 @@ export class TextSelectionHandler {
     TextSelectionHandler.initialized = true;
   }
 
+  /**
+   * Cleans up shared static state and event listeners.
+   */
   private static destroyShared() {
     if (!TextSelectionHandler.initialized) return;
     document.removeEventListener('pointerdown', TextSelectionHandler.onPointerDown);

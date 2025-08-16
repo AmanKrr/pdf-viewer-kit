@@ -19,7 +19,10 @@ import { PDFViewerInstance } from './viewer-instance.core';
 
 /**
  * Manages multiple PDF viewer instances with complete isolation.
- * Each instance has its own state, resources, and event system.
+ *
+ * Each instance has its own state, resources, and event system,
+ * providing a centralized management layer for multi-instance PDF viewing.
+ * Implements singleton pattern to ensure global coordination.
  */
 export class PDFViewerManager {
   private static _instance: PDFViewerManager;
@@ -30,7 +33,12 @@ export class PDFViewerManager {
   private constructor() {}
 
   /**
-   * Gets the singleton instance of PDFViewerManager
+   * Gets the singleton instance of PDFViewerManager.
+   *
+   * Creates a new instance if one doesn't exist, ensuring
+   * only one manager exists throughout the application lifecycle.
+   *
+   * @returns The singleton PDFViewerManager instance
    */
   public static getInstance(): PDFViewerManager {
     if (!PDFViewerManager._instance) {
@@ -40,14 +48,21 @@ export class PDFViewerManager {
   }
 
   /**
-   * Loads a PDF document into a new isolated instance
+   * Loads a PDF document into a new isolated instance.
+   *
+   * Creates a completely isolated PDF viewer instance for the specified
+   * container, ensuring no resource conflicts with existing instances.
+   * Automatically handles container conflict resolution and cleanup.
+   *
+   * @param options - Configuration options for loading the PDF document
+   * @returns Promise that resolves to the new PDFViewerInstance
+   * @throws Error if the manager is destroyed or container conflicts exist
    */
   async load(options: LoadOptions): Promise<PDFViewerInstance> {
     if (this._isDestroyed) {
       throw new Error('PDFViewerManager has been destroyed');
     }
 
-    // Check if container is already in use
     if (this._containerToInstance.has(options.containerId)) {
       const existingInstanceId = this._containerToInstance.get(options.containerId)!;
       const existingInstance = this._instances.get(existingInstanceId);
@@ -55,21 +70,17 @@ export class PDFViewerManager {
       if (existingInstance && !existingInstance.isDestroyed) {
         throw new Error(`Container ${options.containerId} is already in use by instance ${existingInstanceId}`);
       } else {
-        // Clean up stale reference
         this._containerToInstance.delete(options.containerId);
         this._instances.delete(existingInstanceId);
       }
     }
 
     try {
-      // Create new isolated instance
       const instance = new PDFViewerInstance(options.containerId, options);
 
-      // Store instance references
       this._instances.set(instance.instanceId, instance);
       this._containerToInstance.set(options.containerId, instance.instanceId);
 
-      // Set up instance cleanup on destroy
       instance.events.on('instanceDestroyed', () => {
         this._cleanupInstance(instance.instanceId);
       });
@@ -84,14 +95,20 @@ export class PDFViewerManager {
   }
 
   /**
-   * Gets an instance by its ID
+   * Gets an instance by its unique identifier.
+   *
+   * @param instanceId - The unique identifier of the instance
+   * @returns The PDFViewerInstance if found, undefined otherwise
    */
   getInstance(instanceId: string): PDFViewerInstance | undefined {
     return this._instances.get(instanceId);
   }
 
   /**
-   * Gets an instance by container ID
+   * Gets an instance by its container ID.
+   *
+   * @param containerId - The DOM container ID where the instance is rendered
+   * @returns The PDFViewerInstance if found, undefined otherwise
    */
   getInstanceByContainer(containerId: string): PDFViewerInstance | undefined {
     const instanceId = this._containerToInstance.get(containerId);
@@ -102,35 +119,49 @@ export class PDFViewerManager {
   }
 
   /**
-   * Gets all active instances
+   * Gets all active instances.
+   *
+   * @returns An array of PDFViewerInstance objects that are not destroyed.
    */
   getAllInstances(): PDFViewerInstance[] {
     return Array.from(this._instances.values()).filter((instance) => !instance.isDestroyed);
   }
 
   /**
-   * Gets all instance IDs
+   * Gets all instance IDs.
+   *
+   * @returns An array of unique identifiers for all instances.
    */
   getAllInstanceIds(): string[] {
     return Array.from(this._instances.keys());
   }
 
   /**
-   * Gets all container IDs
+   * Gets all container IDs.
+   *
+   * @returns An array of DOM container IDs that are currently in use.
    */
   getAllContainerIds(): string[] {
     return Array.from(this._containerToInstance.keys());
   }
 
   /**
-   * Gets the total number of active instances
+   * Gets the total number of active instances.
+   *
+   * @returns The count of instances that are not destroyed.
    */
   getInstanceCount(): number {
     return this.getAllInstances().length;
   }
 
   /**
-   * Unloads a specific instance
+   * Unloads a specific instance.
+   *
+   * Destroys the instance and removes it from the manager's state.
+   *
+   * @param instanceId - The unique identifier of the instance to unload.
+   * @returns Promise that resolves when the instance is unloaded.
+   * @throws Error if the instance is not found or is already destroyed.
    */
   async unload(instanceId: string): Promise<void> {
     const instance = this._instances.get(instanceId);
@@ -147,7 +178,13 @@ export class PDFViewerManager {
   }
 
   /**
-   * Unloads an instance by container ID
+   * Unloads an instance by container ID.
+   *
+   * Finds the instance by its container ID and unloads it.
+   *
+   * @param containerId - The DOM container ID where the instance is rendered.
+   * @returns Promise that resolves when the instance is unloaded.
+   * @throws Error if the container ID is not found.
    */
   async unloadByContainer(containerId: string): Promise<void> {
     const instanceId = this._containerToInstance.get(containerId);
@@ -157,7 +194,11 @@ export class PDFViewerManager {
   }
 
   /**
-   * Unloads all instances
+   * Unloads all instances.
+   *
+   * Iterates through all instances and unloads them.
+   *
+   * @returns Promise that resolves when all instances are unloaded.
    */
   async unloadAll(): Promise<void> {
     const instanceIds = Array.from(this._instances.keys());
@@ -173,14 +214,19 @@ export class PDFViewerManager {
   }
 
   /**
-   * Checks if a container is in use
+   * Checks if a container is in use.
+   *
+   * @param containerId - The DOM container ID to check.
+   * @returns True if the container is currently mapped to an instance, false otherwise.
    */
   isContainerInUse(containerId: string): boolean {
     return this._containerToInstance.has(containerId);
   }
 
   /**
-   * Gets instance statistics
+   * Gets instance statistics.
+   *
+   * @returns An object containing various statistics about the manager's state.
    */
   getStats(): {
     instanceCount: number;
@@ -228,7 +274,11 @@ export class PDFViewerManager {
   }
 
   /**
-   * Destroys the manager and all instances
+   * Destroys the manager and all instances.
+   *
+   * Unloads all instances and clears all internal state.
+   *
+   * @returns Promise that resolves when the manager is destroyed.
    */
   async destroy(): Promise<void> {
     if (this._isDestroyed) {
@@ -250,7 +300,11 @@ export class PDFViewerManager {
   }
 
   /**
-   * Cleans up a destroyed instance
+   * Cleans up a destroyed instance.
+   *
+   * Removes the instance from the instances map and its container mapping.
+   *
+   * @param instanceId - The unique identifier of the destroyed instance.
    */
   private _cleanupInstance(instanceId: string): void {
     const instance = this._instances.get(instanceId);
@@ -266,7 +320,9 @@ export class PDFViewerManager {
   }
 
   /**
-   * Handles memory pressure by cleaning up all instances
+   * Handles memory pressure by cleaning up all instances.
+   *
+   * Iterates through all active instances and calls their memory pressure handlers.
    */
   handleMemoryPressure(): void {
     console.log('Handling memory pressure in PDFViewerManager');
@@ -281,7 +337,9 @@ export class PDFViewerManager {
   }
 
   /**
-   * Sets up periodic cleanup to prevent memory leaks
+   * Sets up periodic cleanup to prevent memory leaks.
+   *
+   * Runs a cleanup task every minute to ensure periodic resource cleanup.
    */
   setupPeriodicCleanup(): void {
     // Clean up every minute

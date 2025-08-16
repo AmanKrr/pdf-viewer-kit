@@ -15,7 +15,10 @@
 */
 
 /**
- * Represents a pooled image bitmap with metadata
+ * Represents a pooled image bitmap with metadata.
+ *
+ * Each pooled bitmap maintains state information for efficient
+ * reuse and memory management within the pool.
  */
 interface PooledImageBitmap {
   bitmap: ImageBitmap;
@@ -29,30 +32,51 @@ interface PooledImageBitmap {
 
 /**
  * Image bitmap pool that is completely isolated to a single PDF instance.
- * Each instance has its own pool of image bitmaps, preventing resource conflicts.
+ *
+ * Each instance has its own pool of image bitmaps, preventing resource
+ * conflicts and ensuring complete isolation between PDF viewer instances.
+ * Implements intelligent bitmap reuse and memory management strategies.
  */
 export class InstanceImageBitmapPool {
   private readonly _instanceId: string;
   private readonly _pool: PooledImageBitmap[] = [];
   private readonly _maxPoolSize: number;
-  private readonly _maxBitmapAge: number = 30000; // 30 seconds max age
-  private readonly _sizeBucketThreshold: number = 128; // Pixels threshold for size bucketing
+  private readonly _maxBitmapAge: number = 30000;
+  private readonly _sizeBucketThreshold: number = 128;
   private _isDestroyed = false;
 
+  /**
+   * Creates a new image bitmap pool for a specific PDF instance.
+   *
+   * @param instanceId - Unique identifier for the PDF instance
+   * @param maxPoolSize - Maximum number of bitmaps to keep in the pool
+   */
   constructor(instanceId: string, maxPoolSize: number = 8) {
     this._instanceId = instanceId;
     this._maxPoolSize = maxPoolSize;
   }
 
   /**
-   * Gets the instance ID this pool belongs to
+   * Gets the instance ID this pool belongs to.
+   *
+   * @returns The unique identifier of the PDF instance
    */
   get instanceId(): string {
     return this._instanceId;
   }
 
   /**
-   * Gets an image bitmap from the pool or creates a new one
+   * Gets an image bitmap from the pool or creates a new one.
+   *
+   * Implements intelligent bitmap reuse by searching for available
+   * bitmaps of appropriate size, or creating new ones when needed.
+   * Uses LRU strategy when the pool is full.
+   *
+   * @param canvas - Source canvas to create bitmap from
+   * @param targetWidth - Optional target width for the bitmap
+   * @param targetHeight - Optional target height for the bitmap
+   * @returns Promise that resolves to an ImageBitmap
+   * @throws Error if the pool has been destroyed
    */
   async getImageBitmap(canvas: HTMLCanvasElement, targetWidth?: number, targetHeight?: number): Promise<ImageBitmap> {
     if (this._isDestroyed) {
@@ -62,7 +86,6 @@ export class InstanceImageBitmapPool {
     const width = targetWidth || canvas.width;
     const height = targetHeight || canvas.height;
 
-    // Try to find an available bitmap of the right size
     const availableBitmap = this._findAvailableBitmap(width, height);
     if (availableBitmap) {
       availableBitmap.inUse = true;
@@ -70,20 +93,16 @@ export class InstanceImageBitmapPool {
       return availableBitmap.bitmap;
     }
 
-    // Create a new bitmap if pool isn't full
     if (this._pool.length < this._maxPoolSize) {
       const newBitmap = await this._createNewBitmap(canvas, width, height);
       this._pool.push(newBitmap);
       return newBitmap.bitmap;
     }
 
-    // Reuse the least recently used bitmap
     const lruBitmap = this._findLRUBitmap();
     if (lruBitmap) {
-      // Clean up old bitmap
       lruBitmap.bitmap.close();
 
-      // Create new bitmap with same dimensions
       const newBitmap = await this._createNewBitmap(canvas, width, height);
       lruBitmap.bitmap = newBitmap.bitmap;
       lruBitmap.width = width;
@@ -95,14 +114,18 @@ export class InstanceImageBitmapPool {
       return lruBitmap.bitmap;
     }
 
-    // Fallback: create a new bitmap anyway
     const fallbackBitmap = await this._createNewBitmap(canvas, width, height);
     this._pool.push(fallbackBitmap);
     return fallbackBitmap.bitmap;
   }
 
   /**
-   * Returns an image bitmap to the pool
+   * Returns an image bitmap to the pool for reuse.
+   *
+   * Marks the bitmap as available and updates its last used timestamp
+   * for LRU-based cleanup strategies.
+   *
+   * @param bitmap - The ImageBitmap to release back to the pool
    */
   releaseImageBitmap(bitmap: ImageBitmap): void {
     if (this._isDestroyed) {
@@ -117,7 +140,12 @@ export class InstanceImageBitmapPool {
   }
 
   /**
-   * Cleans up old bitmaps to free memory
+   * Cleans up old bitmaps to free memory.
+   *
+   * Removes bitmaps that haven't been used for longer than the specified age
+   * to prevent memory accumulation from stale resources.
+   *
+   * @param maxAge - Maximum age in milliseconds before cleanup (defaults to 30 seconds)
    */
   cleanup(maxAge?: number): void {
     if (this._isDestroyed) {
@@ -127,7 +155,6 @@ export class InstanceImageBitmapPool {
     const age = maxAge || this._maxBitmapAge;
     const now = Date.now();
 
-    // Remove old unused bitmaps
     for (let i = this._pool.length - 1; i >= 0; i--) {
       const pooledBitmap = this._pool[i];
       if (!pooledBitmap.inUse && now - pooledBitmap.createdAt > age) {
@@ -138,17 +165,21 @@ export class InstanceImageBitmapPool {
   }
 
   /**
-   * Shrinks the pool to free memory
+   * Shrinks the pool to free memory.
+   *
+   * Uses LRU (Least Recently Used) strategy to remove unused bitmaps
+   * beyond the target size, ensuring the most recently used bitmaps
+   * are kept in the pool.
+   *
+   * @param targetSize - Target size for the pool (defaults to half the max size)
    */
   shrinkPool(targetSize: number = Math.floor(this._maxPoolSize / 2)): void {
     if (this._isDestroyed) {
       return;
     }
 
-    // Sort by last used time (oldest first)
     this._pool.sort((a, b) => a.lastUsed - b.lastUsed);
 
-    // Remove unused bitmaps beyond target size
     while (this._pool.length > targetSize) {
       const bitmap = this._pool.shift();
       if (bitmap && !bitmap.inUse) {
@@ -158,14 +189,16 @@ export class InstanceImageBitmapPool {
   }
 
   /**
-   * Sets up periodic cleanup to prevent memory leaks
+   * Sets up periodic cleanup to prevent memory leaks.
+   *
+   * Runs cleanup every 15 seconds to remove old unused bitmaps
+   * and maintain optimal memory usage.
    */
   setupPeriodicCleanup(): void {
     if (this._isDestroyed) {
       return;
     }
 
-    // Clean up every 15 seconds
     setInterval(() => {
       if (!this._isDestroyed) {
         this.cleanup();
@@ -174,26 +207,32 @@ export class InstanceImageBitmapPool {
   }
 
   /**
-   * Handles memory pressure by aggressively cleaning up
+   * Handles memory pressure by aggressively cleaning up.
+   *
+   * Implements emergency cleanup strategies when the system
+   * is under memory pressure to free resources immediately.
    */
   handleMemoryPressure(): void {
     if (this._isDestroyed) {
       return;
     }
 
-    // Release all unused bitmaps
     this._pool.forEach((pooledBitmap) => {
       if (!pooledBitmap.inUse) {
         pooledBitmap.bitmap.close();
       }
     });
 
-    // Shrink pool aggressively
     this.shrinkPool(Math.floor(this._maxPoolSize / 4));
   }
 
   /**
-   * Gets pool statistics
+   * Gets comprehensive pool statistics.
+   *
+   * Provides detailed information about bitmap usage, memory consumption,
+   * and pool status for monitoring and debugging purposes.
+   *
+   * @returns Object containing pool statistics
    */
   getPoolStats(): {
     totalBitmaps: number;
@@ -207,12 +246,10 @@ export class InstanceImageBitmapPool {
     const inUseBitmaps = this._pool.filter((pb) => pb.inUse).length;
     const availableBitmaps = totalBitmaps - inUseBitmaps;
 
-    // Estimate memory usage
     const totalPixels = this._pool.reduce((sum, pb) => sum + pb.width * pb.height, 0);
-    const memoryBytes = totalPixels * 4; // 4 bytes per pixel (RGBA)
+    const memoryBytes = totalPixels * 4;
     const memoryMB = (memoryBytes / (1024 * 1024)).toFixed(2);
 
-    // Calculate average age
     const now = Date.now();
     const totalAge = this._pool.reduce((sum, pb) => sum + (now - pb.createdAt), 0);
     const averageAge = totalBitmaps > 0 ? Math.round(totalAge / totalBitmaps) : 0;
@@ -228,7 +265,12 @@ export class InstanceImageBitmapPool {
   }
 
   /**
-   * Destroys this image bitmap pool and cleans up all resources
+   * Destroys this image bitmap pool and cleans up all resources.
+   *
+   * Performs complete cleanup including:
+   * - Closing all ImageBitmap resources
+   * - Clearing the pool array
+   * - Marking the pool as destroyed
    */
   destroy(): void {
     if (this._isDestroyed) {
@@ -237,7 +279,6 @@ export class InstanceImageBitmapPool {
 
     this._isDestroyed = true;
 
-    // Clean up all bitmaps
     this._pool.forEach((pooledBitmap) => {
       pooledBitmap.bitmap.close();
     });
@@ -246,14 +287,20 @@ export class InstanceImageBitmapPool {
   }
 
   /**
-   * Finds an available bitmap of the right size
+   * Finds an available bitmap of the right size.
+   *
+   * @param width - Required width for the bitmap
+   * @param height - Required height for the bitmap
+   * @returns Available bitmap if found, null otherwise
    */
   private _findAvailableBitmap(width: number, height: number): PooledImageBitmap | null {
     return this._pool.find((pb) => !pb.inUse && this._canReuseBitmap(pb, width, height)) || null;
   }
 
   /**
-   * Finds the least recently used bitmap
+   * Finds the least recently used bitmap.
+   *
+   * @returns The bitmap that was used least recently, or null if pool is empty
    */
   private _findLRUBitmap(): PooledImageBitmap | null {
     if (this._pool.length === 0) return null;
@@ -262,35 +309,46 @@ export class InstanceImageBitmapPool {
   }
 
   /**
-   * Checks if a bitmap can be reused for the given dimensions
+   * Checks if a bitmap can be reused for the given dimensions.
+   *
+   * Implements intelligent size matching with tolerance for small bitmaps
+   * and exact matching for larger ones to optimize reuse rates.
+   *
+   * @param pooledItem - The pooled bitmap to check
+   * @param requiredWidth - Required width
+   * @param requiredHeight - Required height
+   * @returns True if the bitmap can be reused, false otherwise
    */
   private _canReuseBitmap(pooledItem: PooledImageBitmap, requiredWidth: number, requiredHeight: number): boolean {
-    // For small bitmaps, allow reuse if dimensions are close
     if (requiredWidth <= this._sizeBucketThreshold && requiredHeight <= this._sizeBucketThreshold) {
       const widthDiff = Math.abs(pooledItem.width - requiredWidth);
       const heightDiff = Math.abs(pooledItem.height - requiredHeight);
-      return widthDiff <= 32 && heightDiff <= 32; // Allow 32px tolerance
+      return widthDiff <= 32 && heightDiff <= 32;
     }
 
-    // For larger bitmaps, require exact match
     return pooledItem.width === requiredWidth && pooledItem.height === requiredHeight;
   }
 
   /**
-   * Creates a new image bitmap for the pool
+   * Creates a new image bitmap for the pool.
+   *
+   * Creates a temporary canvas with target dimensions, draws the source
+   * canvas content, and generates an ImageBitmap from it.
+   *
+   * @param canvas - Source canvas to create bitmap from
+   * @param width - Target width for the bitmap
+   * @param height - Target height for the bitmap
+   * @returns Promise that resolves to a new PooledImageBitmap
    */
   private async _createNewBitmap(canvas: HTMLCanvasElement, width: number, height: number): Promise<PooledImageBitmap> {
-    // Create a temporary canvas with the target dimensions
     const tempCanvas = document.createElement('canvas');
     const tempContext = tempCanvas.getContext('2d')!;
 
     tempCanvas.width = width;
     tempCanvas.height = height;
 
-    // Draw the source canvas onto the temp canvas
     tempContext.drawImage(canvas, 0, 0, width, height);
 
-    // Create image bitmap from the temp canvas
     const bitmap = await createImageBitmap(tempCanvas);
 
     return {

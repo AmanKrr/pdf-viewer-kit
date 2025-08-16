@@ -18,18 +18,28 @@ import { PDFViewerInstance } from '../core/viewer-instance.core';
 import { PDFViewerManager } from '../core/viewer-manager.core';
 import { LoadOptions } from '../types/webpdf.types';
 
+/**
+ * Main entry point class for the PDF viewer library.
+ *
+ * Provides a static interface for managing multiple PDF viewer instances
+ * with complete isolation between them. Each instance has its own state,
+ * resources, and event system.
+ */
 class PdfViewerKit {
   private static _manager: PDFViewerManager;
 
   /**
-   * Initializes the multi-instance PDF viewer system
+   * Initializes the multi-instance PDF viewer system.
+   *
+   * Sets up the global manager instance and configures memory pressure handling.
+   * This method is called automatically when needed, but can be called explicitly
+   * for early initialization.
    */
   static initialize(): void {
     if (!this._manager) {
       this._manager = PDFViewerManager.getInstance();
       this._manager.setupPeriodicCleanup();
 
-      // Set up memory pressure handling
       if ('onmemorypressure' in window) {
         (window as any).addEventListener('memorypressure', () => {
           this._manager.handleMemoryPressure();
@@ -41,10 +51,10 @@ class PdfViewerKit {
   }
 
   /**
-   * Loads a PDF document into a new isolated instance
+   * Loads a PDF document into a new isolated instance.
    *
-   * @param options - Configuration options for loading the document
-   * @returns Promise that resolves to a PDFViewerInstance
+   * @param options - Configuration options for loading the document including container ID, source URL, and other PDF.js options
+   * @returns Promise that resolves to a fully initialized PDFViewerInstance
    */
   static async load(options: LoadOptions): Promise<PDFViewerInstance> {
     this.initialize();
@@ -54,70 +64,95 @@ class PdfViewerKit {
   }
 
   /**
-   * Gets an instance by its ID
+   * Retrieves a PDF viewer instance by its unique identifier.
+   *
+   * @param instanceId - The unique identifier of the instance
+   * @returns The PDFViewerInstance if found, undefined otherwise
    */
   static getInstance(instanceId: string): PDFViewerInstance | undefined {
     return this._manager?.getInstance(instanceId);
   }
 
   /**
-   * Gets an instance by container ID
+   * Retrieves a PDF viewer instance by its container ID.
+   *
+   * @param containerId - The DOM container ID where the instance is rendered
+   * @returns The PDFViewerInstance if found, undefined otherwise
    */
   static getInstanceByContainer(containerId: string): PDFViewerInstance | undefined {
     return this._manager?.getInstanceByContainer(containerId);
   }
 
   /**
-   * Gets all active instances
+   * Gets all currently active PDF viewer instances.
+   *
+   * @returns Array of all active PDFViewerInstance objects
    */
   static getAllInstances(): PDFViewerInstance[] {
     return this._manager?.getAllInstances() || [];
   }
 
   /**
-   * Gets the total number of active instances
+   * Gets the total number of currently active instances.
+   *
+   * @returns The count of active instances
    */
   static getInstanceCount(): number {
     return this._manager?.getInstanceCount() || 0;
   }
 
   /**
-   * Unloads a specific instance
+   * Unloads and destroys a specific PDF viewer instance.
+   *
+   * @param instanceId - The unique identifier of the instance to unload
    */
   static async unload(instanceId: string): Promise<void> {
     await this._manager?.unload(instanceId);
   }
 
   /**
-   * Unloads an instance by container ID
+   * Unloads and destroys an instance by its container ID.
+   *
+   * @param containerId - The DOM container ID of the instance to unload
    */
   static async unloadByContainer(containerId: string): Promise<void> {
     await this._manager?.unloadByContainer(containerId);
   }
 
   /**
-   * Unloads all instances
+   * Unloads and destroys all currently active PDF viewer instances.
+   *
+   * This method performs a complete cleanup of all resources and instances.
    */
   static async unloadAll(): Promise<void> {
     await this._manager?.unloadAll();
   }
 
   /**
-   * Checks if a container is in use
+   * Checks if a specific container ID is currently in use by an instance.
+   *
+   * @param containerId - The DOM container ID to check
+   * @returns True if the container is in use, false otherwise
    */
   static isContainerInUse(containerId: string): boolean {
     return this._manager?.isContainerInUse(containerId) || false;
   }
 
   /**
-   * Gets system statistics
+   * Gets comprehensive system statistics including memory usage, instance counts, and performance metrics.
+   *
+   * @returns Object containing detailed system statistics
    */
   static getStats() {
     return this._manager?.getStats();
   }
 
   /**
-   * Destroys the entire system and all instances
+   * Destroys the entire PDF viewer system and all instances.
+   *
+   * This method performs a complete cleanup of all resources, instances,
+   * and the global manager. After calling this, the system must be
+   * re-initialized before use.
    */
   static async destroy(): Promise<void> {
     await this._manager?.destroy();
@@ -125,7 +160,11 @@ class PdfViewerKit {
   }
 
   /**
-   * Handles memory pressure across all instances
+   * Handles memory pressure across all instances.
+   *
+   * Triggers aggressive cleanup and resource management when the system
+   * detects memory pressure. This method is called automatically by
+   * the memory pressure event listener.
    */
   static handleMemoryPressure(): void {
     this._manager?.handleMemoryPressure();
