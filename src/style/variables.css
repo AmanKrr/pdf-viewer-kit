@@ -9,7 +9,7 @@
 
   Unless required by applicable law or agreed to in writing, software
   distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied.
   See the License for the specific language governing permissions and
   limitations under the License.
 */
@@ -19,40 +19,259 @@
 /* ========================== */
 
 :root {
-  /* Defines the height of the toolbar */
+  /* ========================== */
+  /* Layout & Dimensions */
+  /* ========================== */
+
+  /* Toolbar height */
   --toolbarHeight: 40px;
 
-  /* Minimum width allowed for the PDF viewer */
+  /* Minimum dimensions */
   --min-pdf-width: 190px;
   --min-pdf-height: 100px;
 
-  /* Default light theme background color for the PDF viewer */
+  /* ========================== */
+  /* Light Theme Colors */
+  /* ========================== */
+
+  /* Main viewer background */
   --pdf-viewer-theme: #eaecef;
 
-  /* Default light theme background color for the toolbar */
+  /* Toolbar colors */
   --pdf-viewer-toolbar-theme: #f8f9fa;
-
-  /* Default dark theme background color for the PDF viewer */
-  --pdf-viewer-dark-theme: #222222;
-
-  /* Default dark theme background color for the toolbar */
-  --pdf-viewer-toolbar-dark-theme: #2d2d2d;
-
-  /* PDF Viewer Colors */
-  --web-pdf-viewer-page-background-color: #ffffff;
   --web-pdf-viewer-toolbar-background-color: #f5f5f5;
   --web-pdf-viewer-toolbar-border-color: #e0e0e0;
   --web-pdf-viewer-toolbar-text-color: #333333;
-  --web-pdf-viewer-toolbar-hover-background-color: #e8e8e8;
-  --web-pdf-viewer-toolbar-active-background-color: #d0d0d0;
 
-  /* Annotation and Text Clarity */
+  /* Page background */
+  --web-pdf-viewer-page-background-color: #ffffff;
+
+  /* ========================== */
+  /* Dark Theme Colors */
+  /* ========================== */
+
+  /* Main viewer background (dark) */
+  --pdf-viewer-dark-theme: #222222;
+
+  /* Toolbar colors (dark) */
+  --pdf-viewer-toolbar-dark-theme: #2d2d2d;
+
+  /* ========================== */
+  /* Button Color System */
+  /* ========================== */
+
+  /* Primary button colors (used for main actions) */
+  --button-primary-background: #6d93ff;
+  --button-primary-text: #ffffff;
+  --button-primary-border: #6d93ff;
+
+  /* Primary button states */
+  --button-primary-hover-background: #4b4b4b;
+  --button-primary-hover-text: #ffffff;
+  --button-primary-hover-border: #4b4b4b;
+
+  --button-primary-active-background: #333333;
+  --button-primary-active-text: #ffffff;
+  --button-primary-active-border: #333333;
+
+  /* Secondary button colors (used for less important actions) */
+  --button-secondary-background: #f0f0f0;
+  --button-secondary-text: #333333;
+  --button-secondary-border: #e0e0e0;
+
+  /* Secondary button states */
+  --button-secondary-hover-background: #e8e8e8;
+  --button-secondary-hover-text: #333333;
+  --button-secondary-hover-border: #d0d0d0;
+
+  --button-secondary-active-background: #d0d0d0;
+  --button-secondary-active-text: #333333;
+  --button-secondary-active-border: #c0c0c0;
+
+  /* Toolbar button colors (used for toolbar items) */
+  --toolbar-button-background: transparent;
+  --toolbar-button-text: #777777;
+  --toolbar-button-border: transparent;
+
+  /* Toolbar button states */
+  --toolbar-button-hover-background: #4b4b4b;
+  --toolbar-button-hover-text: #d5d5d5;
+  --toolbar-button-hover-border: transparent;
+
+  --toolbar-button-active-background: #333333;
+  --toolbar-button-active-text: #d5d5d5;
+  --toolbar-button-active-border: transparent;
+
+  /* ========================== */
+  /* Error & Status Colors */
+  /* ========================== */
+
+  /* Error colors */
+  --color-error: #d32f2f;
+  --color-error-light: #ff6b6b;
+  --color-error-dark: #b71c1c;
+
+  /* Success colors */
+  --color-success: #2e7d32;
+  --color-success-light: #4caf50;
+  --color-success-dark: #1b5e20;
+
+  /* Warning colors */
+  --color-warning: #f57c00;
+  --color-warning-light: #ff9800;
+  --color-warning-dark: #e65100;
+
+  /* Info colors */
+  --color-info: #1976d2;
+  --color-info-light: #2196f3;
+  --color-info-dark: #0d47a1;
+
+  /* ========================== */
+  /* Text & Content Colors */
+  /* ========================== */
+
+  /* Primary text */
+  --text-primary: #333333;
+  --text-primary-light: #666666;
+  --text-primary-lighter: #999999;
+
+  /* Secondary text */
+  --text-secondary: #777777;
+  --text-secondary-light: #b0b0b0;
+
+  /* Background text (for light text on dark backgrounds) */
+  --text-on-background: #ffffff;
+  --text-on-background-light: #d5d5d5;
+
+  /* ========================== */
+  /* Border & Divider Colors */
+  /* ========================== */
+
+  /* Primary borders */
+  --border-primary: #e0e0e0;
+  --border-primary-light: #f0f0f0;
+  --border-primary-dark: #c0c0c0;
+
+  /* Secondary borders */
+  --border-secondary: #d0d0d0;
+  --border-secondary-light: #e8e8e8;
+  --border-secondary-dark: #b0b0b0;
+
+  /* ========================== */
+  /* Shadow & Depth Colors */
+  /* ========================== */
+
+  /* Box shadows */
+  --shadow-light: rgba(0, 0, 0, 0.1);
+  --shadow-medium: rgba(0, 0, 0, 0.2);
+  --shadow-heavy: rgba(0, 0, 0, 0.3);
+
+  /* ========================== */
+  /* Thumbnail & Sidebar Colors */
+  /* ========================== */
+
+  /* Sidebar background */
+  --sidebar-background: rgb(207, 207, 207);
+  --sidebar-background-light: rgb(173, 173, 173);
+
+  /* Thumbnail colors */
+  --thumbnail-background: transparent;
+  --thumbnail-hover-background: rgb(173, 173, 173);
+  --thumbnail-active-background: rgb(184, 184, 248);
+  --thumbnail-shadow: #c7c7c9;
+
+  /* Page number label */
+  --page-number-color: #777777;
+
+  /* ========================== */
+  /* Toolbar Component Colors */
+  /* ========================== */
+
+  /* Separator colors */
+  --toolbar-separator-color: #bebebe;
+  --toolbar-separator-light: #ccc;
+
+  /* Search component colors */
+  --search-container-background: white;
+  --search-container-border: #dcdcdc;
+  --search-container-shadow: rgba(0, 0, 0, 0.2);
+
+  /* Search input colors */
+  --search-input-text: #555;
+  --search-nav-color: #666;
+  --search-nav-hover-color: black;
+
+  /* Option button colors */
+  --option-button-border: #dcdcdc;
+  --option-button-hover-background: #f0f0f0;
+  --option-button-hover-border: #bbb;
+  --option-button-active-background: #4b4b4b;
+  --option-button-active-text: white;
+
+  /* Search icon colors */
+  --search-icon-color: #666;
+  --search-icon-hover-color: black;
+
+  /* Annotation toolbar colors */
+  --annotation-toolbar-border: #dcdcdc;
+  --annotation-shape-border: #ccc;
+  --annotation-shape-hover-background: #4b4b4b;
+  --annotation-shape-hover-text: white;
+
+  /* Annotation dropdown colors */
+  --annotation-dropdown-background: white;
+  --annotation-dropdown-border: #ccc;
+  --annotation-dropdown-shadow: rgba(0, 0, 0, 0.2);
+  --annotation-dropdown-hover-background: #f0f0f0;
+  --annotation-dropdown-active-background: #4b4b4b;
+  --annotation-dropdown-active-text: white;
+
+  /* Annotation properties colors */
+  --annotation-properties-label-color: #555;
+  --annotation-color-picker-border: rgb(204, 204, 204);
+  --annotation-color-picker-option-border: #6d93ff;
+
+  /* Text annotation toolbar colors */
+  --text-annotation-background: rgba(0, 0, 0, 0.8);
+  --text-annotation-shadow: rgba(0, 0, 0, 0.3);
+  --text-annotation-button-color: #fff;
+  --text-annotation-button-hover: rgba(255, 255, 255, 0.1);
+
+  /* Annotation overlay colors */
+  --annotation-highlight: rgba(255, 255, 0, 0.4);
+  --annotation-underline: rgba(255, 255, 0, 0.8);
+  --annotation-strike: rgba(255, 0, 0, 0.4);
+  --annotation-squiggle: #00FF00;
+
+  /* ========================== */
+  /* Legacy Support (keeping existing variables) */
+  /* ========================== */
+
+  /* These maintain backward compatibility */
+  --web-pdf-viewer-toolbar-hover-background-color: var(--button-secondary-hover-background);
+  --web-pdf-viewer-toolbar-active-background-color: var(--button-secondary-active-background);
+
+  /* Error handling colors (using new system) */
+  --pdf-error-primary-color: var(--button-primary-background);
+  --pdf-error-hover-color: var(--button-primary-hover-background);
+  --pdf-error-active-color: var(--button-primary-active-background);
+  --pdf-error-text-color: var(--color-error);
+  --pdf-error-background-color: var(--web-pdf-viewer-page-background-color);
+
+  /* ========================== */
+  /* Z-Index Management */
+  /* ========================== */
+
   --annotation-blend-mode: multiply;
   --annotation-isolation: isolate;
   --text-layer-z-index: 5;
   --annotation-drawing-layer-z-index: 3;
   --annotation-hit-layer-z-index: 6;
   --pdf-content-z-index: 1;
+
+  /* ========================== */
+  /* Special Effects */
+  /* ========================== */
 
   /* Text Selection */
   --text-selection-background: rgba(0, 128, 255, 0.3);

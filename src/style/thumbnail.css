@@ -15,6 +15,11 @@
 */
 
 /* ========================== */
+/* Import Variables */
+/* ========================== */
+@import "./variables.css";
+
+/* ========================== */
 /* Sidebar Container Styles */
 /* ========================== */
 
@@ -29,7 +34,7 @@
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  background-color: rgb(207, 207, 207);
+  background-color: var(--sidebar-background);
   width: max-content;
   min-height: calc(100% - 40px);
   /* Adjust height to match viewer minus toolbar */
@@ -65,18 +70,19 @@
   margin-bottom: 20px;
   padding: 4px;
   border-radius: 1px;
+  background-color: var(--thumbnail-background);
 }
 
 /* Hover effect on thumbnails */
 .thumbnail:hover {
-  background-color: rgb(173, 173, 173);
+  background-color: var(--thumbnail-hover-background);
   color: white;
-  box-shadow: 5px 3px 5px 1px #c7c7c9;
+  box-shadow: 5px 3px 5px 1px var(--thumbnail-shadow);
 }
 
 /* Active state: highlights the currently selected page */
 .thumbnail-active {
-  background-color: rgb(184, 184, 248);
+  background-color: var(--thumbnail-active-background);
   color: white;
 }
 
@@ -95,5 +101,5 @@
   text-align: center;
   font-size: 0.75rem;
   font-weight: bold;
-  color: #777777;
+  color: var(--page-number-color);
 }
