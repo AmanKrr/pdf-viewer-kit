@@ -334,7 +334,7 @@ span.a-active-highlight {
 }
 
 .pdf-error-message {
-  color: var(--web-pdf-viewer-toolbar-text-color);
+  color: var(--text-primary);
   margin: 0 0 3rem 0;
   font-size: 1.25rem;
   line-height: 1.6;
@@ -343,9 +343,9 @@ span.a-active-highlight {
 }
 
 .pdf-error-retry {
-  background: var(--pdf-error-primary-color);
-  color: white;
-  border: none;
+  background: var(--button-primary-background);
+  color: var(--button-primary-text);
+  border: 1px solid var(--button-primary-border);
   padding: 1rem 2rem;
   border-radius: 8px;
   font-size: 1.1rem;
@@ -353,18 +353,22 @@ span.a-active-highlight {
   cursor: pointer;
   transition: all 0.3s ease;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  box-shadow: 0 4px 20px rgba(109, 147, 255, 0.3);
+  box-shadow: 0 4px 20px var(--shadow-medium);
   min-width: 200px;
 }
 
 .pdf-error-retry:hover {
-  background: var(--pdf-error-hover-color);
+  background: var(--button-primary-hover-background);
+  color: var(--button-primary-hover-text);
+  border-color: var(--button-primary-hover-border);
   transform: translateY(-2px);
-  box-shadow: 0 6px 25px rgba(109, 147, 255, 0.4);
+  box-shadow: 0 6px 25px var(--shadow-heavy);
 }
 
 .pdf-error-retry:active {
-  background: var(--pdf-error-active-color);
+  background: var(--button-primary-active-background);
+  color: var(--button-primary-active-text);
+  border-color: var(--button-primary-active-border);
   transform: translateY(0);
 }
 
@@ -380,7 +384,7 @@ span.a-active-highlight {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--shadow-light);
   pointer-events: none;
 }
 
@@ -437,14 +441,14 @@ span.a-active-highlight {
 @media (prefers-color-scheme: dark) {
   .pdf-error-container {
     background: var(--pdf-viewer-dark-theme);
-    color: var(--web-pdf-viewer-toolbar-text-color);
+    color: var(--text-on-background);
   }
 
   .pdf-error-title {
-    color: #ff6b6b;
+    color: var(--color-error-light);
   }
 
   .pdf-error-message {
-    color: #d5d5d5;
+    color: var(--text-on-background-light);
   }
 }
