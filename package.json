@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "author": "Aman Kumar",
   "private": false,
-  "version": "0.2.0-canvas-pooling.2",
+  "version": "0.2.0-canvas-pooling.3",
   "keywords": [
     "pdf",
     "react",
