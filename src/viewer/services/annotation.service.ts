@@ -15,7 +15,7 @@
 */
 
 import { EllipseConfig, LineConfig, RectangleConfig, ShapeConfig } from '../../types/geometry.types';
-import WebViewer from '../ui/web-viewer';
+import WebViewer from '../ui/web-viewer.component';
 import { AnnotationManager } from '../managers/annotation-manager.manager';
 import { ShapeAnno } from './annotation-export.service';
 import { toShapeAnnos } from '../../utils/annotation-utils';

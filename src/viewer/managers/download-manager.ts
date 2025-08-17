@@ -17,7 +17,7 @@
 import { PageViewport } from 'pdfjs-dist';
 import { PdfExportService } from '../services/annotation-export.service';
 import { AnnotationService } from '../services/annotation.service';
-import WebViewer from '../ui/web-viewer';
+import WebViewer from '../ui/web-viewer.component';
 
 /**
  * Manages downloading of the current PDF, optionally embedding annotations.

@@ -69,10 +69,10 @@ class WebViewer {
   /**
    * Initializes the WebViewer instance.
    *
-   * @param {PDFDocumentProxy} pdfInstance - The PDF.js document instance.
-   * @param {import('../../types/webpdf.types').ViewerLoadOptions} viewerOptions - Configuration for the viewer.
-   * @param {HTMLElement} parentContainer - The parent container where the viewer is rendered.
-   * @param {HTMLElement} pageParentContainer - The container holding the PDF pages.
+   * @param options - Configuration for the viewer
+   * @param instance - The PDF viewer instance
+   * @param parentContainer - The parent container where the viewer is rendered
+   * @param pageParentContainer - The container holding the PDF pages
    */
   constructor(options: ViewerLoadOptions, instance: PDFViewerInstance, parentContainer: HTMLElement, pageParentContainer: HTMLElement) {
     this._options = options;
@@ -83,57 +83,78 @@ class WebViewer {
     this.initialize();
   }
 
+  /**
+   * Gets the PDF viewer instance.
+   */
   get instance() {
     return this._instance;
   }
 
+  /**
+   * Gets the instance ID of the viewer.
+   */
   get instanceId(): string {
     return this._instance.instanceId;
   }
 
+  /**
+   * Gets the container ID of the viewer.
+   */
   get containerId(): string {
     return this._instance.containerId;
   }
 
+  /**
+   * Gets the viewer state.
+   */
   get state() {
     return this._instance.state;
   }
 
+  /**
+   * Gets the PDF document instance.
+   */
   get pdfDocument() {
     return this._instance.pdfDocument!;
   }
 
+  /**
+   * Gets the event emitter instance.
+   */
   get events() {
     return this._instance.events;
   }
 
+  /**
+   * Gets the canvas pool instance.
+   */
   get canvasPool() {
     return this._instance.canvasPool;
   }
 
   /**
-   * Gets the annotation state manager for UI-related annotation state
+   * Gets the annotation state manager for UI-related annotation state.
    */
   get annotationState() {
     return this._annotationStateManager;
   }
 
   /**
-   * Gets the ready promise for initialization completion
+   * Gets the ready promise for initialization completion.
    */
   get ready() {
     return this._initializationPromise;
   }
 
   /**
-   * Checks if this instance has been destroyed
+   * Checks if this instance has been destroyed.
    */
   get isDestroyed(): boolean {
     return this._isDestroyed;
   }
 
   /**
-   * Initializes the web viewer and all its components
+   * Initializes the web viewer and all its components.
    */
   async initialize(): Promise<void> {
     if (this._isInitialized || this._isDestroyed) {
@@ -145,7 +166,7 @@ class WebViewer {
   }
 
   /**
-   * Performs the actual initialization
+   * Performs the actual initialization of all components.
    */
   private async _performInitialization(): Promise<void> {
     try {
@@ -169,7 +190,7 @@ class WebViewer {
   }
 
   /**
-   * Initializes all viewer components
+   * Initializes all viewer components.
    */
   private _initializeComponents(): void {
     const instanceState = this._instance.state;
@@ -242,12 +263,12 @@ class WebViewer {
       }, 50);
     });
 
-    // Initialize download manager (commented out due to type compatibility issues)
+    // Initialize download manager
     // this._downloadManager = new DownloadManager(this._annotationService, this._instance.state);
   }
 
   /**
-   * Sets up event handlers
+   * Sets up event handlers for the viewer.
    */
   private _setupEventHandlers(): void {
     this._boundScrollHandler = this._onScroll.bind(this);
@@ -255,7 +276,7 @@ class WebViewer {
   }
 
   /**
-   * Sets up page observer for navigation
+   * Sets up page observer for navigation tracking.
    */
   private _setupPageObserver(): void {
     this._observer((pageNum) => {
@@ -265,7 +286,9 @@ class WebViewer {
   }
 
   /**
-   * Page observer for tracking current page
+   * Page observer for tracking current page using Intersection Observer API.
+   *
+   * @param callback - Function called when page visibility changes
    */
   private _observer(callback: (pageNumber: number) => void): void {
     let lastNotified: number | null = null;
@@ -308,6 +331,9 @@ class WebViewer {
     this._selectionManager.setupGlobalClickHandler(this.containerId);
   }
 
+  /**
+   * Debounced scroll handler for thumbnail synchronization.
+   */
   private _onScroll = debounce((event: Event) => {
     this._syncThumbnailScrollWithMainPageContainer();
   }, 120);
@@ -337,7 +363,7 @@ class WebViewer {
   }
 
   /**
-   * @returns {AnnotationService} The annotation service instance.
+   * Gets the annotation service instance.
    * This service is responsible for managing annotations in the PDF viewer.
    */
   get annotation() {
@@ -345,31 +371,32 @@ class WebViewer {
   }
 
   /**
-   * @returnss visible page numbers in the PDF viewer.
+   * Gets the currently visible page numbers in the PDF viewer.
    */
   get visiblePageNumbers() {
     return this._pageVirtualization.currentlyVisiblePages;
   }
 
-  /** @returns {number} The currently active page number. */
+  /**
+   * Gets the currently active page number.
+   */
   get currentPageNumber(): number {
     return this._instance.state.currentPage;
   }
 
-  /** @returns {number} The total number of pages in the PDF document. */
+  /**
+   * Gets the total number of pages in the PDF document.
+   */
   get totalPages(): number {
     return this.pdfDocument.numPages;
   }
 
-  /** @returns {number} The current zoom scale of the PDF viewer. */
+  /**
+   * Gets the current zoom scale of the PDF viewer.
+   */
   get currentScale(): number {
     return this._instance.state.scale;
   }
-
-  /** @returns {PDFDocumentProxy} The PDF.js document instance. */
-  // get pdfInstance(): PDFDocumentProxy {
-  //   return this.pdfDocument;
-  // }
 
   /**
    * Toggles the thumbnail viewer sidebar.
@@ -446,7 +473,7 @@ class WebViewer {
    * Downloads the PDF with embedded annotations.
    * Shows progress indication during the download process.
    *
-   * @param filename Optional filename for the download
+   * @param filename - Optional filename for the download
    */
   public async downloadPdf(filename?: string): Promise<void> {
     // Create a simple progress indicator
@@ -598,18 +625,10 @@ class WebViewer {
     await this._zoomHandler.zoomOut();
   }
 
-  // public async fitWidth() {
-  //   await this._zoomHandler.fitWidth();
-  // }
-
-  // public async fitPage() {
-  //   await this._zoomHandler.fitPage();
-  // }
-
   /**
    * Navigates to a specific page in the PDF viewer.
    *
-   * @param {number} pageNumber - The target page number.
+   * @param pageNumber - The target page number
    */
   public goToPage(pageNumber: number) {
     if (pageNumber >= 1 && pageNumber <= this.totalPages!) {
@@ -640,8 +659,8 @@ class WebViewer {
   /**
    * Handles toolbar button clicks and executes corresponding actions.
    *
-   * @param {string} buttonName - The name of the toolbar button clicked.
-   * @param {MouseEvent | Event} event - The event object associated with the action.
+   * @param buttonName - The name of the toolbar button clicked
+   * @param event - The event object associated with the action
    */
   async toolbarButtonClick(buttonName: string, event: MouseEvent | Event) {
     switch (buttonName) {
@@ -674,10 +693,10 @@ class WebViewer {
     }
   }
 
+  /**
+   * Destroys the viewer and cleans up all resources.
+   */
   public destroy(): void {
-    // Remove event listeners
-    // Global click handler is now managed by SelectionManager
-
     // Remove scroll handler
     if (this._boundScrollHandler) {
       const mainViewer = document.querySelector(`#${this.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`);

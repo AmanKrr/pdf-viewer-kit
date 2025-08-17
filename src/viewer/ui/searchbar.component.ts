@@ -17,7 +17,7 @@
 import { debounce } from 'lodash';
 import { PDF_VIEWER_CLASSNAMES } from '../../constants/pdf-viewer-selectors';
 import { SearchOptions } from '../managers/search-highlighter.manager';
-import WebViewer from './web-viewer';
+import WebViewer from './web-viewer.component';
 
 /**
  * SearchBar creates the search UI and wires events to perform a search,

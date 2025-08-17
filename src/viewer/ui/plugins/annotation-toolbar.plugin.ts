@@ -15,7 +15,7 @@
 */
 
 import { AnnotationToolbarStateManager } from '../annotation-toolbar-state.component';
-import WebViewer from '../web-viewer';
+import WebViewer from '../web-viewer.component';
 
 /**
  * Context object passed to plugins for rendering and interaction

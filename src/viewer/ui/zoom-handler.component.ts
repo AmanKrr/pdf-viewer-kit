@@ -17,7 +17,7 @@
 import PageVirtualization from './page-virtualization.component';
 import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
 import { debounce } from 'lodash';
-import WebViewer from './web-viewer';
+import WebViewer from './web-viewer.component';
 
 interface ZoomOptions {
   /** Minimum permitted scale. */

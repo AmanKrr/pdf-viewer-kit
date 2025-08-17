@@ -16,7 +16,7 @@
 
 import { PDFDocumentProxy } from 'pdfjs-dist';
 import SearchIndexManager from './search-index.manager';
-import WebViewer from '../ui/web-viewer';
+import WebViewer from '../ui/web-viewer.component';
 import { PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
 import { scrollElementIntoView } from '../../utils/web-ui-utils';
 

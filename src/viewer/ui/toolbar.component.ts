@@ -14,7 +14,7 @@
   limitations under the License.
 */
 
-import WebViewer from './web-viewer';
+import WebViewer from './web-viewer.component';
 import { IToolbar, ToolbarOptions, ToolbarButtonConfig, ToolbarButtonEvent } from '../../types/toolbar.types';
 import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
 import { AnnotationToolbar } from './annotation-toolbar.component';
@@ -32,9 +32,11 @@ export class Toolbar implements IToolbar {
   private _searchBarOpen = false;
 
   /**
-   * @param viewer    The WebViewer instance.
-   * @param buttons   Optional custom button configurations.
-   * @param options   ToolbarOptions to enable/disable features.
+   * Creates a new toolbar instance with the specified configuration.
+   *
+   * @param viewer - The WebViewer instance to control
+   * @param buttons - Optional custom button configurations to override defaults
+   * @param options - Toolbar options to enable/disable specific features
    */
   constructor(viewer: WebViewer, buttons: ToolbarButtonConfig[] = [], options: ToolbarOptions = {}) {
     this._viewer = viewer;
@@ -57,14 +59,23 @@ export class Toolbar implements IToolbar {
     this._annotationToolbar = new AnnotationToolbar(this._viewer, this._viewer.annotationState);
   }
 
+  /**
+   * Gets the instance ID of the associated viewer.
+   */
   get instanceId(): string {
     return this._viewer.instanceId;
   }
 
+  /**
+   * Gets the container ID of the associated viewer.
+   */
   get containerId(): string {
     return this._viewer.containerId;
   }
 
+  /**
+   * Gets the WebViewer instance associated with this toolbar.
+   */
   get instance(): WebViewer {
     return this._viewer;
   }
@@ -72,7 +83,7 @@ export class Toolbar implements IToolbar {
   /**
    * Renders the toolbar into the specified container element.
    *
-   * @param container  The HTML element to host the toolbar.
+   * @param container - The HTML element to host the toolbar
    */
   public render(container: HTMLElement): void {
     this._container = container;
@@ -99,7 +110,7 @@ export class Toolbar implements IToolbar {
   /**
    * Builds the default toolbar buttons based on enabled options.
    *
-   * @returns Array of ToolbarButtonConfig for default buttons.
+   * @returns Array of ToolbarButtonConfig for default buttons
    */
   private _defaultButtons(): ToolbarButtonConfig[] {
     const buttons: ToolbarButtonConfig[] = [];
@@ -266,8 +277,8 @@ export class Toolbar implements IToolbar {
   /**
    * Creates a toolbar button element.
    *
-   * @param cfg  Configuration for the button.
-   * @returns The constructed HTMLButtonElement.
+   * @param cfg - Configuration for the button
+   * @returns The constructed HTMLButtonElement
    */
   protected __createButton(cfg: ToolbarButtonConfig): HTMLButtonElement {
     const btn = document.createElement('button');
@@ -307,8 +318,8 @@ export class Toolbar implements IToolbar {
   /**
    * Wraps a toolbar item for consistent styling.
    *
-   * @param itemId  Identifier for the toolbar item.
-   * @returns A wrapper div element.
+   * @param itemId - Identifier for the toolbar item
+   * @returns A wrapper div element
    */
   protected __wrapItem(itemId: string): HTMLDivElement {
     const wrapper = document.createElement('div');
@@ -319,7 +330,7 @@ export class Toolbar implements IToolbar {
   /**
    * Creates a visual separator between toolbar items.
    *
-   * @returns A separator div element.
+   * @returns A separator div element
    */
   protected __addSeparator(): HTMLDivElement {
     const sep = document.createElement('div');
@@ -330,8 +341,8 @@ export class Toolbar implements IToolbar {
   /**
    * Renders the "page X of Y" page number control.
    *
-   * @param viewer  The WebViewer instance.
-   * @returns An HTMLElement containing page navigation controls.
+   * @param viewer - The WebViewer instance
+   * @returns An HTMLElement containing page navigation controls
    */
   private _renderPageNumberControls(viewer: WebViewer): HTMLElement {
     const inputContainer = document.createElement('div');

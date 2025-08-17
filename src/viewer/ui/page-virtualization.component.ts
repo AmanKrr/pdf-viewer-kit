@@ -20,7 +20,7 @@ import { RenderParameters } from 'pdfjs-dist/types/src/display/api';
 import PageElement from './page-element.component';
 import { debounce, throttle } from 'lodash';
 import ThumbnailViewer from './thumbnail-viewer.component';
-import WebViewer from './web-viewer';
+import WebViewer from './web-viewer.component';
 import { ViewerLoadOptions } from '../../types/webpdf.types';
 import AnnotationLayer from './annotation-layer.component';
 import { PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';

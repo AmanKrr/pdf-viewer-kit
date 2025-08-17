@@ -154,6 +154,10 @@ export class TextSelectionHandler {
     mainViewerContainer.removeEventListener('scroll', TextSelectionHandler.onScroll);
   }
 
+  /**
+   * Builds the text annotation toolbar with highlight, underline, strike, and squiggle options.
+   * The toolbar is created once and shared across all handler instances.
+   */
   private static buildToolbar() {
     const tb = document.createElement('div');
     tb.className = 'text-annotation-toolbar';
@@ -181,12 +185,19 @@ export class TextSelectionHandler {
   }
 
   // ─── Pointer & selection events ────────────────────
+  /**
+   * Handles pointer down events to detect when mouse selection begins.
+   * @param evt - The pointer event that occurred
+   */
   private static onPointerDown = (evt: PointerEvent) => {
     if (evt.isPrimary && evt.pointerType === 'mouse') {
       TextSelectionHandler.isMouseSelecting = true;
     }
   };
 
+  /**
+   * Handles pointer up events to process text selection after mouse selection completes.
+   */
   private static onPointerUp = () => {
     if (!TextSelectionHandler.isMouseSelecting) return;
     requestAnimationFrame(() => {
@@ -195,16 +206,26 @@ export class TextSelectionHandler {
     });
   };
 
+  /**
+   * Handles selection change events to hide toolbar when selection is cleared.
+   */
   private static onSelectionChange = () => {
     if (!TextSelectionHandler.isMouseSelecting) {
       TextSelectionHandler.hideToolbar();
     }
   };
 
+  /**
+   * Handles scroll and resize events to update toolbar positioning.
+   */
   private static onScroll = () => {
     TextSelectionHandler.popperInstance?.update();
   };
 
+  /**
+   * Processes the current text selection to determine if toolbar should be shown.
+   * Finds the appropriate handler for the selected text and shows the annotation toolbar.
+   */
   private static processSelection() {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) {
@@ -229,6 +250,10 @@ export class TextSelectionHandler {
     TextSelectionHandler.showToolbarAt(); // no args any more
   }
 
+  /**
+   * Shows the annotation toolbar positioned above the current text selection.
+   * Uses Popper.js for intelligent positioning and flipping.
+   */
   private static showToolbarAt() {
     if (!TextSelectionHandler.currentSelectionRange) return;
 
@@ -253,6 +278,9 @@ export class TextSelectionHandler {
     TextSelectionHandler.toolbar.style.display = 'flex';
   }
 
+  /**
+   * Hides the annotation toolbar and cleans up the current selection state.
+   */
   private static hideToolbar() {
     TextSelectionHandler.toolbar.style.display = 'none';
     TextSelectionHandler.popperInstance?.destroy();
@@ -260,6 +288,12 @@ export class TextSelectionHandler {
     TextSelectionHandler.currentSelectionRect = null;
   }
 
+  /**
+   * Applies the specified annotation type to the currently selected text.
+   * Creates visual annotation elements and converts coordinates to PDF space for persistence.
+   *
+   * @param type - The type of annotation to apply (highlight, underline, strike, or squiggle)
+   */
   public applyAnnotation(type: AnnotationType) {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) {
@@ -298,10 +332,20 @@ export class TextSelectionHandler {
     this.persist(quads);
   }
 
+  /**
+   * Persists the annotation data in PDF coordinates.
+   * This is a placeholder method that should be hooked into the AnnotationManager or storage system.
+   *
+   * @param quads - Array of annotation quads with PDF coordinates and type information
+   */
   private persist(quads: Array<{ x1: number; y1: number; x2: number; y2: number; type: AnnotationType }>) {
     // ➜ hook into your AnnotationManager / storage here
   }
 
+  /**
+   * Destroys this handler instance and cleans up shared resources if this is the last handler.
+   * Should be called when a page is removed to prevent memory leaks.
+   */
   public destroy() {
     TextSelectionHandler.handlers.delete(this);
     if (TextSelectionHandler.handlers.size === 0) {

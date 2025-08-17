@@ -14,7 +14,7 @@
   limitations under the License.
 */
 
-import WebViewer from '../viewer/ui/web-viewer';
+import WebViewer from '../viewer/ui/web-viewer.component';
 
 /**
  * Contract for a pluggable toolbar implementation.

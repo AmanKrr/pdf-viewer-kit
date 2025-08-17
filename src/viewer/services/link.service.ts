@@ -14,7 +14,7 @@
   limitations under the License.
 */
 
-import WebViewer from '../ui/web-viewer';
+import WebViewer from '../ui/web-viewer.component';
 
 // Define the link target options.
 export enum LinkTarget {
@@ -83,29 +83,37 @@ export class PDFLinkService {
     return this.pdfViewer ? this.pdfViewer.currentPageNumber : 1;
   }
 
-  // Sets the current page number.
+  /**
+   * Sets the current page number.
+   */
   set page(value: number) {
     if (this.pdfViewer) {
       // this.pdfViewer.currentPageNumber = value;
     }
   }
 
-  // Returns the current rotation.
+  /**
+   * Returns the current rotation.
+   */
   get rotation(): number {
-    // return this.pdfViewer ? this.pdfViewer.pagesRotation : 0;
+    // Rotation is not currently implemented in this minimal version
     return 0;
   }
 
-  // Sets the rotation value.
+  /**
+   * Sets the rotation value.
+   */
   set rotation(value: number) {
     if (this.pdfViewer) {
-      // this.pdfViewer.pagesRotation = value;
+      // Rotation setting is not currently implemented in this minimal version
     }
   }
 
-  // Returns whether the viewer is in presentation mode.
+  /**
+   * Returns whether the viewer is in presentation mode.
+   */
   get isInPresentationMode(): boolean {
-    // return this.pdfViewer ? this.pdfViewer.isInPresentationMode : false;
+    // Presentation mode is not currently implemented in this minimal version
     return false;
   }
 
@@ -191,11 +199,7 @@ export class PDFLinkService {
     // Finally, scroll the viewer to the desired page/destination.
     if (this.pdfViewer) {
       this.goToPage(pageNumber);
-      // this.pdfViewer.scrollPageIntoView({
-      //   pageNumber,
-      //   destArray: explicitDest,
-      //   ignoreDestinationZoom: this._ignoreDestinationZoom,
-      // });
+      // Scroll to page is handled by the viewer's goToPage method
     } else {
       console.error('PDF viewer is not set or does not support scrolling.');
     }
@@ -210,7 +214,7 @@ export class PDFLinkService {
     if (this.pdfViewer) {
       // Convert to number if needed.
       const pageNum = typeof val === 'string' ? parseInt(val, 10) : val;
-      // this.pdfViewer.currentPageNumber = pageNum;
+      // Page navigation is handled by the viewer's goToPage method
       this.pdfViewer.goToPage(pageNum);
     } else {
       console.warn('No PDF viewer set for goToPage.');

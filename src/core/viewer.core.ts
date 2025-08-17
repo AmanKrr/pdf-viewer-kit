@@ -17,7 +17,7 @@
 import { PDFDocumentProxy } from 'pdfjs-dist';
 import { LoadOptions, ViewerLoadOptions } from '../types/webpdf.types';
 import { PDFViewerInstance } from './viewer-instance.core';
-import WebViewer from '../viewer/ui/web-viewer';
+import WebViewer from '../viewer/ui/web-viewer.component';
 
 /**
  * Web viewer instance that integrates with the new multi-instance architecture.

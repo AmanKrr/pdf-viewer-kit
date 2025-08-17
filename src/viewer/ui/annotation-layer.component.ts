@@ -18,7 +18,7 @@ import { AnnotationLayer as PdfJsAnnotationLayerInternal, PageViewport, PDFDocum
 import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
 import { PDFLinkService } from '../services/link.service';
 import PageElement from './page-element.component';
-import WebViewer from './web-viewer';
+import WebViewer from './web-viewer.component';
 import { debugWarn } from '../../utils/debug-utils';
 
 /**
