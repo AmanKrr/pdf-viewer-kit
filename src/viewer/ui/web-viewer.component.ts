@@ -16,18 +16,20 @@
 
 import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
 import { debounce } from 'lodash';
-import PageVirtualization from './page-virtualization.component';
-import ZoomHandler from './zoom-handler.component';
+import {
+  PageVirtualization,
+  ZoomHandler,
+  SearchBar,
+  SearchHighlighter,
+  Toolbar,
+  DownloadManager,
+  AnnotationService,
+  SelectionManager,
+  AnnotationToolbarStateManager,
+} from '../../internal';
 import { LoadOptions, ViewerLoadOptions } from '../../types/webpdf.types';
-import { AnnotationService } from '../services/annotation.service';
-import { SelectionManager } from '../managers/selection.manager';
-import SearchBar from './searchbar.component';
-import SearchHighlighter from '../managers/search-highlighter.manager';
-import { Toolbar } from './toolbar.component';
-import { DownloadManager } from '../managers/download-manager';
 import { IToolbar } from '../../interface/IToolbar';
 import { PDFViewerInstance } from '../../core/viewer-instance.core';
-import { AnnotationToolbarStateManager } from './annotation-toolbar-state.component';
 import { scrollElementIntoView } from '../../utils/web-ui-utils';
 
 /**

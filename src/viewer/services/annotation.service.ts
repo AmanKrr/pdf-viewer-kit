@@ -130,7 +130,7 @@ export class AnnotationService {
    */
   private _waitForPageContainer(page: number, timeoutMs = 5000): Promise<HTMLElement> {
     return new Promise((resolve, reject) => {
-      const id = `#pageContainer-${this.instanceId}-${page}[data-page-number="${page}"]`;
+      const id = `pageContainer-${this.instanceId}-${page}`;
       const start = performance.now();
 
       const check = () => {
