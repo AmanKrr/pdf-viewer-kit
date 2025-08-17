@@ -102,11 +102,11 @@ class SearchBar {
             const { current, total } = getMatchStatus();
             this.updateMatchCounter(current, total);
             break;
-          case 'Escape':
-            e.preventDefault();
-            // Hide the search bar
-            this.hide();
-            break;
+          // case 'Escape':
+          //   e.preventDefault();
+          //   // Hide the search bar
+          //   this.hide();
+          //   break;
         }
       });
 
