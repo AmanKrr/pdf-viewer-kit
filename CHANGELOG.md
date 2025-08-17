@@ -1,3 +1,18 @@
+# [1.0.0-canvas-pooling.1](https://github.com/AmanKrr/pdf-kit/compare/v0.2.0-canvas-pooling.3...v1.0.0-canvas-pooling.1) (2025-08-17)
+
+
+### Features
+
+* **Delete Confirmation:** implement delete confirmation popup and enhance delete button functionality ([6304f46](https://github.com/AmanKrr/pdf-kit/commit/6304f465ca5a613c7e904b8808ce17834258b049))
+* implement comprehensive annotation system improvements and architecture refactoring ([0748f3d](https://github.com/AmanKrr/pdf-kit/commit/0748f3db153e4ad2677b412d42b20d5eb3437025))
+* **PDFViewerKit:** enhance PDF viewer instance management and public API ([8fff955](https://github.com/AmanKrr/pdf-kit/commit/8fff9556f71861a2568712d12e5b57a875f51344))
+
+
+### BREAKING CHANGES
+
+* Library structure has been reorganized with new public API
+* File naming conventions have been standardized to lowercase
+
 # [0.2.0-canvas-pooling.3](https://github.com/AmanKrr/pdf-kit/compare/v0.2.0-canvas-pooling.2...v0.2.0-canvas-pooling.3) (2025-08-17)
 
 
