@@ -50,6 +50,7 @@ export class AnnotationManager {
   private _boundMouseUp = this._onMouseUp.bind(this);
   private _boundInitMouseDown = this._initMouseDown.bind(this);
   private _boundAnnotationSelection = this._onAnnotationSelection.bind(this);
+  private _boundDeleteKey = this._onDeleteKey.bind(this);
 
   /**
    * @param annotationDrawerContainer The HTML container for drawing annotations
@@ -69,6 +70,130 @@ export class AnnotationManager {
     });
 
     this.events.on('ANNOTATION_SELECTED', this._boundAnnotationSelection);
+
+    // Add global delete key handler
+    this._addGlobalDeleteHandler();
+  }
+
+  /**
+   * Adds a global delete key handler to the document
+   */
+  private _addGlobalDeleteHandler(): void {
+    document.addEventListener('keydown', this._boundDeleteKey);
+  }
+
+  /**
+   * Handles delete/backspace key presses globally
+   */
+  private _onDeleteKey(event: KeyboardEvent): void {
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      // Only handle delete if we have a selected annotation and we're not in an input field
+      if (this._selectedAnnotation && !this._isInputElement(event.target as Element)) {
+        event.preventDefault();
+        this._showDeleteConfirmation();
+      }
+    }
+  }
+
+  /**
+   * Shows a confirmation popup before deleting the selected annotation
+   */
+  private _showDeleteConfirmation(): void {
+    if (!this._selectedAnnotation) return;
+
+    // Create confirmation popup
+    const popup = document.createElement('div');
+    popup.className = 'a-delete-confirmation-popup';
+    popup.innerHTML = `
+      <div class="a-popup-content">
+        <div class="a-popup-header">
+          <h3>Delete Annotation</h3>
+        </div>
+        <div class="a-popup-body">
+          <p>Are you sure you want to delete this annotation?</p>
+          <p class="a-annotation-type">Type: ${this._selectedAnnotation.type}</p>
+        </div>
+        <div class="a-popup-actions">
+          <button class="a-btn a-btn-cancel" type="button">Cancel</button>
+          <button class="a-btn a-btn-delete" type="button">Delete</button>
+        </div>
+      </div>
+    `;
+
+    // Add event listeners
+    const cancelBtn = popup.querySelector('.a-btn-cancel') as HTMLButtonElement;
+    const deleteBtn = popup.querySelector('.a-btn-delete') as HTMLButtonElement;
+
+    cancelBtn.addEventListener('click', () => {
+      document.body.removeChild(popup);
+    });
+
+    deleteBtn.addEventListener('click', () => {
+      this.deleteSelectedAnnotation();
+      document.body.removeChild(popup);
+    });
+
+    // Close on backdrop click
+    popup.addEventListener('click', (e) => {
+      if (e.target === popup) {
+        document.body.removeChild(popup);
+      }
+    });
+
+    // Close on Escape key
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        document.body.removeChild(popup);
+        document.removeEventListener('keydown', handleEscape);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+
+    // Add to DOM
+    document.body.appendChild(popup);
+
+    // Focus the delete button for better accessibility
+    deleteBtn.focus();
+  }
+
+  /**
+   * Checks if the target element is an input field where we shouldn't handle delete
+   */
+  private _isInputElement(element: Element): boolean {
+    if (!element) return false;
+
+    const tagName = element.tagName.toLowerCase();
+    const inputTypes = ['input', 'textarea', 'select'];
+
+    if (inputTypes.includes(tagName)) return true;
+
+    // Check if element has contenteditable attribute
+    if (element.hasAttribute('contenteditable')) return true;
+
+    // Check if element is inside an input field
+    const closestInput = element.closest('input, textarea, select, [contenteditable]');
+    return !!closestInput;
+  }
+
+  /**
+   * Deletes the currently selected annotation
+   */
+  public deleteSelectedAnnotation(): void {
+    if (this._selectedAnnotation) {
+      const annotationId = this._selectedAnnotation.annotationId;
+      this.deleteAnnotation(annotationId);
+      this._selectedAnnotation = null;
+    }
+  }
+
+  /**
+   * Shows delete confirmation popup for the currently selected annotation
+   * This can be called programmatically from other parts of the application
+   */
+  public showDeleteConfirmation(): void {
+    if (this._selectedAnnotation) {
+      this._showDeleteConfirmation();
+    }
   }
 
   get instanceId(): string {
@@ -139,6 +264,27 @@ export class AnnotationManager {
    */
   get getSelectedAnnoation(): IAnnotation | null {
     return this._selectedAnnotation;
+  }
+
+  /**
+   * Returns the currently selected annotation
+   */
+  get getSelectedAnnotation(): IAnnotation | null {
+    return this._selectedAnnotation;
+  }
+
+  /**
+   * Checks if there's currently a selected annotation
+   */
+  public hasSelectedAnnotation(): boolean {
+    return this._selectedAnnotation !== null;
+  }
+
+  /**
+   * Gets the type of the currently selected annotation
+   */
+  public getSelectedAnnotationType(): string | null {
+    return this._selectedAnnotation?.type || null;
   }
 
   /**
@@ -499,6 +645,10 @@ export class AnnotationManager {
       this._selectionUnsubscribe();
     }
     this.events.off('ANNOTATION_SELECTED', this._boundAnnotationSelection);
+
+    // Remove global delete key handler
+    document.removeEventListener('keydown', this._boundDeleteKey);
+
     // Optionally remove all shapes from DOM:
     // this._annotations.forEach(a => a.deleteAnnotation(true));
     // this._annotations = [];

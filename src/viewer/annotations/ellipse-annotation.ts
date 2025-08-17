@@ -54,7 +54,6 @@ export class EllipseAnnotation extends Annotation {
     instanceId: string;
     containerId: string;
   };
-  private _onDeleteKeyBound = this._onDeleteKey.bind(this);
   private _bindOnScaleChange = this._onScaleChange.bind(this);
 
   /**
@@ -220,22 +219,23 @@ export class EllipseAnnotation extends Annotation {
     this._onShapeUpdate();
   }
 
-  /** Adds resizers and listens for Delete/Backspace. */
+  /** Adds resizers. */
   public select(): void {
     if (!this._resizer) {
       this._resizer = new Resizer(this.__svg, this.__element as any, this._onShapeUpdate.bind(this), this._constraints);
       this.__svg.focus();
-      this.__svg.addEventListener('keydown', this._onDeleteKeyBound);
     }
   }
 
   /** Removes resizers and key listener. */
   public deselect(): void {
     if (this._resizer) {
-      this.__svg.removeEventListener('keydown', this._onDeleteKeyBound);
       this._resizer.removeResizers();
       this._resizer = null;
     }
+
+    // Emit deselection event
+    this.events.emit('ANNOTATION_DESELECT');
   }
 
   /**
@@ -311,14 +311,6 @@ export class EllipseAnnotation extends Annotation {
       this.__onAnnotationClick(e, this.getConfig());
     };
     this.__svg.appendChild(this.__hitElementRect);
-  }
-
-  /**
-   * Handles Delete/Backspace key to remove the annotation.
-   * @param e Keyboard event
-   */
-  private _onDeleteKey(e: KeyboardEvent): void {
-    if (e.key === 'Delete' || e.key === 'Backspace') this.deleteAnnotation();
   }
 
   /**

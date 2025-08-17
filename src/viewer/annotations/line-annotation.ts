@@ -54,7 +54,6 @@ export class LineAnnotation extends Annotation {
     instanceId: string;
     containerId: string;
   };
-  private _onDeleteKeyBound = this._onDeleteKey.bind(this);
   private _bindOnScaleChange = this._onScaleChange.bind(this);
 
   /**
@@ -227,25 +226,26 @@ export class LineAnnotation extends Annotation {
   }
 
   /**
-   * Select this annotation, adding resize handles and delete‐key listener.
+   * Select this annotation, adding resize handles.
    */
   public select(): void {
     if (!this._resizer) {
       this._resizer = new Resizer(this.__svg, this.__element as SVGGraphicsElement, this._onShapeUpdate.bind(this), this.__annotationDrawerContainer.getBoundingClientRect());
       this.__svg.focus();
-      this.__svg.addEventListener('keydown', this._onDeleteKeyBound);
     }
   }
 
   /**
-   * Deselect this annotation, removing handles and delete‐key listener.
+   * Deselect this annotation, removing handles.
    */
   public deselect(): void {
     if (this._resizer) {
-      this.__svg.removeEventListener('keydown', this._onDeleteKeyBound);
       this._resizer.removeResizers();
       this._resizer = null;
     }
+
+    // Emit deselection event
+    this.events.emit('ANNOTATION_DESELECT');
   }
 
   /**
@@ -336,13 +336,6 @@ export class LineAnnotation extends Annotation {
       this.__onAnnotationClick(e, this.getConfig() as any);
     };
     this.__svg.appendChild(hit);
-  }
-
-  /** Handle Delete/Backspace key to remove annotation. */
-  private _onDeleteKey(e: KeyboardEvent): void {
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      this.deleteAnnotation();
-    }
   }
 
   /** Capture logical (unscaled) endpoints for later zoom updates. */

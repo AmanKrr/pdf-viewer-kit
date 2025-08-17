@@ -476,6 +476,35 @@
   width: 14px;
 }
 
+.a-toolbar-button .a-annotation-toolbar-delete-icon::before {
+  content: '\e872';
+  font-size: 1.34rem !important;
+}
+
+/* Smooth transitions for delete button visibility */
+.a-toolbar-item[data-delete-button] {
+  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.a-toolbar-item[data-delete-button].hidden {
+  opacity: 0;
+  transform: scale(0.8);
+  pointer-events: none;
+}
+
+/* Right container styling for better alignment */
+.a-annotation-toolbar-right-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Ensure delete button has consistent spacing with shape buttons */
+.a-annotation-toolbar-right-container .a-toolbar-item[data-delete-button] {
+  margin-left: 8px;
+}
+
 .a-annotation-shape-button {
   display: inline-flex;
   align-items: center;

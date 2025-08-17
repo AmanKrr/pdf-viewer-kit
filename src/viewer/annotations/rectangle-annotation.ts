@@ -46,7 +46,6 @@ export class RectangleAnnotation extends Annotation {
     instanceId: string;
     containerId: string;
   };
-  private _onDeleteKeyBound = this._onDeleteKey.bind(this);
   private _bindOnScaleChange = this._onScaleChange.bind(this);
 
   /** Unique identifier of this annotation. */
@@ -222,25 +221,26 @@ export class RectangleAnnotation extends Annotation {
   }
 
   /**
-   * Selects this annotation, adding resizers and Delete/Backspace handler.
+   * Selects this annotation, adding resizers.
    */
   public select(): void {
     if (!this._resizer) {
       this._resizer = new Resizer(this.__svg, this.__element as SVGGraphicsElement, this._onShapeUpdate.bind(this), this._constraints);
       this.__svg.focus();
-      this._addDeleteEvent();
     }
   }
 
   /**
-   * Deselects this annotation, removing resizers and keyboard handler.
+   * Deselects this annotation, removing resizers.
    */
   public deselect(): void {
     if (this._resizer) {
-      this._removeDeleteEvent();
       this._resizer.removeResizers();
       this._resizer = null;
     }
+
+    // Emit deselection event
+    this.events.emit('ANNOTATION_DESELECT');
   }
 
   /**
@@ -250,7 +250,6 @@ export class RectangleAnnotation extends Annotation {
   public deleteAnnotation(suppressEvent = false): void {
     if (this.__svg) {
       if (this._resizer) {
-        this._removeDeleteEvent();
         this._resizer.removeResizers();
         this._resizer = null;
       }
@@ -381,25 +380,6 @@ export class RectangleAnnotation extends Annotation {
 
       // Make sure pointer events are enabled
       this.__hitElementRect.style.pointerEvents = 'auto';
-    }
-  }
-
-  /** Adds keyboard listener for Delete/Backspace. */
-  private _addDeleteEvent(): void {
-    this.__svg.addEventListener('keydown', this._onDeleteKeyBound);
-  }
-
-  /** Removes keyboard listener for Delete/Backspace. */
-  private _removeDeleteEvent(): void {
-    this.__svg.removeEventListener('keydown', this._onDeleteKeyBound);
-  }
-
-  /**
-   * Handles Delete or Backspace key to delete the annotation.
-   */
-  private _onDeleteKey(event: KeyboardEvent): void {
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      this.deleteAnnotation();
     }
   }
 

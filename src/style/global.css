@@ -452,3 +452,127 @@ span.a-active-highlight {
     color: var(--text-on-background-light);
   }
 }
+
+/* ========================== */
+/* Delete Confirmation Popup */
+/* ========================== */
+
+.a-delete-confirmation-popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.a-delete-confirmation-popup .a-popup-content {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  max-width: 400px;
+  width: 90%;
+  overflow: hidden;
+  animation: slideIn 0.2s ease-out;
+}
+
+.a-delete-confirmation-popup .a-popup-header {
+  padding: 20px 20px 0 20px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.a-delete-confirmation-popup .a-popup-header h3 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.a-delete-confirmation-popup .a-popup-body {
+  padding: 20px;
+}
+
+.a-delete-confirmation-popup .a-popup-body p {
+  margin: 0 0 10px 0;
+  color: #666;
+  line-height: 1.5;
+}
+
+.a-delete-confirmation-popup .a-popup-body .a-annotation-type {
+  margin: 0;
+  color: #999;
+  font-size: 14px;
+  font-style: italic;
+}
+
+.a-delete-confirmation-popup .a-popup-actions {
+  padding: 0 20px 20px 20px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.a-delete-confirmation-popup .a-btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  border: none;
+  outline: none;
+}
+
+.a-delete-confirmation-popup .a-btn-cancel {
+  border: 1px solid #ddd;
+  background: white;
+  color: #666;
+}
+
+.a-delete-confirmation-popup .a-btn-cancel:hover {
+  background: #f8f9fa;
+  border-color: #adb5bd;
+}
+
+.a-delete-confirmation-popup .a-btn-delete {
+  border: 1px solid #dc3545;
+  background: #dc3545;
+  color: white;
+}
+
+.a-delete-confirmation-popup .a-btn-delete:hover {
+  background: #c82333;
+  border-color: #c82333;
+}
+
+.a-delete-confirmation-popup .a-btn:focus {
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

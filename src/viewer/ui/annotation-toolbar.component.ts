@@ -36,6 +36,7 @@ export class AnnotationToolbar {
 
   private _toolbarContainer!: HTMLElement | undefined;
   private _toolbarPropertiesContainer!: HTMLElement | undefined;
+  private _deleteButtonWrapper: HTMLElement | null = null;
 
   private _viewer: WebViewer;
   private _onAnnotationCreated = this._handleAnnotationCreated.bind(this);
@@ -122,6 +123,95 @@ export class AnnotationToolbar {
     this._stateManager.subscribe((prevState, newState) => {
       this._updatePlugins();
     });
+
+    // Monitor annotation selection changes
+    this._setupAnnotationSelectionMonitoring();
+  }
+
+  /**
+   * Set up monitoring for annotation selection changes
+   */
+  private _setupAnnotationSelectionMonitoring(): void {
+    // Listen for annotation selection events
+    this.events.on('ANNOTATION_SELECTED', () => {
+      setTimeout(() => {
+        this._updateDeleteButtonVisibility();
+      }, 300);
+    });
+
+    // Listen for annotation deselection events
+    this.events.on('ANNOTATION_DESELECT', () => {
+      this._hideDeleteButton();
+    });
+
+    // Also listen for annotation deletion events
+    this.events.on('ANNOTATION_DELETED', () => {
+      this._updateDeleteButtonVisibility();
+    });
+
+    // Monitor for when annotation drawing starts/stops
+    this.events.on('DRAWING_STARTED', () => {
+      this._hideDeleteButton();
+    });
+
+    this.events.on('DRAWING_FINISHED', () => {
+      // Small delay to ensure annotation is created and selected
+      setTimeout(() => {
+        this._updateDeleteButtonVisibility();
+      }, 100);
+    });
+  }
+
+  /**
+   * Update the delete button visibility based on current selection state
+   */
+  private _updateDeleteButtonVisibility(): void {
+    if (!this._deleteButtonWrapper) return;
+
+    const currentPage = this._viewer.currentPageNumber;
+    let hasSelection = false;
+
+    if (currentPage !== undefined) {
+      const manager = this._viewer.annotation.isAnnotationManagerRegistered(currentPage);
+      if (manager) {
+        if (manager.getAnnotations.length == 0) this._hideDeleteButton();
+        hasSelection = manager.hasSelectedAnnotation();
+      }
+    }
+
+    if (hasSelection) {
+      this._showDeleteButton();
+    } else {
+      this._hideDeleteButton();
+    }
+  }
+
+  /**
+   * Show the delete button
+   */
+  private _showDeleteButton(): void {
+    if (this._deleteButtonWrapper) {
+      this._deleteButtonWrapper.classList.remove('hidden');
+    }
+  }
+
+  /**
+   * Hide the delete button
+   */
+  private _hideDeleteButton(): void {
+    if (this._deleteButtonWrapper) {
+      this._deleteButtonWrapper.classList.add('hidden');
+    }
+  }
+
+  /**
+   * Handle drawing finished event with delay to ensure annotation is created
+   */
+  private _onDrawingFinished(): void {
+    // Small delay to ensure annotation is created and selected
+    setTimeout(() => {
+      this._updateDeleteButtonVisibility();
+    }, 100);
   }
 
   /**
@@ -222,6 +312,9 @@ export class AnnotationToolbar {
     rightContainer.style.alignItems = 'center';
     this._toolbarContainer.appendChild(rightContainer);
 
+    // Create delete button in the right container
+    this._createDeleteButton(rightContainer);
+
     // Update plugin context with current state
     this._pluginManager.setContext({
       viewer: this._viewer,
@@ -280,9 +373,41 @@ export class AnnotationToolbar {
     this._toolbarContainer?.appendChild(wrapper);
   }
 
+  /** Create the Delete button for the toolbar. */
+  private _createDeleteButton(container: HTMLElement): void {
+    const deleteButton = this.createToolbarButton({
+      id: 'annotationToolbarDeleteButton',
+      iconClass: 'a-annotation-toolbar-delete-icon',
+      tooltip: 'Delete Selected Annotation',
+      onClick: () => this.handleDeleteClick(),
+    });
+    this._deleteButtonWrapper = this.parentWrapper({});
+    this._deleteButtonWrapper.appendChild(deleteButton);
+
+    // Add data attribute for CSS targeting
+    this._deleteButtonWrapper.setAttribute('data-delete-button', 'true');
+
+    // Initially hide the delete button with smooth animation
+    this._deleteButtonWrapper.classList.add('hidden');
+
+    container.appendChild(this._deleteButtonWrapper);
+  }
+
   /** Handle Back button click: destroy toolbar and reset state. */
   private handleBackClick(): void {
     this.destroy();
+  }
+
+  /** Handle Delete button click: show confirmation popup. */
+  private handleDeleteClick(): void {
+    // Get the annotation manager for the current page
+    const currentPage = this._viewer.currentPageNumber;
+    if (currentPage !== undefined) {
+      const manager = this._viewer.annotation.isAnnotationManagerRegistered(currentPage);
+      if (manager && manager.hasSelectedAnnotation()) {
+        manager.showDeleteConfirmation();
+      }
+    }
   }
 
   /**
@@ -310,6 +435,7 @@ export class AnnotationToolbar {
   /** Cleanup toolbar and event handlers. */
   public destroy(): void {
     this.events.off('ANNOTATION_CREATED', this._onAnnotationCreated);
+    // Note: Inline event listeners will be cleaned up automatically when the component is destroyed
 
     // Reset state
     this._stateManager.reset();
@@ -336,5 +462,8 @@ export class AnnotationToolbar {
     // Clean up popper
     this._popper?.destroy();
     this._popper = null;
+
+    // Reset delete button wrapper
+    this._deleteButtonWrapper = null;
   }
 }
