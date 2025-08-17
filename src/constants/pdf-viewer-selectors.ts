@@ -38,6 +38,7 @@ export const PDF_VIEWER_IDS = {
   ANNOTATION_LAYER: 'annotation-layer',
   ANNOTATION_DRAWING_LAYER: 'annotation-drawing-layer',
   LOADING_CONTAINER: 'loading-container',
+  ERROR_CONTAINER: 'error-container',
   INPUT_PAGE_NUMBER: 'input-page-number-container',
   CURRENT_PAGE_INPUT: 'current-page-input',
 };
@@ -53,6 +54,7 @@ export const PDF_VIEWER_IDS = {
  */
 export const PDF_VIEWER_CLASSNAMES = {
   PDF_LOADING: 'pdf-loading',
+  PDF_ERROR: 'pdf-error',
   A_PDF_VIEWER: 'a-pdf-viewer',
   A_TOOLBAR_CONTAINER: 'a-toolbar-container',
   A_TOOLBAR_ITEMS: 'a-toolbar-items',

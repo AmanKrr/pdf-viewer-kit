@@ -24,6 +24,7 @@ import { getPdfWorkerSrc } from '../utils/worker-factory';
 import PageElement from '../viewer/ui/page-element.component';
 import { InstanceWebUiUtils } from '../utils/web-ui-utils';
 import { PasswordManagerService } from '../viewer/services/password-manager.service';
+import { ErrorHandlerService } from '../viewer/services/error-handler.service';
 
 /**
  * Manages a single, completely isolated PDF viewer instance.
@@ -47,6 +48,7 @@ export class PDFViewerInstance {
   private _loadingTask: PDFDocumentLoadingTask | null = null;
   private _isDestroyed = false;
   private _passwordManagerService: PasswordManagerService | null = null;
+  private _errorHandlerService: ErrorHandlerService | null = null;
 
   /**
    * Creates a new PDF viewer instance.
@@ -179,6 +181,9 @@ export class PDFViewerInstance {
       // Initialize password manager service
       this._passwordManagerService = new PasswordManagerService(internalContainers.parent, this._instanceId);
 
+      // Initialize error handler service
+      this._errorHandlerService = new ErrorHandlerService(internalContainers.parent, this._instanceId, () => this.retryLoad());
+
       this._pdfDocument = await this._loadPDFDocument();
 
       this._loadingTask = null;
@@ -209,6 +214,11 @@ export class PDFViewerInstance {
 
       this._hideInstanceLoading();
 
+      // Show user-friendly error message
+      if (this._errorHandlerService) {
+        this._errorHandlerService.showError(error as Error, 'PDF Loading Error');
+      }
+
       this._events.emit('pdfLoadError', {
         instanceId: this._instanceId,
         error: error as Error,
@@ -233,6 +243,29 @@ export class PDFViewerInstance {
       }
       this._loadingTask = null;
     }
+  }
+
+  /**
+   * Retries loading the PDF document.
+   *
+   * This method can be called when the user wants to retry after an error.
+   * It will attempt to load the PDF again with the same options.
+   *
+   * @returns Promise that resolves to the initialized web viewer
+   * @throws Error if the instance is destroyed or loading fails
+   */
+  async retryLoad(): Promise<InstanceWebViewer> {
+    if (this._isDestroyed) {
+      throw new Error('Cannot retry loading into destroyed instance');
+    }
+
+    // Hide any existing error messages
+    if (this._errorHandlerService) {
+      this._errorHandlerService.hideError();
+    }
+
+    // Attempt to load the PDF again
+    return this.load();
   }
 
   /**
@@ -272,6 +305,12 @@ export class PDFViewerInstance {
       if (this._passwordManagerService) {
         this._passwordManagerService.destroy();
         this._passwordManagerService = null;
+      }
+
+      // Clean up error handler service
+      if (this._errorHandlerService) {
+        this._errorHandlerService.destroy();
+        this._errorHandlerService = null;
       }
 
       this._canvasPool.destroy();

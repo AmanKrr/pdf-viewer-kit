@@ -57,4 +57,11 @@
   /* Text Selection */
   --text-selection-background: rgba(0, 128, 255, 0.3);
   --text-selection-color: inherit;
+
+  /* Error Handling Colors */
+  --pdf-error-primary-color: #6d93ff;
+  --pdf-error-hover-color: #4b4b4b;
+  --pdf-error-active-color: #333;
+  --pdf-error-text-color: #d32f2f;
+  --pdf-error-background-color: var(--web-pdf-viewer-page-background-color);
 }
