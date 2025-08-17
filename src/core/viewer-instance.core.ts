@@ -23,6 +23,7 @@ import { InstanceWebViewer } from './viewer.core';
 import { getPdfWorkerSrc } from '../utils/worker-factory';
 import PageElement from '../viewer/ui/page-element.component';
 import { InstanceWebUiUtils } from '../utils/web-ui-utils';
+import { PasswordManagerService } from '../viewer/services/password-manager.service';
 
 /**
  * Manages a single, completely isolated PDF viewer instance.
@@ -45,6 +46,7 @@ export class PDFViewerInstance {
   private _webViewer: InstanceWebViewer | null = null;
   private _loadingTask: PDFDocumentLoadingTask | null = null;
   private _isDestroyed = false;
+  private _passwordManagerService: PasswordManagerService | null = null;
 
   /**
    * Creates a new PDF viewer instance.
@@ -174,6 +176,9 @@ export class PDFViewerInstance {
 
       this._showInstanceLoading(internalContainers.parent);
 
+      // Initialize password manager service
+      this._passwordManagerService = new PasswordManagerService(internalContainers.parent, this._instanceId);
+
       this._pdfDocument = await this._loadPDFDocument();
 
       this._loadingTask = null;
@@ -183,6 +188,11 @@ export class PDFViewerInstance {
       await this._webViewer.initialize(internalContainers);
 
       this._hideInstanceLoading();
+
+      // Clean up password manager after successful load
+      if (this._passwordManagerService) {
+        this._passwordManagerService.cleanupAfterSuccess();
+      }
 
       this._events.emit('pdfLoaded', { instanceId: this._instanceId });
 
@@ -258,6 +268,12 @@ export class PDFViewerInstance {
         console.log(`Loading task destroyed for instance ${this._instanceId}`);
       }
 
+      // Clean up password manager service
+      if (this._passwordManagerService) {
+        this._passwordManagerService.destroy();
+        this._passwordManagerService = null;
+      }
+
       this._canvasPool.destroy();
       this._state.destroy();
 
@@ -299,11 +315,9 @@ export class PDFViewerInstance {
     this._loadingTask = getDocument(loadOptions as any);
 
     this._loadingTask.onPassword = (updatePassword: (pass: string) => void, reason: any) => {
-      this._events.emit('passwordRequired', {
-        instanceId: this._instanceId,
-        updatePassword,
-        reason,
-      });
+      if (this._passwordManagerService) {
+        this._passwordManagerService.handlePasswordRequired(updatePassword, reason);
+      }
     };
 
     this._loadingTask.onProgress = (progressData: any) => {
