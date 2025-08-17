@@ -1,140 +1,637 @@
-# pdf-viewer-kit
+# PDF Viewer Kit 🚀
 
-PDF-VIEWER-KIT is a versatile, framework-agnostic library designed to render, manipulate, and interact with PDF documents seamlessly. Whether you're building a React, Next.js, Angular, or any other frontend application, PDF-VIEWER-KIT provides you with a well-structured, modular, and feature-rich solution for embedding PDF viewers into your web applications.
+[![npm version](https://badge.fury.io/js/pdf-viewer-kit.svg)](https://badge.fury.io/js/pdf-viewer-kit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue.svg)](https://www.typescriptlang.org/)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/AmanKrr/pdf-viewer-kit)
 
-Doc: https://github.com/AmanKrr/pdf-viewer-kit/wiki
+**PDF Viewer Kit** is a modern, high-performance, framework-agnostic, lightweight PDF viewer and annotation library built with TypeScript. Built on top of **pdf.js**, it provides PDF viewing capabilities with basic annotation features, canvas pooling, and a robust public API.
 
-### Overview
+> ⚠️ **Note**
+>
+> `1.0.0-canvas-pooling.1` is a **beta release**.
+>
+> It is highly recommended to use this version, as it is mostly stable and will be promoted to a **stable release** soon.
 
-**pdf-viewer-kit** is an open-source, robust PDF viewer and annotation library built on top of **pdf.js**, fully implemented in TypeScript. The primary goal of pdf-viewer-kit is to offer high-performance, customizable PDF viewing and annotation capabilities that closely match the experience provided by commercial libraries like PSPDFKit.
+## ✨ Features
 
-### Features
+### 🎯 **Core PDF Viewing**
 
-#### Current Capabilities
+- **High-Performance Rendering**: Optimized PDF rendering using pdf.js with canvas pooling
+- **Multi-Instance Support**: Load multiple PDF documents simultaneously with complete isolation
+- **Responsive Design**: Adaptive layout that works on all device sizes
+- **Memory Efficient**: Advanced memory management with canvas pooling and image bitmap optimization
 
-* **High-Performance PDF Viewing**: Efficient rendering of PDF documents using pdf.js.
-* **Annotations**: Current support includes rectangle, ellipse, and line annotations with drawing and resizing functionalities.
-* **Downloadable Annotated PDFs**: Users can export PDFs along with drawn annotations (rectangle, ellipse, and line).
-* **Optimized Text Selection**: Enhanced text selection, significantly improving usability over the standard pdf.js implementation.
-* **Text Extraction**: Extract text content from drawn rectangle annotations efficiently.
-* **Thumbnails**: Fast page navigation via thumbnail previews.
-* **Customizable Toolbar**: Users can either modify default toolbar options or pass a fully custom toolbar.
-* **Multiple Document Sources**: Fetch documents from URLs, local storage, and authorization-supported endpoints.
-* **Memory Efficiency**: Focused optimizations to minimize memory usage during document rendering and interaction.
+### 🖊️ **Advanced Annotation System**
 
-#### Future Roadmap
+- **Multiple Annotation Types**: Rectangle, Ellipse, Line, and Text Selection annotations
+- **Interactive Drawing**: Real-time annotation drawing with visual feedback
+- **Smart Selection**: Intelligent annotation selection with resize handles
+- **State-Based UI**: Dynamic toolbar and button visibility based on annotation state
+- **Delete Confirmation**: User-friendly deletion with confirmation popups
+- **Legacy Support**: Backward compatibility with both modern and legacy coordinate formats
 
-* **Additional Annotations**: Expand annotation capabilities beyond rectangles, ellipses, and lines.
-* **Text Highlighting**: Introduce and optimize text highlighting features.
-* **Tiling**: Implement page tiling for improved memory management, crucial for handling large documents.
-* **Fit Page and Fit Width**: Introduce zoom features for enhanced user experience.
-* **Search Functionality Enhancements**: Improve search highlight alignment and activate search word suggestions.
-* **Real-Time Resizing**: Enhance resizing experience to achieve real-time responsiveness.
+### 🔧 **Developer Experience**
+
+- **TypeScript First**: Full TypeScript support with comprehensive type definitions
+- **Runtime Protection**: JavaScript runtime protection with facade pattern
+- **Clean API**: Professional, well-organized public API with proper namespacing
+- **Event System**: Comprehensive event system for all PDF viewer interactions
+- **Modular Architecture**: Clean separation of concerns with internal/external APIs
+
+### 🎨 **UI & Customization**
+
+- **Customizable Toolbar**: Flexible toolbar system with plugin architecture
+- **Theme Support**: CSS custom properties for easy theming
+- **Responsive Layout**: Adaptive design that works on all screen sizes
+
+## 🚀 Quick Start
 
 ### Installation
 
-Install pdf-viewer-kit via npm:
+```bash
+npm install pdf-viewer-kit
+# or
+yarn add pdf-viewer-kit
+# or
+pnpm add pdf-viewer-kit
+```
+
+### Basic Usage
+
+```typescript
+import { PdfViewerKit } from 'pdf-viewer-kit';
+
+// Load a PDF document
+const instance = await PdfViewerKit.load({
+  containerId: 'pdf-container',
+  url: 'https://example.com/document.pdf',
+});
+
+// Access viewer functionality
+instance.goToPage(5);
+instance.zoomIn();
+instance.nextPage();
+```
+
+### Advanced Usage with Annotations
+
+```typescript
+import { PdfViewerKit, PDFViewerKit } from 'pdf-viewer-kit';
+
+// Load PDF with options
+const instance = await PdfViewerKit.load({
+  containerId: 'pdf-container',
+  url: 'document.pdf',
+  toolbarOptions: {
+    showThumbnail: true,
+    showSearch: true,
+    showAnnotation: true,
+  },
+});
+
+// Create annotations
+const annotationId = await instance.annotations.createAnnotation({
+  type: 'rectangle',
+  pageNumber: 1,
+  position: {
+    left: 100,
+    top: 100,
+    width: 200,
+    height: 100,
+  },
+  style: {
+    fillColor: 'rgba(0, 123, 255, 0.3)',
+    strokeColor: '#007bff',
+    strokeWidth: 2,
+    opacity: 0.8,
+  },
+});
+
+// Extract text from annotation area
+const extractedText = await instance.annotations.getTextInsideRectangle(annotationId);
+console.log('Extracted text:', extractedText);
+
+// Listen to events
+instance.events.on(PDFViewerKit.Events.ANNOTATION_CREATED, (annotation) => {
+  console.log('New annotation created:', annotation.id);
+});
+```
+
+## 📚 API Reference
+
+### Core Classes
+
+#### `PdfViewerKit`
+
+The main entry point for the library.
+
+```typescript
+// Load PDF document
+static async load(options: LoadOptions): Promise<IPDFViewerInstance>
+
+// Get existing instance
+static getInstance(instanceId: string): IPDFViewerInstance | undefined
+
+// Get instance by container
+static getInstanceByContainer(containerId: string): IPDFViewerInstance | undefined
+
+// Get all instances
+static getAllInstances(): IPDFViewerInstance[]
+
+// Unload instance
+static async unload(instanceId: string): Promise<void>
+
+// Unload all instances
+static async unloadAll(): Promise<void>
+```
+
+#### `IPDFViewerInstance`
+
+Represents a loaded PDF viewer instance.
+
+```typescript
+// Properties
+instanceId: string
+containerId: string
+isReady: boolean
+currentPage: number
+totalPages: number
+currentScale: number
+pdfDocument: PDFDocumentProxy | null
+
+// Methods
+goToPage(pageNumber: number): void
+nextPage(): void
+previousPage(): void
+zoomIn(): void
+zoomOut(): void
+
+// Services
+events: IPDFViewerEvents
+annotations: IPDFViewerAnnotations
+search: IPDFViewerSearch
+```
+
+### Annotation System
+
+#### `IPDFViewerAnnotations`
+
+Manages all annotation operations.
+
+```typescript
+// Create annotations
+createAnnotation(config: IAnnotationConfig): Promise<string>
+
+// Get annotations
+getAnnotations(pageNumber: number): IAnnotation[]
+
+// Delete annotations
+deleteAnnotation(annotationId: string): void
+
+// Text extraction
+getTextInsideRectangle(annotationId: string): Promise<string>
+
+// Get annotation configuration
+getAnnotationShapeConfig(annotationId: string): IShapeConfig
+
+// Utility methods
+isPageManagerRegistered(pageNumber: number): boolean
+getRegisteredPages(): number[]
+```
+
+#### Annotation Types
+
+```typescript
+// Rectangle annotation
+interface IRectangleConfig {
+  type: 'rectangle';
+  pageNumber: number;
+  position: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
+  // OR legacy format
+  x0?: number;
+  y0?: number;
+  x1?: number;
+  y1?: number;
+  style: IAnnotationStyle;
+}
+
+// Ellipse annotation
+interface IEllipseConfig {
+  type: 'ellipse';
+  pageNumber: number;
+  position: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
+  style: IAnnotationStyle;
+}
+
+// Line annotation
+interface ILineConfig {
+  type: 'line';
+  pageNumber: number;
+  position: {
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+  };
+  style: IAnnotationStyle;
+}
+```
+
+### Event System
+
+#### Available Events
+
+```typescript
+// Annotation events
+'ANNOTATION_SELECTED';
+'ANNOTATION_CREATED';
+'ANNOTATION_DELETED';
+'ANNOTATION_DESELECT';
+'ANNOTATION_UPDATED';
+```
+
+#### Event Usage
+
+```typescript
+// Listen to events
+instance.events.on('ANNOTATION_CREATED', (annotation) => {
+  console.log('Annotation created:', annotation);
+});
+
+// Remove specific listener
+instance.events.off('ANNOTATION_CREATED', listener);
+
+// Remove all listeners for an event
+instance.events.removeAllListeners('ANNOTATION_CREATED');
+```
+
+### Namespace Access
+
+```typescript
+import { PDFViewerKit } from 'pdf-viewer-kit';
+
+// Access organized functionality
+PDFViewerKit.Viewer.load(options); // Main viewer class
+PDFViewerKit.Events.ANNOTATION_CREATED; // Event constants
+PDFViewerKit.Utils.normalizeRect(coords); // Utility functions
+```
+
+## 🎨 Customization
+
+### Toolbar Configuration
+
+```typescript
+const instance = await PdfViewerKit.load({
+  containerId: 'pdf-container',
+  url: 'document.pdf',
+  toolbarOptions: {
+    showThumbnail: true,
+    showSearch: true,
+    showAnnotation: true,
+    showDownload: true,
+    showZoom: true,
+    showPageNavigation: true,
+  },
+});
+```
+
+### Custom Styling
+
+```css
+/* Customize annotation colors */
+:root {
+  --annotation-fill-color: rgba(0, 123, 255, 0.3);
+  --annotation-stroke-color: #007bff;
+  --annotation-selected-color: #ff6b6b;
+}
+
+/* Customize toolbar appearance */
+.pdf-viewer-toolbar {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+```
+
+### Plugin System
+
+```typescript
+// Create custom toolbar plugins
+class CustomPlugin extends BaseAnnotationToolbarPlugin {
+  initialize(context: AnnotationContext) {
+    // Custom initialization logic
+  }
+
+  render() {
+    // Custom rendering logic
+  }
+}
+```
+
+## 🔧 Advanced Configuration
+
+### Load Options
+
+```typescript
+interface LoadOptions {
+  containerId: string;
+  url?: string;
+  document?: ArrayBuffer | Uint8Array;
+  password?: string;
+  toolbarOptions?: ToolbarOptions;
+}
+```
+
+## 📱 Multi-Instance Support
+
+```typescript
+// Load multiple PDFs simultaneously
+const instance1 = await PdfViewerKit.load({
+  containerId: 'pdf-container-1',
+  url: 'document1.pdf',
+});
+
+const instance2 = await PdfViewerKit.load({
+  containerId: 'pdf-container-2',
+  url: 'document2.pdf',
+});
+
+// Each instance is completely isolated
+instance1.goToPage(5);
+instance2.zoomIn();
+
+// Get all instances
+const allInstances = PdfViewerKit.getAllInstances();
+console.log('Active instances:', allInstances.length);
+```
+
+## 🚀 Performance Features
+
+### Canvas Pooling
+
+- **Memory Optimization**: Reuses canvas elements to reduce memory allocation
+- **Performance Boost**: Faster rendering and smoother interactions
+- **Configurable**: Adjustable pool size based on your needs
+
+### Page Virtualization
+
+- **Efficient Memory Usage**: Only renders visible pages
+- **Smooth Scrolling**: Handles large documents without performance degradation
+- **Smart Caching**: Intelligent page caching for optimal performance
+
+### Image Bitmap Pooling
+
+- **Reduced Memory Pressure**: Efficient handling of PDF images
+- **Faster Rendering**: Optimized image processing pipeline
+- **Better UX**: Smoother page transitions and zoom operations
+
+## 🧪 Examples
+
+### Basic PDF Viewer
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>PDF Viewer Kit - Basic Example</title>
+  </head>
+  <body>
+    <div id="pdf-container" style="width: 100%; height: 600px;"></div>
+
+    <script type="module">
+      import { PdfViewerKit } from 'pdf-viewer-kit';
+
+      PdfViewerKit.load({
+        containerId: 'pdf-container',
+        url: 'sample.pdf',
+      });
+    </script>
+  </body>
+</html>
+```
+
+### Advanced Annotation Example
+
+```typescript
+import { PdfViewerKit, PDFViewerKit } from 'pdf-viewer-kit';
+
+class PDFAnnotationManager {
+  private instance: any;
+
+  async initialize() {
+    this.instance = await PdfViewerKit.load({
+      containerId: 'pdf-container',
+      url: 'document.pdf',
+      toolbarOptions: {
+        showAnnotation: true,
+        showThumbnail: true,
+      },
+    });
+
+    this.setupEventListeners();
+  }
+
+  private setupEventListeners() {
+    // Listen to annotation events
+    this.instance.events.on(PDFViewerKit.Events.ANNOTATION_CREATED, (annotation) => {
+      this.onAnnotationCreated(annotation);
+    });
+
+    this.instance.events.on(PDFViewerKit.Events.ANNOTATION_DELETED, (annotation) => {
+      this.onAnnotationDeleted(annotation);
+    });
+  }
+
+  async createRectangleAnnotation(page: number, x: number, y: number, width: number, height: number) {
+    return await this.instance.annotations.createAnnotation({
+      type: 'rectangle',
+      pageNumber: page,
+      position: { left: x, top: y, width, height },
+      style: {
+        fillColor: 'rgba(255, 0, 0, 0.3)',
+        strokeColor: '#ff0000',
+        strokeWidth: 2,
+      },
+    });
+  }
+
+  private onAnnotationCreated(annotation: any) {
+    console.log('Annotation created:', annotation);
+    // Update UI, save to database, etc.
+  }
+
+  private onAnnotationDeleted(annotation: any) {
+    console.log('Annotation deleted:', annotation);
+    // Update UI, remove from database, etc.
+  }
+}
+
+// Usage
+const manager = new PDFAnnotationManager();
+manager.initialize();
+```
+
+## 🏗️ Architecture
+
+### Core Components
+
+```
+PDF Viewer Kit
+├── Core System
+│   ├── PdfViewerKit (Main class)
+│   ├── PDFViewerInstance (Instance management)
+│   └── EventEmitter (Event system)
+├── Viewer Components
+│   ├── WebViewer (Main viewer)
+│   ├── PageVirtualization (Page management)
+│   └── Toolbar (User interface)
+├── Annotation System
+│   ├── AnnotationService (Core logic)
+│   ├── AnnotationManager (Page-level management)
+│   └── Annotation Types (Rectangle, Ellipse, Line)
+├── Performance Features
+│   ├── CanvasPool (Memory optimization)
+│   ├── ImageBitmapPool (Image handling)
+│   └── PageVirtualization (Efficient rendering)
+└── Public API
+    ├── Facade Pattern (Runtime protection)
+    ├── TypeScript Interfaces (Type safety)
+    └── Namespace Organization (Clean API)
+```
+
+### Design Patterns
+
+- **Facade Pattern**: Clean public API with runtime protection
+- **Observer Pattern**: Event-driven architecture for loose coupling
+- **Factory Pattern**: Annotation creation and management
+- **Pool Pattern**: Memory optimization with canvas and image pooling
+- **Strategy Pattern**: Flexible annotation rendering and interaction
+
+## 🔒 Security Features
+
+### Runtime Protection
+
+- **JavaScript Safety**: Prevents direct access to internal properties
+- **Facade Pattern**: Controlled access to library functionality
+- **Type Safety**: Full TypeScript support with strict typing
+
+### Input Validation
+
+- **Coordinate Validation**: Ensures annotation coordinates are valid
+- **File Validation**: Secure PDF file handling
+- **Event Validation**: Safe event emission and handling
+
+## 📊 Browser Support
+
+| Browser | Version | Support         |
+| ------- | ------- | --------------- |
+| Chrome  | 90+     | ✅ Full Support |
+| Firefox | 88+     | ✅ Full Support |
+| Safari  | 14+     | ✅ Full Support |
+| Edge    | 90+     | ✅ Full Support |
+
+## 🚀 Getting Started
+
+### 1. Installation
 
 ```bash
 npm install pdf-viewer-kit
 ```
 
-### Quick Start
+### 2. Basic Setup
 
-```typescript
-import { PdfKit, RectangleConfig } from 'pdf-viewer-kit';
-
-PdfKit.load({
-  document: 'adient-test.pdf',
-  containerId: 'view-pdf',
-  toolbarOptions: {
-    showThumbnail: true,
-    showSearch: true,
-  },
-}).then((instances) => {
-  if (instances) {
-    const annotationId = instances.annotation.addAnnotation({
-      pageNumber: 2,
-      x0: 151.219,
-      y0: 159,
-      x1: 212,
-      y1: 193,
-      fillColor: 'blue',
-      strokeColor: 'transparent',
-      strokeWidth: 0,
-      strokeStyle: 'none',
-      opacity: 0.1,
-      type: 'rectangle',
-    } as RectangleConfig);
-
-    instances.annotation.getTextInsideRectangle(annotationId).then((text: string) => {
-      console.log('Extracted Text:', text);
-    });
-  }
-});
-
-// Cleanup
-PdfKit.unloadAll();
+```html
+<div id="pdf-container"></div>
 ```
 
-### API Documentation
-
-#### Loading and Unloading
-
-* `PdfKit.load(options: LoadOptions): Promise<WebViewer | undefined>`: Loads and displays a PDF.
-* `PdfKit.unload(containerId: string): void`: Cleans up a loaded PDF.
-* `PdfKit.unloadAll(): void`: Unloads all PDF instances.
-
-#### Viewer Methods
-
-* Page navigation (`nextPage()`, `previousPage()`, `firstPage()`, `lastPage()`, `goToPage(pageNumber: number)`)
-* Zoom controls (`zoomIn()`, `zoomOut()`)
-* Search control (`search()`)
-* Download PDF (`downloadPdf()`)
-* Thumbnail visibility (`toogleThumbnailViewer()`)
-
-#### Annotation Methods
-
-* Add annotations (`addAnnotation(config: ShapeConfig)`)
-* Update annotations (`updateAnnotation(annotationId: string, updatedData: Partial<ShapeConfig>)`)
-* Delete annotations (`deleteAnnotation(annotationId: string)`)
-* Extract text (`getTextInsideRectangle(annotationId: string): Promise<string>`)
-* Export annotations (`exportShapes()`)
-
-### Customizing Toolbar
-
-You can either customize the default toolbar or provide your own.
-
-**Example:**
-
 ```typescript
-const viewer = await PdfKit.load({
+import { PdfViewerKit } from 'pdf-viewer-kit';
+
+const instance = await PdfViewerKit.load({
   containerId: 'pdf-container',
-  document: '/path/to/document.pdf',
-  toolbarItems: {
-    showAnnotation: true,
-    showDownload: true
-  }
+  url: 'your-document.pdf',
 });
 ```
 
-### Performance Comparison
+### 3. Add Annotations
 
-*(Coming Soon)*
+```typescript
+const annotationId = await instance.annotations.createAnnotation({
+  type: 'rectangle',
+  pageNumber: 1,
+  position: { left: 100, top: 100, width: 200, height: 100 },
+  style: { fillColor: 'rgba(0, 123, 255, 0.3)' },
+});
+```
 
-An upcoming feature will include detailed benchmarks and performance comparisons between **pdf-viewer-kit** and **PSPDFKit** to help developers make informed decisions based on their needs.
+### 4. Listen to Events
 
-### Demonstrations
+```typescript
+instance.events.on('ANNOTATION_CREATED', (annotation) => {
+  console.log('Annotation created:', annotation);
+});
+```
 
-* **Enhanced Text Selection**
+## 🤝 Contributing
 
-https://github.com/user-attachments/assets/75e54d14-8b6f-48a5-94c1-62942d21cf20
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
+### Development Setup
 
-### Contribution
+```bash
+# Clone the repository
+git clone https://github.com/AmanKrr/pdf-viewer-kit.git
 
-Contributions are warmly welcomed! Please submit issues, enhancements, or pull requests via GitHub.
+# Install dependencies
+npm install
 
-### License
+# Start development server
+npm run dev
 
-pdf-viewer-kit is licensed under the MIT License. See the [[LICENSE](https://chatgpt.com/c/LICENSE)](LICENSE) file for details.
+# Build the library
+npm run build
+
+# Run tests
+npm test
+```
+
+### Code Style
+
+- **TypeScript**: Strict typing with comprehensive interfaces
+- **ESLint**: Consistent code style and quality
+- **Prettier**: Automatic code formatting
+- **Conventional Commits**: Standardized commit messages
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- **pdf.js**: The foundation for PDF rendering
+- **TypeScript**: For type safety and developer experience
+- **Canvas API**: For high-performance graphics
+- **Open Source Community**: For inspiration and contributions
+
+## 📞 Support
+
+- **Documentation**: [Wiki](https://github.com/AmanKrr/pdf-viewer-kit/wiki)
+- **Issues**: [GitHub Issues](https://github.com/AmanKrr/pdf-viewer-kit/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/AmanKrr/pdf-viewer-kit/discussions)
+
+---
+
+**Made with ❤️ by [Aman Kumar](https://github.com/AmanKrr)**
+
+_PDF Viewer Kit - Lightweight PDF viewing and annotation for modern web applications_
