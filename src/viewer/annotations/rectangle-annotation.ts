@@ -110,15 +110,22 @@ export class RectangleAnnotation extends Annotation {
    * @param pageNumber PDF page index
    */
   public draw(x0: number, y0: number, width: number, height: number, pageNumber: number, interactive: boolean): void {
+    // Treat inputs as SHAPE coordinates (top-left and dimensions at current viewport),
+    // not as SVG container coordinates. Adjust SVG to include stroke padding.
     this._interactive = interactive;
     this.__startX = x0;
     this.__startY = y0;
     this.isDrawing = false;
 
-    this.__svg.style.left = `${x0}px`;
-    this.__svg.style.top = `${y0}px`;
-    this.__svg.setAttribute('width', `${width}`);
-    this.__svg.setAttribute('height', `${height}`);
+    const currentScale = this.state.scale || 1;
+    const scaledStrokeWidth = this._strokeWidth * currentScale;
+    const strokePadding = scaledStrokeWidth / 2;
+
+    // Position SVG so that its inner rect (offset by strokePadding) aligns at shape-left/top
+    this.__svg.style.left = `${x0 - strokePadding}px`;
+    this.__svg.style.top = `${y0 - strokePadding}px`;
+    this.__svg.setAttribute('width', `${width + scaledStrokeWidth}`);
+    this.__svg.setAttribute('height', `${height + scaledStrokeWidth}`);
     this._pageNumber = pageNumber;
 
     this._createSvgRect(width, height);

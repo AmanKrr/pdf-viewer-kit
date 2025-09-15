@@ -494,9 +494,17 @@ export class AnnotationManager {
         y1 = (shapeConfig as any).y1;
       }
 
-      // Now normalize to get top-left position and dimensions
+      // Now normalize to get top-left position and dimensions (logical coords)
       const { top, left, width, height } = normalizeRect(x0, y0, x1, y1);
-      (shape as any).draw(left, top, width, height, shapeConfig.pageNumber, shapeConfig.interactive);
+
+      // Scale logical coords to current viewport so RectangleAnnotation captures correct originals
+      const scale = this.state.scale || 1;
+      const vLeft = left * scale;
+      const vTop = top * scale;
+      const vWidth = width * scale;
+      const vHeight = height * scale;
+
+      (shape as any).draw(vLeft, vTop, vWidth, vHeight, shapeConfig.pageNumber, shapeConfig.interactive);
     } else if (shapeConfig.type === 'ellipse') {
       (shape as any).draw(
         (shapeConfig as any).cx ?? 0,
@@ -536,28 +544,35 @@ export class AnnotationManager {
     let normalizedConfig = { ...shapeConfig };
 
     // Handle modern coordinate format for rectangles
-    if (shapeConfig.type === 'rectangle' && isModernFormat(shapeConfig)) {
-      // Convert modern format to legacy format (viewport coordinates)
-      const legacyCoords = {
-        x0: shapeConfig.left,
-        y0: shapeConfig.top,
-        x1: shapeConfig.left + shapeConfig.width,
-        y1: shapeConfig.top + shapeConfig.height,
-      };
+    // if (shapeConfig.type === 'rectangle' && isModernFormat(shapeConfig)) {
+    //   // Convert modern format to legacy format (viewport coordinates)
+    //   const scale = this.state.scale || 1;
+    //   // Always treat modern coordinates as logical (scale=1) and scale to viewport
+    //   const left = shapeConfig.left * scale;
+    //   const top = shapeConfig.top * scale;
+    //   const width = shapeConfig.width * scale;
+    //   const height = shapeConfig.height * scale;
 
-      normalizedConfig = {
-        ...shapeConfig,
-        x0: legacyCoords.x0,
-        y0: legacyCoords.y0,
-        x1: legacyCoords.x1,
-        y1: legacyCoords.y1,
-        // Remove modern format properties
-        left: undefined,
-        top: undefined,
-        width: undefined,
-        height: undefined,
-      };
-    }
+    //   const legacyCoords = {
+    //     x0: left,
+    //     y0: top,
+    //     x1: left + width,
+    //     y1: top + height,
+    //   };
+
+    //   normalizedConfig = {
+    //     ...shapeConfig,
+    //     x0: legacyCoords.x0,
+    //     y0: legacyCoords.y0,
+    //     x1: legacyCoords.x1,
+    //     y1: legacyCoords.y1,
+    //     // Remove modern format properties
+    //     left: undefined,
+    //     top: undefined,
+    //     width: undefined,
+    //     height: undefined,
+    //   };
+    // }
 
     // Process the annotation
     this._processAnnotation(normalizedConfig);
