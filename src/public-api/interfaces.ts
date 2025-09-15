@@ -206,8 +206,14 @@ export interface IAnnotationConfig {
   /** Page number where to place the annotation (1-based) */
   pageNumber: number;
 
-  /** Position and size of the annotation (modern format) */
-  position?: IAnnotationPosition;
+  /**
+   * Modern rectangle coordinates at top-level (preferred for 'rectangle').
+   * These are supported by the runtime. If provided, they take precedence.
+   */
+  left?: number;
+  top?: number;
+  width?: number;
+  height?: number;
 
   /** Legacy coordinates for backward compatibility */
   x0?: number; // Left/top-left X coordinate
