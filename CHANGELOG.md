@@ -1,3 +1,11 @@
+# [1.0.0-canvas-pooling.2](https://github.com/AmanKrr/pdf-kit/compare/v1.0.0-canvas-pooling.1...v1.0.0-canvas-pooling.2) (2025-09-15)
+
+
+### Bug Fixes
+
+* enhance annotation configuration with modern rectangle coordinates ([b447df0](https://github.com/AmanKrr/pdf-kit/commit/b447df0754ad9108418b41591807810018344b66))
+* **RectangleAnnotation:** adjust SVG positioning and dimensions for accurate rendering ([e9fcb2d](https://github.com/AmanKrr/pdf-kit/commit/e9fcb2d50a24468a7f8f9bcae193b911f57598ae))
+
 # [1.0.0-canvas-pooling.1](https://github.com/AmanKrr/pdf-kit/compare/v0.2.0-canvas-pooling.3...v1.0.0-canvas-pooling.1) (2025-08-17)
 
 
