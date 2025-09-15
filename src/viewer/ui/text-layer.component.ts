@@ -105,15 +105,15 @@ class TextLayer {
     //   ele.onclick = (e) => console.log('Coming soon'); // Placeholder for future interaction
     // });
 
-    this._selectionHandler = new TextSelectionHandler(
-      this._containerId,
-      this._instanceId,
-      this._pageWrapper!,
-      this._textLayerDiv!,
-      this._annotationHostDiv!,
-      this._pdfJsInternalTextLayerInstance.textDivs,
-      this._viewport!,
-    );
+    // this._selectionHandler = new TextSelectionHandler(
+    //   this._containerId,
+    //   this._instanceId,
+    //   this._pageWrapper!,
+    //   this._textLayerDiv!,
+    //   this._annotationHostDiv!,
+    //   this._pdfJsInternalTextLayerInstance.textDivs,
+    //   this._viewport!,
+    // );
 
     return [this._textLayerDiv, this._annotationHostDiv];
   }
