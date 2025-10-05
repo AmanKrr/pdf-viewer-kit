@@ -1,3 +1,10 @@
+# [1.0.0-canvas-pooling.4](https://github.com/AmanKrr/pdf-kit/compare/v1.0.0-canvas-pooling.3...v1.0.0-canvas-pooling.4) (2025-10-05)
+
+
+### Bug Fixes
+
+* pdfjs internal image loading ([2f70a87](https://github.com/AmanKrr/pdf-kit/commit/2f70a87c7b5ac3cce094b62bfc45e9ccc2e55d08))
+
 # [1.0.0-canvas-pooling.3](https://github.com/AmanKrr/pdf-kit/compare/v1.0.0-canvas-pooling.2...v1.0.0-canvas-pooling.3) (2025-10-05)
 
 
