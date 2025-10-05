@@ -1,3 +1,10 @@
+# [1.0.0-canvas-pooling.3](https://github.com/AmanKrr/pdf-kit/compare/v1.0.0-canvas-pooling.2...v1.0.0-canvas-pooling.3) (2025-10-05)
+
+
+### Features
+
+* **PageElement:** integrate Shadow DOM for PDF viewer component styling ([5c0d4a6](https://github.com/AmanKrr/pdf-kit/commit/5c0d4a6a95a507c492458059b20ee5fef9810bd3))
+
 # [1.0.0-canvas-pooling.2](https://github.com/AmanKrr/pdf-kit/compare/v1.0.0-canvas-pooling.1...v1.0.0-canvas-pooling.2) (2025-09-15)
 
 
