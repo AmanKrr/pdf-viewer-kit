@@ -234,8 +234,8 @@ export class AnnotationToolbar {
    */
   private _toggleAnnotationDrawing(enable: boolean): void {
     for (const page of this._viewer.visiblePageNumbers) {
-      const selector = `#${this.containerId} [data-page-number="${page}"] #${PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER}-${this.instanceId}`;
-      const container = document.querySelector<HTMLElement>(selector);
+      const selector = `[data-page-number="${page}"] #${PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER}-${this.instanceId}`;
+      const container = document.getElementById(this.containerId)?.shadowRoot?.querySelector<HTMLElement>(selector);
       if (!container) continue;
 
       if (enable) {
@@ -334,7 +334,9 @@ export class AnnotationToolbar {
    * Insert toolbar elements into the PDF viewer DOM.
    */
   private _injectToolbarContainers(insertToolbar: boolean, insertProps: boolean): void {
-    const viewWrapper = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
+    const viewWrapper = document
+      .getElementById(this.containerId)
+      ?.shadowRoot?.querySelector<HTMLElement>(`.${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
     const pdfContainer = viewWrapper?.parentElement;
     if (!viewWrapper || !pdfContainer) return;
 
@@ -450,7 +452,7 @@ export class AnnotationToolbar {
     }
 
     // Clean up UI
-    const btn = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;
+    const btn = document.getElementById(this.containerId)?.shadowRoot?.querySelector<HTMLElement>(`.${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;
     btn?.classList.remove('active');
 
     this._removeToolbarContainer();

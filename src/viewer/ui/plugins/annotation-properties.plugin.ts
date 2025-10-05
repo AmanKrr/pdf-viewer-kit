@@ -77,7 +77,7 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
     this.propertiesContainer.style.display = context.stateManager.state.propertiesOpen ? 'flex' : 'none';
 
     // Get the .a-pdf-viewer container for appending dropdowns
-    const pdfViewerContainer = document.querySelector<HTMLElement>(`#${context.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`);
+    const pdfViewerContainer = document.getElementById(context.containerId)?.shadowRoot?.querySelector<HTMLElement>(`.${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`);
     if (!pdfViewerContainer) {
       console.error('PDF viewer container not found');
       return;
@@ -200,6 +200,8 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
 
     const valueLabel = document.createElement('div');
     valueLabel.style.textAlign = 'right';
+    valueLabel.style.minWidth = '40px';
+    valueLabel.style.marginLeft = '10px';
     valueLabel.textContent = displayValueFn(initialValue);
     dropdown.appendChild(valueLabel);
 
@@ -266,11 +268,12 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
         }
       } else {
         // Show dropdown with Popper.js positioning
+        // Ensure the dropdown manager doesn't immediately hide the same dropdown
+        if (AnnotationPropertiesPlugin.currentlyOpenDropdown !== dropdown) {
+          AnnotationPropertiesPlugin.setDropdownOpen(dropdown);
+        }
         // already class hace display flex no need to give block
         dropdown.style.display = '';
-
-        // Close any previously open dropdown and set this one as open
-        AnnotationPropertiesPlugin.setDropdownOpen(dropdown);
 
         // Create Popper instance
         popperInstance = createPopper(button, dropdown, {
@@ -293,7 +296,10 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
       }
     };
 
-    document.addEventListener('click', (ev) => {
+    // Use shadowRoot-level listener to avoid retargeting issues across Shadow DOM boundaries
+    const shadowRoot = document.getElementById(this.context?.containerId || '')?.shadowRoot;
+    const clickTarget = shadowRoot || document;
+    clickTarget.addEventListener('click', (ev) => {
       // Check if click is outside both the container AND the dropdown
       const target = ev.target as Node;
       if (!container.contains(target) && !dropdown.contains(target)) {
@@ -361,7 +367,8 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
 
       row.onclick = () => {
         btn.textContent = style;
-        dropdown.style.display = 'none';
+        // Properly close and clear manager state
+        AnnotationPropertiesPlugin.closeDropdown(dropdown);
 
         // Clean up Popper instance
         if (popperInstance) {
@@ -398,11 +405,12 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
         }
       } else {
         // Show dropdown with Popper.js positioning
-        // already class hace display flex no need to give block
+        // Ensure the dropdown manager doesn't immediately hide the same dropdown
+        if (AnnotationPropertiesPlugin.currentlyOpenDropdown !== dropdown) {
+          AnnotationPropertiesPlugin.setDropdownOpen(dropdown);
+        }
+        // already class have display flex no need to give block
         dropdown.style.display = '';
-
-        // Close any previously open dropdown and set this one as open
-        AnnotationPropertiesPlugin.setDropdownOpen(dropdown);
 
         // Create Popper instance
         popperInstance = createPopper(btn, dropdown, {
@@ -419,7 +427,9 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
       }
     };
 
-    document.addEventListener('click', (ev) => {
+    const shadowRoot = document.getElementById(this.context?.containerId || '')?.shadowRoot;
+    const clickTarget = shadowRoot || document;
+    clickTarget.addEventListener('click', (ev) => {
       // Check if click is outside both the container AND the dropdown
       const target = ev.target as Node;
       if (!container.contains(target) && !dropdown.contains(target)) {
@@ -448,7 +458,9 @@ export class AnnotationPropertiesPlugin extends BaseAnnotationToolbarPlugin {
   private injectPropertiesContainer(context: AnnotationContext): void {
     if (!this.propertiesContainer) return;
 
-    const viewWrapper = document.querySelector<HTMLElement>(`#${context.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
+    const viewWrapper = document
+      .getElementById(context.containerId)
+      ?.shadowRoot?.querySelector<HTMLElement>(`.${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
     const pdfContainer = viewWrapper?.parentElement;
 
     if (viewWrapper && pdfContainer) {

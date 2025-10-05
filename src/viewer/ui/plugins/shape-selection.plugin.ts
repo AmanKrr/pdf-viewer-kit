@@ -131,7 +131,7 @@ export class ShapeSelectionPlugin extends BaseAnnotationToolbarPlugin {
     this.shapeDropdown = this.createShapeDropdown(context);
 
     // Get the .a-pdf-viewer container for appending dropdowns
-    const pdfViewerContainer = document.querySelector<HTMLElement>(`#${context.containerId} .a-pdf-viewer`);
+    const pdfViewerContainer = document.getElementById(context.containerId)?.shadowRoot?.querySelector<HTMLElement>(`.a-pdf-viewer`);
     if (pdfViewerContainer) {
       pdfViewerContainer.appendChild(this.shapeDropdown);
     } else {

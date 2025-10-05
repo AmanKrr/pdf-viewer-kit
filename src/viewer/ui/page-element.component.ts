@@ -17,6 +17,7 @@
 import { PageViewport } from 'pdfjs-dist';
 import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
 import { InstanceCanvasPool } from '../../core/canvas-pool.core';
+import baseCss from '../../index.css?inline';
 
 /**
  * Utility class for managing and creating elements related to rendering PDF pages.
@@ -72,35 +73,83 @@ class PageElement {
     canvasPool.releaseCanvas(canvas);
   }
 
+  static addGoogleFontLink(shadowRoot: ShadowRoot) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200';
+    shadowRoot.appendChild(link);
+  }
+
   /**
    * Creates main container elements with instance scoping
    */
   static containerCreation(containerId: string, scale: number, instanceId: string) {
-    const pdfParentViewer = document.createElement('div');
+    const rootContainer = document.getElementById(containerId);
+    if (!rootContainer) {
+      throw new Error(`Container with ID "${containerId}" not found`);
+    }
+
+    // Always use Shadow DOM for isolation
+    const shadowRoot = rootContainer.shadowRoot || rootContainer.attachShadow({ mode: 'open' });
+    // Ensure the shadow host fills the container
+    (rootContainer as HTMLElement).style.display = (rootContainer as HTMLElement).style.display || 'block';
+    (rootContainer as HTMLElement).style.width = (rootContainer as HTMLElement).style.width || '100%';
+    (rootContainer as HTMLElement).style.height = (rootContainer as HTMLElement).style.height || '100%';
+
+    // add google fonts
+    this.addGoogleFontLink(shadowRoot);
+
+    // Adopt core CSS into the shadow root for encapsulated styling
+    const coreStyle = document.createElement('style');
+    // In Shadow DOM, :host and :host, * selectors are needed for root styling.
+    // html, body selectors do not match anything in shadow root.
+    // So, use :host and * for global font and sizing.
+    coreStyle.textContent = `
+      :host, * {
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+        box-sizing: border-box;
+      }
+      :host {
+        width: 100%;
+        height: 100%;
+        display: block;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      ${baseCss}
+    `;
+    shadowRoot.appendChild(coreStyle);
+
+    let targetDocument: Document = document;
+    let mountRoot: HTMLElement | null = shadowRoot as unknown as HTMLElement;
+
+    const pdfParentViewer = targetDocument.createElement('div');
     pdfParentViewer.className = `${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER} pdf-loading`;
 
     pdfParentViewer.setAttribute('data-instance', instanceId);
 
-    const toolbarParent = document.createElement('div');
+    const toolbarParent = targetDocument.createElement('div');
     toolbarParent.classList.add(...[PDF_VIEWER_CLASSNAMES.A_TOOLBAR_ITEMS, PDF_VIEWER_CLASSNAMES.A_TOOLBAR_CONTAINER]);
     toolbarParent.id = `${PDF_VIEWER_IDS.TOOLBAR_CONTAINER}-${instanceId}`;
 
-    const groupOneParent = document.createElement('div');
+    const groupOneParent = targetDocument.createElement('div');
     groupOneParent.id = `${PDF_VIEWER_IDS.TOOLBAR_GROUP_ONE}-${instanceId}`;
     groupOneParent.classList.add(PDF_VIEWER_CLASSNAMES.TOOLBAR_GROUP);
     toolbarParent.appendChild(groupOneParent);
 
-    const groupTwoParent = document.createElement('div');
+    const groupTwoParent = targetDocument.createElement('div');
     groupTwoParent.id = `${PDF_VIEWER_IDS.TOOLBAR_GROUP_TWO}-${instanceId}`;
     groupTwoParent.classList.add(PDF_VIEWER_CLASSNAMES.TOOLBAR_GROUP);
     toolbarParent.appendChild(groupTwoParent);
 
-    const pageParentViewer = document.createElement('div');
+    const pageParentViewer = targetDocument.createElement('div');
     pageParentViewer.classList.add(PDF_VIEWER_CLASSNAMES.A_VIEWER_CONTAINER);
     pageParentViewer.id = `${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}-${instanceId}`;
     pageParentViewer.setAttribute('data-instance', instanceId);
 
-    const pageContainer = document.createElement('div');
+    const pageContainer = targetDocument.createElement('div');
     pageContainer.classList.add(PDF_VIEWER_CLASSNAMES.A_PAGE_CONTAINER);
     pageContainer.id = `${PDF_VIEWER_IDS.MAIN_PAGE_VIEWER_CONTAINER}-${instanceId}`;
     pageContainer.style.setProperty('--scale-factor', String(scale));
@@ -109,24 +158,20 @@ class PageElement {
     pageParentViewer.appendChild(pageContainer);
     pdfParentViewer.appendChild(toolbarParent);
 
-    const wrapper = document.createElement('div');
+    const wrapper = targetDocument.createElement('div');
     wrapper.classList.add(PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER);
     wrapper.setAttribute('data-instance', instanceId);
     wrapper.appendChild(pageParentViewer);
     pdfParentViewer.appendChild(wrapper);
 
-    const container = document.getElementById(containerId);
-    if (!container) {
-      throw new Error(`Container with ID "${containerId}" not found`);
-    }
-
-    container.appendChild(pdfParentViewer);
+    mountRoot!.appendChild(pdfParentViewer);
 
     return {
       parent: pdfParentViewer,
       viewerContainer: pageParentViewer,
       pagesContainer: pageContainer,
       injectElementId: `${PDF_VIEWER_IDS.MAIN_PAGE_VIEWER_CONTAINER}-${instanceId}`,
+      shadowRoot: shadowRoot,
     };
   }
 
@@ -164,9 +209,9 @@ class PageElement {
   /**
    * Clean up all elements for a specific instance
    */
-  static cleanupInstance(instanceId: string): void {
-    const instanceElements = document.querySelectorAll(`[data-instance="${instanceId}"]`);
-    instanceElements.forEach((element) => {
+  static cleanupInstance(contaierId: string, instanceId: string): void {
+    const instanceElements = document.getElementById(contaierId)?.shadowRoot?.querySelectorAll(`[data-instance="${instanceId}"]`);
+    instanceElements?.forEach((element) => {
       if (element.parentNode) {
         element.parentNode.removeChild(element);
       }

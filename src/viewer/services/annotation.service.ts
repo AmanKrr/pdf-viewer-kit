@@ -138,7 +138,7 @@ export class AnnotationService {
         if (elapsed > timeoutMs) {
           return reject(new Error(`Timed out after ${timeoutMs}ms waiting for pageContainer-${page}`));
         }
-        const el = document.getElementById(id);
+        const el = document.getElementById(this.containerId)?.shadowRoot?.getElementById(id);
         if (el) {
           return resolve(el);
         }

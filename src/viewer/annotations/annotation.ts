@@ -124,7 +124,7 @@ export abstract class Annotation implements IAnnotation {
     this.isDrawing = false;
 
     if (this.containerId) {
-      const button = document.querySelector(`#${this.containerId} .a-annotation-container-icon`) as HTMLElement;
+      const button = document.getElementById(this.containerId)?.shadowRoot?.querySelector(`.a-annotation-container-icon`) as HTMLElement;
       if (button && button.parentElement?.classList.contains('active')) {
         button.parentElement.classList.toggle('active');
       }

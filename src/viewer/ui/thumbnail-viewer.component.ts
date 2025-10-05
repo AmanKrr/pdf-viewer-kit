@@ -59,7 +59,8 @@ class ThumbnailViewer {
     inner.classList.add(PDF_VIEWER_CLASSNAMES.A_INNER_SIDEBAR_CONTAINER_CONTENT);
     thumbnailContainer.appendChild(inner);
 
-    const pdfViewer = document.querySelector(`#${parentContainerId} .${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
+    const shadowRoot = document.getElementById(parentContainerId)?.shadowRoot as ShadowRoot | null;
+    const pdfViewer = shadowRoot?.querySelector(`.${PDF_VIEWER_CLASSNAMES.A_VIEWER_WRAPPER}`);
     if (!pdfViewer) {
       console.error(`Viewer not found!`);
       return;

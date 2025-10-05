@@ -60,7 +60,8 @@ class SearchBar {
     this._webViewer = webViewer;
     this._cleanupCallback = cleanupCallback;
     // Get the parent container based on the containerId and viewer class.
-    const parentContainer = document.querySelector(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`);
+    const shadowRoot = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
+    const parentContainer = shadowRoot?.querySelector(`.${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`);
     if (parentContainer) {
       // Create the main search container.
       const container = document.createElement('div');
@@ -178,9 +179,10 @@ class SearchBar {
           }
 
           // Perform the search with the updated options.
-          const matchCase = document.querySelector(`#${this.containerId} .a-option-button.active`)?.textContent === 'Aa';
-          const wholeWord = document.querySelector(`#${this.containerId} .a-option-button.active`)?.textContent === 'ab';
-          const regex = document.querySelector(`#${this.containerId} .a-option-button.active`)?.textContent === 'Regex';
+          const root = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
+          const matchCase = root?.querySelector(`.a-option-button.active`)?.textContent === 'Aa';
+          const wholeWord = root?.querySelector(`.a-option-button.active`)?.textContent === 'ab';
+          const regex = root?.querySelector(`.a-option-button.active`)?.textContent === 'Regex';
           this._debounceSearch(searchCallback, searchTerm, { matchCase, regex, wholeWord }, getMatchStatus);
         });
         // const label = document.createElement('label');

@@ -202,7 +202,7 @@ class WebViewer {
     this._annotationStateManager = new AnnotationToolbarStateManager();
 
     // Initialize selection manager
-    this._selectionManager = new SelectionManager();
+    this._selectionManager = new SelectionManager(this._instance.containerId);
 
     // Initialize search highlighter
     this._searchHighlighter = new SearchHighlighter(this);
@@ -223,7 +223,8 @@ class WebViewer {
     );
 
     // Initialize page virtualization
-    const mainViewerContainer = document.querySelector(`#${this.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`);
+    const shadowRoot = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
+    const mainViewerContainer = shadowRoot?.querySelector(`#${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`);
     if (!mainViewerContainer) {
       throw new Error(`Main viewer container not found for instance ${this._instance.instanceId}`);
     }
@@ -239,7 +240,7 @@ class WebViewer {
     );
 
     if (!this._options.disableToolbar) {
-      const toolbarHost = document.querySelector(`#${PDF_VIEWER_IDS.TOOLBAR_CONTAINER}-${this._instance.instanceId}`)! as HTMLElement;
+      const toolbarHost = shadowRoot?.querySelector(`#${PDF_VIEWER_IDS.TOOLBAR_CONTAINER}-${this._instance.instanceId}`)! as HTMLElement;
       const buttons = this._options.customToolbarItems ?? [];
       const opts = this._options.toolbarOptions ?? {};
       this._toolbar = this._options.customToolbar ? this._options.customToolbar : (new Toolbar(this, buttons, opts) as any);
@@ -295,6 +296,7 @@ class WebViewer {
   private _observer(callback: (pageNumber: number) => void): void {
     let lastNotified: number | null = null;
     if (!this._intersectionObserver) {
+      const shadowRoot = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
       this._intersectionObserver = new IntersectionObserver(
         (entries) => {
           const visible = entries.filter((e) => e.isIntersecting);
@@ -309,7 +311,7 @@ class WebViewer {
           }
         },
         {
-          root: document.querySelector(`#${this.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`),
+          root: shadowRoot?.querySelector(`#${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`),
           threshold: 0,
           rootMargin: '-50% 0px -50% 0px',
         },
@@ -324,7 +326,8 @@ class WebViewer {
    * Adds event listeners for scrolling and updates page number input dynamically.
    */
   private _addInstanceEvents() {
-    const mainViewer = document.querySelector(`#${this.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`);
+    const shadowRoot = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
+    const mainViewer = shadowRoot?.querySelector(`#${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`);
     if (mainViewer && this._options.toolbarOptions?.showThumbnail) {
       mainViewer.addEventListener('scroll', this._boundScrollHandler);
     }
@@ -344,17 +347,18 @@ class WebViewer {
    * Synchronizes the thumbnail sidebar scroll position with the currently viewed page.
    */
   private _syncThumbnailScrollWithMainPageContainer() {
+    const shadowRoot = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
     const pageNumber = this.currentPageNumber;
-    const previousActiveThumbnail = document.querySelector(`#${this.containerId} .thumbnail.thumbnail-active`);
+    const previousActiveThumbnail = shadowRoot?.querySelector(`.thumbnail.thumbnail-active`);
     if (previousActiveThumbnail) {
       previousActiveThumbnail.classList.remove(`thumbnail-active`);
     }
-    const thumbnailToBeActive = document.querySelector(`#${this.containerId} .thumbnail[data-page-number="${pageNumber}"]`);
+    const thumbnailToBeActive = shadowRoot?.querySelector(`.thumbnail[data-page-number="${pageNumber}"]`);
     if (thumbnailToBeActive) {
       thumbnailToBeActive.classList.add('thumbnail-active');
 
       // Find the thumbnail sidebar container to scroll within
-      const thumbnailSidebar = document.querySelector(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_SIDEBAR_CONTAINER}`);
+      const thumbnailSidebar = shadowRoot?.querySelector(`.${PDF_VIEWER_CLASSNAMES.A_SIDEBAR_CONTAINER}`);
       if (thumbnailSidebar) {
         scrollElementIntoView(thumbnailToBeActive, { block: 'center', container: thumbnailSidebar });
       } else {
@@ -404,7 +408,8 @@ class WebViewer {
    * Toggles the thumbnail viewer sidebar.
    */
   public toogleThumbnailViewer() {
-    const thumbnailSidebarElement = document.querySelector(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES['A_SIDEBAR_CONTAINER']}`);
+    const shadowRoot = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
+    const thumbnailSidebarElement = shadowRoot?.querySelector(`.${PDF_VIEWER_CLASSNAMES['A_SIDEBAR_CONTAINER']}`);
 
     if (!thumbnailSidebarElement) {
       console.error(`Invalid sidebar container element ${thumbnailSidebarElement}.`);
@@ -600,7 +605,8 @@ class WebViewer {
    */
   public search(): void {
     // Use the SearchBar's show/hide methods which handle focus automatically
-    const searchContainer = document.querySelector(`#${this.containerId} .a-search-container`);
+    const shadowRoot = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
+    const searchContainer = shadowRoot?.querySelector(`.a-search-container`);
     if (searchContainer) {
       const isHidden = searchContainer.classList.contains('a-search-hidden');
       if (isHidden) {
@@ -636,7 +642,8 @@ class WebViewer {
     if (pageNumber >= 1 && pageNumber <= this.totalPages!) {
       const pagePosition = this._pageVirtualization.pagePositions.get(pageNumber);
       if (pagePosition != undefined) {
-        const scrollElement = document.querySelector(`#${this.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`);
+        const shadowRoot = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
+        const scrollElement = shadowRoot?.querySelector(`#${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`);
         if (scrollElement) {
           scrollElement.scrollTop = pagePosition;
           this._instance.state.currentPage = pageNumber;
@@ -652,7 +659,8 @@ class WebViewer {
    * Updates the current page number input field in the toolbar.
    */
   private _updateCurrentPageInput() {
-    const currentPageInputField = document.querySelector(`#${this.containerId} #${PDF_VIEWER_IDS.CURRENT_PAGE_INPUT}-${this.instanceId}`);
+    const shadowRoot = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
+    const currentPageInputField = shadowRoot?.querySelector(`#${PDF_VIEWER_IDS.CURRENT_PAGE_INPUT}-${this.instanceId}`);
     if (currentPageInputField) {
       (currentPageInputField as HTMLInputElement).value = String(this.currentPageNumber);
     }
@@ -701,7 +709,8 @@ class WebViewer {
   public destroy(): void {
     // Remove scroll handler
     if (this._boundScrollHandler) {
-      const mainViewer = document.querySelector(`#${this.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`);
+      const shadowRoot = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
+      const mainViewer = shadowRoot?.querySelector(`#${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`);
       if (mainViewer) {
         mainViewer.removeEventListener('scroll', this._boundScrollHandler);
       }

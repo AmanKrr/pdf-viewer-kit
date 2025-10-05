@@ -31,6 +31,7 @@ export class InstanceWebViewer {
   private readonly _options: LoadOptions;
   private readonly _containerId: string;
   private readonly _instance: PDFViewerInstance;
+  private readonly _shadowRoot: ShadowRoot;
   private _webViewer: WebViewer | null = null;
   private _isDestroyed = false;
 
@@ -41,12 +42,14 @@ export class InstanceWebViewer {
    * @param options - Configuration options for the viewer
    * @param containerId - DOM container ID where the viewer will be rendered
    * @param instance - The parent PDF viewer instance
+   * @param shadowRoot - The ShadowRoot where the viewer is rendered
    */
-  constructor(pdfDocument: PDFDocumentProxy, options: LoadOptions, containerId: string, instance: PDFViewerInstance) {
+  constructor(pdfDocument: PDFDocumentProxy, options: LoadOptions, containerId: string, instance: PDFViewerInstance, shadowRoot: ShadowRoot) {
     this._pdfDocument = pdfDocument;
     this._options = options;
     this._containerId = containerId;
     this._instance = instance;
+    this._shadowRoot = shadowRoot;
   }
 
   /**
@@ -101,7 +104,7 @@ export class InstanceWebViewer {
    * @returns The first matching element or null if not found
    */
   private _query(selector: string): Element | null {
-    return document.querySelector(`#${this._containerId} ${selector}`);
+    return this._shadowRoot.querySelector(selector);
   }
 
   /**
@@ -111,7 +114,7 @@ export class InstanceWebViewer {
    * @returns NodeList of all matching elements
    */
   private _queryAll(selector: string): NodeListOf<Element> {
-    return document.querySelectorAll(`#${this._containerId} ${selector}`);
+    return this._shadowRoot.querySelectorAll(selector);
   }
 
   /**
@@ -133,13 +136,19 @@ export class InstanceWebViewer {
    * @param internalContainers - Container structure for the viewer
    * @throws Error if the viewer is destroyed or containers are invalid
    */
-  async initialize(internalContainers: { parent: HTMLDivElement; viewerContainer: HTMLDivElement; pagesContainer: HTMLDivElement; injectElementId: string }): Promise<void> {
+  async initialize(internalContainers: {
+    parent: HTMLDivElement;
+    viewerContainer: HTMLDivElement;
+    pagesContainer: HTMLDivElement;
+    injectElementId: string;
+    shadowRoot: ShadowRoot;
+  }): Promise<void> {
     if (this._isDestroyed) {
       throw new Error('Cannot initialize destroyed InstanceWebViewer');
     }
 
     try {
-      const container = document.querySelector(`#${this._containerId} #${internalContainers.injectElementId}`)! as HTMLElement;
+      const container = internalContainers.shadowRoot.querySelector(`#${internalContainers.injectElementId}`)! as HTMLElement;
 
       if (!container || !internalContainers || !internalContainers.parent) {
         throw new Error('Container not found. PDFViewerInstance should create containers first.');
@@ -323,9 +332,14 @@ export class InstanceWebViewer {
       this._webViewer = null;
     }
 
+    // Clean up elements within the shadow root
+    this._shadowRoot.innerHTML = '';
+
+    // Optionally, if the shadow host itself needs cleanup from the main DOM
     const root = document.getElementById(this._containerId);
-    if (root) {
-      root.innerHTML = '';
+    if (root && root.shadowRoot === this._shadowRoot) {
+      // If the shadow root is directly attached to the root, we might want to clear the root or remove it
+      // For now, clearing the shadowRoot innerHTML is sufficient as the host remains.
     }
 
     console.log(`InstanceWebViewer destroyed for container ${this._containerId}`);

@@ -1396,7 +1396,7 @@ class PageVirtualization {
    */
   private _ensureCanvasPresentationDiv(pageInfo: CachedPageInfo): HTMLDivElement {
     const canvasPresentationDivId = `canvasPresentation-${pageInfo.pageNumber}`;
-    let canvasPresentationDiv = pageInfo.pageWrapperDiv.querySelector<HTMLDivElement>(`#${this.containerId} #${canvasPresentationDivId}`);
+    let canvasPresentationDiv = pageInfo.pageWrapperDiv.querySelector<HTMLDivElement>(`#${canvasPresentationDivId}`);
     if (!canvasPresentationDiv) {
       canvasPresentationDiv = document.createElement('div');
       canvasPresentationDiv.id = canvasPresentationDivId;
@@ -1419,7 +1419,7 @@ class PageVirtualization {
    */
   private _ensureImageContainerDiv(pageInfo: CachedPageInfo, viewport: PageViewport, canvasPresentationDiv: HTMLDivElement): HTMLDivElement {
     const imageContainerId = `zoomedImageContainer-${pageInfo.pageNumber}`;
-    let imageContainer = canvasPresentationDiv.querySelector<HTMLDivElement>(`#${this.containerId} #${imageContainerId}`);
+    let imageContainer = canvasPresentationDiv.querySelector<HTMLDivElement>(`#${imageContainerId}`);
     if (!imageContainer) {
       imageContainer = document.createElement('div');
       imageContainer.id = imageContainerId;
@@ -1499,7 +1499,9 @@ class PageVirtualization {
       // Get the wrapper div for this page
       const wrapperDiv = pageInfo.pageWrapperDiv;
       if (!wrapperDiv) return;
-      const container = wrapperDiv || document.querySelector<HTMLElement>(`#${this.containerId} #pageContainer-${this.instanceId}-${pageNum}[data-page-number="${pageNum}"]`);
+      const container =
+        wrapperDiv ||
+        document.getElementById(this.containerId)?.shadowRoot?.querySelector<HTMLElement>(`#pageContainer-${this.instanceId}-${pageNum}[data-page-number="${pageNum}"]`);
       if (!container) return;
 
       const page = await this._pdfDocument.getPage(pageNum);
@@ -1575,7 +1577,7 @@ class PageVirtualization {
       if (pageInfo.highResImageBitmap) {
         pageInfo.highResImageBitmap.close();
         pageInfo.highResImageBitmap = undefined;
-        const imageContainer = pageInfo.pageWrapperDiv.querySelector(`${this.containerId} #zoomedImageContainer-${pageInfo.pageNumber}`);
+        const imageContainer = pageInfo.pageWrapperDiv.querySelector(`#zoomedImageContainer-${pageInfo.pageNumber}`);
         if (imageContainer) imageContainer.innerHTML = '';
       }
       return;
@@ -1585,7 +1587,7 @@ class PageVirtualization {
     if (pageInfo.highResImageBitmap) pageInfo.highResImageBitmap.close();
     pageInfo.highResImageBitmap = undefined; // Clear previous before new render
 
-    const imageContainer = pageInfo.pageWrapperDiv.querySelector(`#${this.containerId} #zoomedImageContainer-${pageInfo.pageNumber}`) as HTMLElement;
+    const imageContainer = pageInfo.pageWrapperDiv.querySelector(`#zoomedImageContainer-${pageInfo.pageNumber}`) as HTMLElement;
     if (!imageContainer) {
       return;
     }

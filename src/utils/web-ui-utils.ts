@@ -38,7 +38,7 @@ class WebUiUtils {
   }
 
   static hideLoading(loadingElement: HTMLElement, containerId: string) {
-    const pdfContainer = document.querySelector(`#${containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`);
+    const pdfContainer = document.getElementById(containerId)?.shadowRoot?.querySelector(`.${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`);
     if (pdfContainer) {
       pdfContainer.classList.remove(PDF_VIEWER_CLASSNAMES.PDF_LOADING);
     }
@@ -57,7 +57,7 @@ class WebUiUtils {
     if (!loadingElement) return;
 
     // Try to find or create a progress text element inside the loading element
-    let progressText = loadingElement.querySelector(`#${containerId} .loading-progress-per`) as HTMLElement;
+    let progressText = loadingElement.querySelector(`#${containerId}`)?.shadowRoot?.querySelector(`.loading-progress-per`) as HTMLElement;
     if (!progressText) {
       progressText = document.createElement('div');
       progressText.className = 'loading-progress-per';
@@ -121,7 +121,7 @@ class InstanceWebUiUtils {
    * Hides instance-scoped loading element
    */
   static hideLoading(loadingElement: HTMLElement, containerId: string, instanceId: string) {
-    const pdfContainer = document.querySelector(`#${containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`);
+    const pdfContainer = document.getElementById(containerId)?.shadowRoot?.querySelector(`.${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`);
     if (pdfContainer) {
       pdfContainer.classList.remove(PDF_VIEWER_CLASSNAMES.PDF_LOADING);
     }
@@ -200,10 +200,10 @@ class InstanceWebUiUtils {
   /**
    * Clean up all instance-specific UI elements
    */
-  static cleanupInstance(instanceId: string): void {
+  static cleanupInstance(containerId: string, instanceId: string): void {
     // Remove all elements belonging to this instance
-    const instanceElements = document.querySelectorAll(`[data-instance="${instanceId}"]`);
-    instanceElements.forEach((element) => {
+    const instanceElements = document.getElementById(containerId)?.shadowRoot?.querySelectorAll(`[data-instance="${instanceId}"]`);
+    instanceElements?.forEach((element) => {
       if (element.parentNode) {
         element.parentNode.removeChild(element);
       }

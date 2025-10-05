@@ -32,10 +32,11 @@ export class SelectionManager {
   private isDrawingInProgress: boolean = false;
 
   // Global click handler for deselection
-  private containerId?: string;
+  private containerId: string;
   private globalClickHandler?: (event: Event) => void;
 
-  constructor() {
+  constructor(containerId: string) {
+    this.containerId = containerId;
     this.interactiveEffectsManager = InteractiveEffectsManager.getInstance();
     this._setupTextSelectionDetection();
   }
@@ -74,6 +75,7 @@ export class SelectionManager {
    * @param isDrawing Whether drawing is in progress.
    */
   public setDrawingState(isDrawing: boolean): void {
+    if (!this.containerId) return;
     this.isDrawingInProgress = isDrawing;
 
     if (isDrawing) {
@@ -85,7 +87,7 @@ export class SelectionManager {
           this.selectionTimeout = null;
         }
       }
-      this.interactiveEffectsManager.disableInteractiveEffects();
+      this.interactiveEffectsManager.disableInteractiveEffects(this.containerId);
     } else {
       // Always re-enable effects when drawing finishes, regardless of text selection state
       // This ensures that drawing tools work properly on subsequent attempts
@@ -141,8 +143,10 @@ export class SelectionManager {
    * This should be called during cleanup.
    */
   public removeGlobalClickHandler(): void {
+    if (!this.containerId) return;
     if (this.globalClickHandler) {
-      const container = document.querySelector(`#${this.containerId}`);
+      const containerRoot = document.getElementById(this.containerId)?.shadowRoot;
+      const container = containerRoot as unknown as HTMLElement | null;
       if (container) {
         container.removeEventListener('click', this.globalClickHandler, false);
       }
@@ -156,7 +160,8 @@ export class SelectionManager {
   private _addGlobalClickHandler(): void {
     if (!this.containerId) return;
 
-    const container = document.querySelector(`#${this.containerId}`);
+    const containerRoot = document.getElementById(this.containerId)?.shadowRoot;
+    const container = containerRoot as unknown as HTMLElement | null;
     if (!container) return;
 
     this.globalClickHandler = (event: Event) => {
@@ -189,15 +194,17 @@ export class SelectionManager {
    * Sets up text selection detection to manage interactive effects.
    */
   private _setupTextSelectionDetection(): void {
+    if (!this.containerId) return;
     // Listen for text selection start/end
     document.addEventListener('selectionchange', () => {
+      if (!this.containerId) return;
       const selection = window.getSelection();
       const hasSelection = selection && selection.toString().length > 0;
 
       if (hasSelection && !this.isSelectingText) {
         // ACTUAL text selection started - disable effects
         this.isSelectingText = true;
-        this.interactiveEffectsManager.disableInteractiveEffects();
+        this.interactiveEffectsManager.disableInteractiveEffects(this.containerId);
       } else if (!hasSelection && this.isSelectingText) {
         // Text selection ended - re-enable effects
         this.isSelectingText = false;

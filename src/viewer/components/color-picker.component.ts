@@ -176,7 +176,7 @@ export class ColorPicker extends ToolbarComponent {
 
   private injectDropdown(): void {
     // Append to .a-pdf-viewer container
-    const pdfViewerContainer = document.querySelector<HTMLElement>(`#${this.config.containerId} .a-pdf-viewer`);
+    const pdfViewerContainer = document.getElementById(this.config.containerId)?.shadowRoot?.querySelector<HTMLElement>(`.a-pdf-viewer`);
     if (pdfViewerContainer) {
       pdfViewerContainer.appendChild(this.dropdown);
     } else {

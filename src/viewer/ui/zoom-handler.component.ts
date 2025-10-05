@@ -54,9 +54,9 @@ export default class ZoomHandler {
     };
 
     // Cache the main scrollable container for performance
-    this._scrollableContainerElement = document.querySelector<HTMLElement>(
-      `#${this._webViewer.containerId} #${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}-${this._webViewer.instanceId}`,
-    );
+    this._scrollableContainerElement = document
+      .getElementById(this._webViewer.containerId)!
+      .shadowRoot!.querySelector<HTMLElement>(`#${PDF_VIEWER_IDS.MAIN_VIEWER_CONTAINER}-${this._webViewer.instanceId}`);
 
     // On window resize, refit width (debounced)
     // this._onWindowResize = debounce(() => this.fitWidth(), 100);
@@ -134,7 +134,9 @@ export default class ZoomHandler {
     const { minScale, maxScale, zoomStep } = this._options;
     const currScale = this._webViewer.state.scale;
 
-    const container = document.querySelector<HTMLElement>(`#${this._webViewer.containerId} .${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}-${this._webViewer.instanceId}`)!;
+    const container = document
+      .getElementById(this._webViewer.containerId)
+      ?.shadowRoot?.querySelector<HTMLElement>(`.${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}-${this._webViewer.instanceId}`)!;
     const containerWidth = container.getBoundingClientRect().width;
 
     const pageCount = this._webViewer.pdfDocument.numPages;
@@ -209,7 +211,9 @@ export default class ZoomHandler {
    * @param scaleFactor New scale value.
    */
   private _applyCssScale(scaleFactor: number): void {
-    const container = document.querySelector<HTMLElement>(`#${this._webViewer.containerId} #${PDF_VIEWER_IDS.MAIN_PAGE_VIEWER_CONTAINER}-${this._webViewer.instanceId}`);
+    const container = document
+      .getElementById(this._webViewer.containerId)
+      ?.shadowRoot?.querySelector<HTMLElement>(`#${PDF_VIEWER_IDS.MAIN_PAGE_VIEWER_CONTAINER}-${this._webViewer.instanceId}`);
     if (container) {
       container.style.setProperty('--scale-factor', String(scaleFactor));
     }

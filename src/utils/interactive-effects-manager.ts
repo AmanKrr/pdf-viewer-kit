@@ -40,10 +40,10 @@ export class InteractiveEffectsManager {
    * Disables interactive effects for all relevant elements.
    * This includes hover effects, cursor changes, and pointer events.
    */
-  public disableInteractiveEffects(): void {
+  public disableInteractiveEffects(containerId: string): void {
     if (this.isDisabled) return;
     this.isDisabled = true;
-    this.disableEffectsForElements();
+    this.disableEffectsForElements(containerId);
   }
 
   /**
@@ -58,164 +58,164 @@ export class InteractiveEffectsManager {
   /**
    * Disables interactive effects for specific elements.
    */
-  private disableEffectsForElements(): void {
+  private disableEffectsForElements(containerId: string): void {
     // Disable effects for annotation elements
-    this.disableEffectsForSelector('[annotation-id]');
-    this.disableEffectsForSelector('.a-annotation-layer');
-    this.disableEffectsForSelector('.a-annotation-toolbar-container');
-    this.disableEffectsForSelector('[data-resizer-handle]');
-    this.disableEffectsForSelector('[data-resizer-overlay]');
+    this.disableEffectsForSelector(containerId, '[annotation-id]');
+    this.disableEffectsForSelector(containerId, '.a-annotation-layer');
+    this.disableEffectsForSelector(containerId, '.a-annotation-toolbar-container');
+    this.disableEffectsForSelector(containerId, '[data-resizer-handle]');
+    this.disableEffectsForSelector(containerId, '[data-resizer-overlay]');
 
     // Disable effects for toolbar elements
-    this.disableEffectsForSelector('.a-toolbar-button');
-    this.disableEffectsForSelector('.a-annotation-toolbar-right-container');
+    this.disableEffectsForSelector(containerId, '.a-toolbar-button');
+    this.disableEffectsForSelector(containerId, '.a-annotation-toolbar-right-container');
 
     // Disable effects for dropdown elements
-    this.disableEffectsForSelector('.a-annotation-color-picker');
-    this.disableEffectsForSelector('.a-annotation-dropdown-slider-container');
-    this.disableEffectsForSelector('.a-annotation-border-dropdown');
+    this.disableEffectsForSelector(containerId, '.a-annotation-color-picker');
+    this.disableEffectsForSelector(containerId, '.a-annotation-dropdown-slider-container');
+    this.disableEffectsForSelector(containerId, '.a-annotation-border-dropdown');
 
     // Disable effects for PDF.js native annotations and elements
-    this.disableEffectsForSelector('.textLayer');
-    this.disableEffectsForSelector('.annotationLayer');
-    this.disableEffectsForSelector('.annotation');
-    this.disableEffectsForSelector('[data-annotation-id]');
-    this.disableEffectsForSelector('[data-annotation-type]');
-    this.disableEffectsForSelector('.linkAnnotation');
-    this.disableEffectsForSelector('.textAnnotation');
-    this.disableEffectsForSelector('.highlightAnnotation');
-    this.disableEffectsForSelector('.underlineAnnotation');
-    this.disableEffectsForSelector('.strikeOutAnnotation');
-    this.disableEffectsForSelector('.squigglyAnnotation');
-    this.disableEffectsForSelector('.popupAnnotation');
-    this.disableEffectsForSelector('.lineAnnotation');
-    this.disableEffectsForSelector('.squareAnnotation');
-    this.disableEffectsForSelector('.circleAnnotation');
-    this.disableEffectsForSelector('.polylineAnnotation');
-    this.disableEffectsForSelector('.polygonAnnotation');
-    this.disableEffectsForSelector('.inkAnnotation');
-    this.disableEffectsForSelector('.stampAnnotation');
-    this.disableEffectsForSelector('.fileAttachmentAnnotation');
-    this.disableEffectsForSelector('.soundAnnotation');
-    this.disableEffectsForSelector('.movieAnnotation');
-    this.disableEffectsForSelector('.screenAnnotation');
-    this.disableEffectsForSelector('.widgetAnnotation');
-    this.disableEffectsForSelector('.printerMarkAnnotation');
-    this.disableEffectsForSelector('.trapNetAnnotation');
-    this.disableEffectsForSelector('.watermarkAnnotation');
-    // this.disableEffectsForSelector('.3DAnnotation');
-    this.disableEffectsForSelector('.redactAnnotation');
-    this.disableEffectsForSelector('.caretAnnotation');
-    this.disableEffectsForSelector('.projectionAnnotation');
-    this.disableEffectsForSelector('.richMediaAnnotation');
-    this.disableEffectsForSelector('.unknownAnnotation');
+    this.disableEffectsForSelector(containerId, '.textLayer');
+    this.disableEffectsForSelector(containerId, '.annotationLayer');
+    this.disableEffectsForSelector(containerId, '.annotation');
+    this.disableEffectsForSelector(containerId, '[data-annotation-id]');
+    this.disableEffectsForSelector(containerId, '[data-annotation-type]');
+    this.disableEffectsForSelector(containerId, '.linkAnnotation');
+    this.disableEffectsForSelector(containerId, '.textAnnotation');
+    this.disableEffectsForSelector(containerId, '.highlightAnnotation');
+    this.disableEffectsForSelector(containerId, '.underlineAnnotation');
+    this.disableEffectsForSelector(containerId, '.strikeOutAnnotation');
+    this.disableEffectsForSelector(containerId, '.squigglyAnnotation');
+    this.disableEffectsForSelector(containerId, '.popupAnnotation');
+    this.disableEffectsForSelector(containerId, '.lineAnnotation');
+    this.disableEffectsForSelector(containerId, '.squareAnnotation');
+    this.disableEffectsForSelector(containerId, '.circleAnnotation');
+    this.disableEffectsForSelector(containerId, '.polylineAnnotation');
+    this.disableEffectsForSelector(containerId, '.polygonAnnotation');
+    this.disableEffectsForSelector(containerId, '.inkAnnotation');
+    this.disableEffectsForSelector(containerId, '.stampAnnotation');
+    this.disableEffectsForSelector(containerId, '.fileAttachmentAnnotation');
+    this.disableEffectsForSelector(containerId, '.soundAnnotation');
+    this.disableEffectsForSelector(containerId, '.movieAnnotation');
+    this.disableEffectsForSelector(containerId, '.screenAnnotation');
+    this.disableEffectsForSelector(containerId, '.widgetAnnotation');
+    this.disableEffectsForSelector(containerId, '.printerMarkAnnotation');
+    this.disableEffectsForSelector(containerId, '.trapNetAnnotation');
+    this.disableEffectsForSelector(containerId, '.watermarkAnnotation');
+    // this.disableEffectsForSelector(containerId, '.3DAnnotation');
+    this.disableEffectsForSelector(containerId, '.redactAnnotation');
+    this.disableEffectsForSelector(containerId, '.caretAnnotation');
+    this.disableEffectsForSelector(containerId, '.projectionAnnotation');
+    this.disableEffectsForSelector(containerId, '.richMediaAnnotation');
+    this.disableEffectsForSelector(containerId, '.unknownAnnotation');
 
     // Also disable effects for any element with PDF.js specific attributes
-    this.disableEffectsForSelector('[data-element-id]');
-    this.disableEffectsForSelector('[data-l10n-id]');
-    this.disableEffectsForSelector('[role="button"]');
-    this.disableEffectsForSelector('[role="link"]');
-    this.disableEffectsForSelector('[role="textbox"]');
-    this.disableEffectsForSelector('[role="checkbox"]');
-    this.disableEffectsForSelector('[role="radio"]');
-    this.disableEffectsForSelector('[role="combobox"]');
-    this.disableEffectsForSelector('[role="listbox"]');
-    this.disableEffectsForSelector('[role="option"]');
-    this.disableEffectsForSelector('[role="slider"]');
-    this.disableEffectsForSelector('[role="spinbutton"]');
-    this.disableEffectsForSelector('[role="tab"]');
-    this.disableEffectsForSelector('[role="tabpanel"]');
-    this.disableEffectsForSelector('[role="tree"]');
-    this.disableEffectsForSelector('[role="treeitem"]');
-    this.disableEffectsForSelector('[role="grid"]');
-    this.disableEffectsForSelector('[role="gridcell"]');
-    this.disableEffectsForSelector('[role="row"]');
-    this.disableEffectsForSelector('[role="rowheader"]');
-    this.disableEffectsForSelector('[role="columnheader"]');
-    this.disableEffectsForSelector('[role="menubar"]');
-    this.disableEffectsForSelector('[role="menu"]');
-    this.disableEffectsForSelector('[role="menuitem"]');
-    this.disableEffectsForSelector('[role="toolbar"]');
-    this.disableEffectsForSelector('[role="tooltip"]');
-    this.disableEffectsForSelector('[role="dialog"]');
-    this.disableEffectsForSelector('[role="alert"]');
-    this.disableEffectsForSelector('[role="log"]');
-    this.disableEffectsForSelector('[role="status"]');
-    this.disableEffectsForSelector('[role="progressbar"]');
-    this.disableEffectsForSelector('[role="scrollbar"]');
-    this.disableEffectsForSelector('[role="searchbox"]');
-    this.disableEffectsForSelector('[role="switch"]');
-    this.disableEffectsForSelector('[role="tablist"]');
-    this.disableEffectsForSelector('[role="timer"]');
-    this.disableEffectsForSelector('[role="marquee"]');
-    this.disableEffectsForSelector('[role="application"]');
-    this.disableEffectsForSelector('[role="article"]');
-    this.disableEffectsForSelector('[role="banner"]');
-    this.disableEffectsForSelector('[role="complementary"]');
-    this.disableEffectsForSelector('[role="contentinfo"]');
-    this.disableEffectsForSelector('[role="form"]');
-    this.disableEffectsForSelector('[role="main"]');
-    this.disableEffectsForSelector('[role="navigation"]');
-    this.disableEffectsForSelector('[role="region"]');
-    this.disableEffectsForSelector('[role="search"]');
-    this.disableEffectsForSelector('[role="section"]');
-    this.disableEffectsForSelector('[role="sectionhead"]');
-    this.disableEffectsForSelector('[role="separator"]');
-    this.disableEffectsForSelector('[role="submenu"]');
-    this.disableEffectsForSelector('[role="text"]');
-    this.disableEffectsForSelector('[role="treegrid"]');
-    this.disableEffectsForSelector('[role="presentation"]');
-    this.disableEffectsForSelector('[role="group"]');
-    this.disableEffectsForSelector("[role='list']");
-    this.disableEffectsForSelector('[role="listitem"]');
-    this.disableEffectsForSelector('[role="definition"]');
-    this.disableEffectsForSelector('[role="term"]');
-    this.disableEffectsForSelector('[role="note"]');
-    this.disableEffectsForSelector('[role="doc-abstract"]');
-    this.disableEffectsForSelector('[role="doc-acknowledgments"]');
-    this.disableEffectsForSelector('[role="doc-afterword"]');
-    this.disableEffectsForSelector('[role="doc-appendix"]');
-    this.disableEffectsForSelector('[role="doc-backlink"]');
-    this.disableEffectsForSelector('[role="doc-biblioentry"]');
-    this.disableEffectsForSelector('[role="doc-bibliography"]');
-    this.disableEffectsForSelector('[role="doc-biblioref"]');
-    this.disableEffectsForSelector('[role="doc-chapter"]');
-    this.disableEffectsForSelector('[role="doc-colophon"]');
-    this.disableEffectsForSelector('[role="doc-conclusion"]');
-    this.disableEffectsForSelector('[role="doc-cover"]');
-    this.disableEffectsForSelector('[role="doc-credit"]');
-    this.disableEffectsForSelector('[role="doc-credits"]');
-    this.disableEffectsForSelector('[role="doc-dedication"]');
-    this.disableEffectsForSelector('[role="doc-endnotes"]');
-    this.disableEffectsForSelector('[role="doc-epigraph"]');
-    this.disableEffectsForSelector('[role="doc-epilogue"]');
-    this.disableEffectsForSelector('[role="doc-errata"]');
-    this.disableEffectsForSelector('[role="doc-example"]');
-    this.disableEffectsForSelector('[role="doc-foreword"]');
-    this.disableEffectsForSelector('[role="doc-glossary"]');
-    this.disableEffectsForSelector('[role="doc-glossref"]');
-    this.disableEffectsForSelector('[role="doc-index"]');
-    this.disableEffectsForSelector('[role="doc-introduction"]');
-    this.disableEffectsForSelector('[role="doc-noteref"]');
-    this.disableEffectsForSelector('[role="doc-notice"]');
-    this.disableEffectsForSelector('[role="doc-pagebreak"]');
-    this.disableEffectsForSelector('[role="doc-pagelist"]');
-    this.disableEffectsForSelector('[role="doc-part"]');
-    this.disableEffectsForSelector('[role="doc-preface"]');
-    this.disableEffectsForSelector('[role="doc-prologue"]');
-    this.disableEffectsForSelector('[role="doc-pullquote"]');
-    this.disableEffectsForSelector('[role="doc-qna"]');
-    this.disableEffectsForSelector('[role="doc-subtitle"]');
-    this.disableEffectsForSelector('[role="doc-tip"]');
-    this.disableEffectsForSelector('[role="doc-toc"]');
-    this.disableEffectsForSelector('[role="doc-warning"]');
+    this.disableEffectsForSelector(containerId, '[data-element-id]');
+    this.disableEffectsForSelector(containerId, '[data-l10n-id]');
+    this.disableEffectsForSelector(containerId, '[role="button"]');
+    this.disableEffectsForSelector(containerId, '[role="link"]');
+    this.disableEffectsForSelector(containerId, '[role="textbox"]');
+    this.disableEffectsForSelector(containerId, '[role="checkbox"]');
+    this.disableEffectsForSelector(containerId, '[role="radio"]');
+    this.disableEffectsForSelector(containerId, '[role="combobox"]');
+    this.disableEffectsForSelector(containerId, '[role="listbox"]');
+    this.disableEffectsForSelector(containerId, '[role="option"]');
+    this.disableEffectsForSelector(containerId, '[role="slider"]');
+    this.disableEffectsForSelector(containerId, '[role="spinbutton"]');
+    this.disableEffectsForSelector(containerId, '[role="tab"]');
+    this.disableEffectsForSelector(containerId, '[role="tabpanel"]');
+    this.disableEffectsForSelector(containerId, '[role="tree"]');
+    this.disableEffectsForSelector(containerId, '[role="treeitem"]');
+    this.disableEffectsForSelector(containerId, '[role="grid"]');
+    this.disableEffectsForSelector(containerId, '[role="gridcell"]');
+    this.disableEffectsForSelector(containerId, '[role="row"]');
+    this.disableEffectsForSelector(containerId, '[role="rowheader"]');
+    this.disableEffectsForSelector(containerId, '[role="columnheader"]');
+    this.disableEffectsForSelector(containerId, '[role="menubar"]');
+    this.disableEffectsForSelector(containerId, '[role="menu"]');
+    this.disableEffectsForSelector(containerId, '[role="menuitem"]');
+    this.disableEffectsForSelector(containerId, '[role="toolbar"]');
+    this.disableEffectsForSelector(containerId, '[role="tooltip"]');
+    this.disableEffectsForSelector(containerId, '[role="dialog"]');
+    this.disableEffectsForSelector(containerId, '[role="alert"]');
+    this.disableEffectsForSelector(containerId, '[role="log"]');
+    this.disableEffectsForSelector(containerId, '[role="status"]');
+    this.disableEffectsForSelector(containerId, '[role="progressbar"]');
+    this.disableEffectsForSelector(containerId, '[role="scrollbar"]');
+    this.disableEffectsForSelector(containerId, '[role="searchbox"]');
+    this.disableEffectsForSelector(containerId, '[role="switch"]');
+    this.disableEffectsForSelector(containerId, '[role="tablist"]');
+    this.disableEffectsForSelector(containerId, '[role="timer"]');
+    this.disableEffectsForSelector(containerId, '[role="marquee"]');
+    this.disableEffectsForSelector(containerId, '[role="application"]');
+    this.disableEffectsForSelector(containerId, '[role="article"]');
+    this.disableEffectsForSelector(containerId, '[role="banner"]');
+    this.disableEffectsForSelector(containerId, '[role="complementary"]');
+    this.disableEffectsForSelector(containerId, '[role="contentinfo"]');
+    this.disableEffectsForSelector(containerId, '[role="form"]');
+    this.disableEffectsForSelector(containerId, '[role="main"]');
+    this.disableEffectsForSelector(containerId, '[role="navigation"]');
+    this.disableEffectsForSelector(containerId, '[role="region"]');
+    this.disableEffectsForSelector(containerId, '[role="search"]');
+    this.disableEffectsForSelector(containerId, '[role="section"]');
+    this.disableEffectsForSelector(containerId, '[role="sectionhead"]');
+    this.disableEffectsForSelector(containerId, '[role="separator"]');
+    this.disableEffectsForSelector(containerId, '[role="submenu"]');
+    this.disableEffectsForSelector(containerId, '[role="text"]');
+    this.disableEffectsForSelector(containerId, '[role="treegrid"]');
+    this.disableEffectsForSelector(containerId, '[role="presentation"]');
+    this.disableEffectsForSelector(containerId, '[role="group"]');
+    this.disableEffectsForSelector(containerId, "[role='list']");
+    this.disableEffectsForSelector(containerId, '[role="listitem"]');
+    this.disableEffectsForSelector(containerId, '[role="definition"]');
+    this.disableEffectsForSelector(containerId, '[role="term"]');
+    this.disableEffectsForSelector(containerId, '[role="note"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-abstract"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-acknowledgments"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-afterword"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-appendix"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-backlink"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-biblioentry"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-bibliography"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-biblioref"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-chapter"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-colophon"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-conclusion"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-cover"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-credit"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-credits"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-dedication"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-endnotes"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-epigraph"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-epilogue"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-errata"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-example"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-foreword"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-glossary"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-glossref"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-index"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-introduction"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-noteref"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-notice"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-pagebreak"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-pagelist"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-part"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-preface"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-prologue"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-pullquote"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-qna"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-subtitle"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-tip"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-toc"]');
+    this.disableEffectsForSelector(containerId, '[role="doc-warning"]');
   }
 
   /**
    * Disables interactive effects for elements matching a CSS selector.
    */
-  private disableEffectsForSelector(selector: string): void {
-    const elements = document.querySelectorAll<HTMLElement>(selector);
+  private disableEffectsForSelector(containerId: string, selector: string): void {
+    const elements = document.getElementById(containerId)?.shadowRoot?.querySelectorAll<HTMLElement>(selector);
     if (elements) {
       elements.forEach((element) => {
         this.disableEffectsForElement(element);

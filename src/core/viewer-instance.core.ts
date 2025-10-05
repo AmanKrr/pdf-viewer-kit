@@ -170,7 +170,13 @@ export class PDFViewerInstance {
     }
 
     try {
-      const internalContainers = PageElement.containerCreation(this._containerId, this._state.scale, this._instanceId);
+      const internalContainers: {
+        parent: HTMLDivElement;
+        viewerContainer: HTMLDivElement;
+        pagesContainer: HTMLDivElement;
+        injectElementId: string;
+        shadowRoot: ShadowRoot;
+      } = PageElement.containerCreation(this._containerId, this._state.scale, this._instanceId);
 
       if (!internalContainers.parent || !internalContainers.pagesContainer) {
         throw new Error('Failed to create container structure');
@@ -188,7 +194,7 @@ export class PDFViewerInstance {
 
       this._loadingTask = null;
 
-      this._webViewer = new InstanceWebViewer(this._pdfDocument, this._options, this._containerId, this);
+      this._webViewer = new InstanceWebViewer(this._pdfDocument, this._options, this._containerId, this, internalContainers.shadowRoot);
 
       await this._webViewer.initialize(internalContainers);
 

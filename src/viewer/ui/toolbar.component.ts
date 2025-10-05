@@ -225,7 +225,9 @@ export class Toolbar implements IToolbar {
             const newState = !annotationState.state.isAnnotationEnabled;
             annotationState.setState({ isAnnotationEnabled: newState });
 
-            const btn = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;
+            const btn = document
+              .getElementById(this.containerId)
+              ?.shadowRoot?.querySelector<HTMLElement>(`.${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;
             btn?.classList.toggle('active');
 
             if (newState) {
@@ -269,7 +271,7 @@ export class Toolbar implements IToolbar {
       annotationState.setState({ isAnnotationEnabled: false });
     }
 
-    const btn = document.querySelector<HTMLElement>(`#${this.containerId} .${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;
+    const btn = document.getElementById(this.containerId)?.shadowRoot?.querySelector<HTMLElement>(`.${PDF_VIEWER_CLASSNAMES.A_TOOLBAR_BUTTON} .annotation-icon`)?.parentElement;
     btn?.classList.toggle('active');
     this._annotationToolbar.destroy();
   }

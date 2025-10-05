@@ -91,7 +91,7 @@ export class TextSelectionHandler {
     if (TextSelectionHandler.initialized) return;
     TextSelectionHandler.buildToolbar();
 
-    const container = document.getElementById(TextSelectionHandler.containerId);
+    const container = document.getElementById(TextSelectionHandler.containerId)?.shadowRoot;
     if (!container) {
       console.error(`TextSelectionHandler: Container "${TextSelectionHandler.containerId}" not found.`);
       return;
@@ -135,7 +135,7 @@ export class TextSelectionHandler {
     TextSelectionHandler.currentSelectionRect = null;
     TextSelectionHandler.initialized = false;
 
-    const container = document.getElementById(TextSelectionHandler.containerId);
+    const container = document.getElementById(TextSelectionHandler.containerId)?.shadowRoot;
     if (!container) {
       console.error(`TextSelectionHandler: Container "${TextSelectionHandler.containerId}" not found.`);
       return;

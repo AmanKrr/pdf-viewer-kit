@@ -207,7 +207,9 @@ class SearchHighlighter {
       let attempts = 0;
       const maxAttempts = 0.2; // 50 * 100ms = 5 seconds
       const check = () => {
-        const el = document.querySelector(`#${this.containerId} #pageContainer-${this.instanceId}-${pageNumber}[data-page-number="${pageNumber}"]`) as HTMLElement;
+        const el = document
+          .getElementById(this.containerId)
+          ?.shadowRoot?.querySelector(`#pageContainer-${this.instanceId}-${pageNumber}[data-page-number="${pageNumber}"]`) as HTMLElement;
         if (el) {
           resolve(el);
         } else {
@@ -227,13 +229,16 @@ class SearchHighlighter {
    * Removes all inline highlights from all text layers.
    */
   removeHighlights(): void {
-    document.querySelectorAll(`#${this.containerId} .a-text-layer`).forEach((layer) => {
-      layer.querySelectorAll('span[role="presentation"]').forEach((span) => {
-        if (span.textContent) {
-          span.innerHTML = span.textContent;
-        }
+    document
+      .getElementById(this.containerId)
+      ?.shadowRoot?.querySelectorAll(`.a-text-layer`)
+      .forEach((layer) => {
+        layer.querySelectorAll('span[role="presentation"]').forEach((span) => {
+          if (span.textContent) {
+            span.innerHTML = span.textContent;
+          }
+        });
       });
-    });
     this._flatResults = [];
     this._currentMatchIndex = -1;
   }
@@ -252,7 +257,7 @@ class SearchHighlighter {
    * Called when a page is unmounted; cleans up any highlight data for that page.
    */
   deregisterPage(pageNumber: number): void {
-    const container = document.querySelector(`#${this.containerId} #pageContainer-${this.instanceId}-${pageNumber}[data-page-number="${pageNumber}"]`);
+    const container = document.getElementById(this.containerId)?.shadowRoot?.querySelector(`#pageContainer-${this.instanceId}-${pageNumber}[data-page-number="${pageNumber}"]`);
     if (container) {
       const textLayer = container.querySelector('.a-text-layer');
       if (textLayer) {
@@ -278,7 +283,9 @@ class SearchHighlighter {
     // and wait for the page to be rendered.
     // This is a workaround for the issue where the page is not rendered yet.
     if (targetMatch) {
-      const container = document.querySelector(`#${this.containerId} #pageContainer-${this.instanceId}-${targetMatch.pageNumber}[data-page-number="${targetMatch.pageNumber}"]`);
+      const container = document
+        .getElementById(this.containerId)
+        ?.shadowRoot?.querySelector(`#pageContainer-${this.instanceId}-${targetMatch.pageNumber}[data-page-number="${targetMatch.pageNumber}"]`);
       if (!container && this._webViewer) {
         this._webViewer.goToPage(targetMatch.pageNumber);
         setTimeout(() => {
@@ -306,7 +313,7 @@ class SearchHighlighter {
         targetElement.classList.add('a-active-highlight');
 
         // Find the main viewer container to scroll within
-        const mainViewerContainer = document.querySelector(`#${this.containerId} #${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`);
+        const mainViewerContainer = document.getElementById(this.containerId)?.shadowRoot?.querySelector(`#${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`);
         if (mainViewerContainer) {
           scrollElementIntoView(targetElement, { block: 'center', container: mainViewerContainer });
         } else {
