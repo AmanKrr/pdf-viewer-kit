@@ -91,6 +91,7 @@ export default class AnnotationLayer {
       page: this._page,
       linkService: new PDFLinkService({ pdfDocument, pdfViewer: webViewer }),
       renderForms: false,
+      imageResourcesPath: '/pdfjs/web/images/',
     });
 
     return this._annotationLayerDiv;

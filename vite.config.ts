@@ -1,15 +1,31 @@
 import { defineConfig } from 'vite';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import dts from 'vite-plugin-dts';
 import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
+import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 export default defineConfig(({ command }) => {
-  console.log('command', command);
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const pdfjsImagesAbs = path.resolve(__dirname, 'node_modules/pdfjs-dist/web/images');
+  const viewerAssetsAbs = path.resolve(__dirname, 'src/viewer/assets');
   if (command === 'serve') {
     return {
       root: 'examples',
       server: {
         open: '/',
       },
+      plugins: [
+        viteStaticCopy({
+          targets: [
+            {
+              src: `${pdfjsImagesAbs}/*`,
+              dest: 'pdfjs/web/images',
+            },
+          ],
+        }),
+      ],
     };
   } else {
     return {
@@ -31,7 +47,22 @@ export default defineConfig(({ command }) => {
           },
         },
       },
-      plugins: [cssInjectedByJsPlugin(), dts({ insertTypesEntry: true })],
+      plugins: [
+        cssInjectedByJsPlugin(),
+        dts({ insertTypesEntry: true }),
+        viteStaticCopy({
+          targets: [
+            {
+              src: viewerAssetsAbs,
+              dest: 'viewer',
+            },
+            {
+              src: `${pdfjsImagesAbs}/*`,
+              dest: 'pdfjs/web/images',
+            },
+          ],
+        }),
+      ],
     };
   }
 });
