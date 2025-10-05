@@ -125,32 +125,62 @@ export class AnnotationManager {
     const deleteBtn = popup.querySelector('.a-btn-delete') as HTMLButtonElement;
 
     cancelBtn.addEventListener('click', () => {
-      document.body.removeChild(popup);
+      const host = document.getElementById(this.containerId);
+      const root = host?.shadowRoot || null;
+      if (root) {
+        root.removeChild(popup);
+      } else {
+        document.body.removeChild(popup);
+      }
     });
 
     deleteBtn.addEventListener('click', () => {
       this.deleteSelectedAnnotation();
-      document.body.removeChild(popup);
+      const host = document.getElementById(this.containerId);
+      const root = host?.shadowRoot || null;
+      if (root) {
+        root.removeChild(popup);
+      } else {
+        document.body.removeChild(popup);
+      }
     });
 
     // Close on backdrop click
     popup.addEventListener('click', (e) => {
       if (e.target === popup) {
-        document.body.removeChild(popup);
+        const host = document.getElementById(this.containerId);
+        const root = host?.shadowRoot || null;
+        if (root) {
+          root.removeChild(popup);
+        } else {
+          document.body.removeChild(popup);
+        }
       }
     });
 
     // Close on Escape key
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        document.body.removeChild(popup);
+        const host = document.getElementById(this.containerId);
+        const root = host?.shadowRoot || null;
+        if (root) {
+          root.removeChild(popup);
+        } else {
+          document.body.removeChild(popup);
+        }
         document.removeEventListener('keydown', handleEscape);
       }
     };
     document.addEventListener('keydown', handleEscape);
 
     // Add to DOM
-    document.body.appendChild(popup);
+    const host = document.getElementById(this.containerId);
+    const root = host?.shadowRoot || null;
+    if (root) {
+      root.appendChild(popup);
+    } else {
+      document.body.appendChild(popup);
+    }
 
     // Focus the delete button for better accessibility
     deleteBtn.focus();
