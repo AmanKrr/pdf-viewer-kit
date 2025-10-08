@@ -1,3 +1,10 @@
+# [1.0.0-canvas-pooling.6](https://github.com/AmanKrr/pdf-kit/compare/v1.0.0-canvas-pooling.5...v1.0.0-canvas-pooling.6) (2025-10-08)
+
+
+### Bug Fixes
+
+* **PageVirtualization:** refine high-res cancellation logic for better performance on lower-end devices ([f972014](https://github.com/AmanKrr/pdf-kit/commit/f972014fd2f4924c989e561a935637e900ae5f70))
+
 # [1.0.0-canvas-pooling.5](https://github.com/AmanKrr/pdf-kit/compare/v1.0.0-canvas-pooling.4...v1.0.0-canvas-pooling.5) (2025-10-07)
 
 
