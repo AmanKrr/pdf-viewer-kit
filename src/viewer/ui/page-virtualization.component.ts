@@ -436,7 +436,7 @@ class PageVirtualization {
     const beyondBufferDuringRapidScroll = this._isRapidScrolling && distance > this._pageBuffer;
 
     // More aggressive high-res cancellation (Fix: Switched to moderate aggration / 2 = / 1 due to failing zoom on scroll on lower end devices)
-    const shouldCancelHighRes = isNotVisible || isTooFar || (isMemoryPressure && distance > 2) || (this._isRapidScrolling && distance > this._pageBuffer);
+    const shouldCancelHighRes = isNotVisible || isTooFar || (isMemoryPressure && distance > 1) || (this._isRapidScrolling && distance > this._pageBuffer);
 
     // Base render cancellation (more conservative)
     const shouldCancelBase = isNotVisible || isTooFar || beyondBufferDuringRapidScroll || (isMemoryPressure && distance > this._pageBuffer);
