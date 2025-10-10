@@ -305,8 +305,15 @@ class PageVirtualization {
         }
 
         // Skip if page is no longer visible, already rendered, or failed
-        if (!pageInfo.isVisible || pageInfo.isFullyRendered || pageInfo.isTransitioningToFullRender || pageInfo.renderFailed) {
+        if (!pageInfo.isVisible || pageInfo.isFullyRendered || pageInfo.isTransitioningToFullRender) {
           continue;
+        }
+
+        // ⭐ FIX: Reset renderFailed and retry for visible pages
+        if (pageInfo.renderFailed) {
+          Logger.warn(`Retrying failed render for page ${pageInfo.pageNumber}`);
+          pageInfo.renderFailed = false;
+          // Don't skip - allow retry
         }
 
         // Check if page is still in DOM (might have been removed during queue wait)
@@ -762,10 +769,12 @@ class PageVirtualization {
     if (!this._pagesParentDiv) return;
 
     for (const pageInfo of this._cachedPages.values()) {
-      // console.log('pageInfo', pageInfo);
+      console.log('pageInfo', pageInfo);
+      console.log(pageInfo.isVisible, pageInfo.isFullyRendered,pageInfo.isTransitioningToFullRender, pageInfo.pdfPageProxy, pageInfo.canvasElement, pageInfo.pageNumber);
       if (pageInfo.isVisible && pageInfo.isFullyRendered && pageInfo.pdfPageProxy && pageInfo.canvasElement) {
         const newViewport = pageInfo.pdfPageProxy.getViewport({ scale: this.state.scale });
         const pageNum = pageInfo.pageNumber;
+        console.log('newViewport: ', newViewport, " pageNum: ", pageNum);
 
         pageInfo.pageWrapperDiv.style.width = `${newViewport.width}px`;
         pageInfo.pageWrapperDiv.style.height = `${newViewport.height}px`;
@@ -829,6 +838,7 @@ class PageVirtualization {
       } catch (error) {
         // reportError(`getting page ${pageInfo.pageNumber} for scale update`, error);
         Logger.error(`_updatePageForNewScale: failed to fetch page ${pageInfo.pageNumber}`, error);
+        console.log(error);
         return;
       }
     }
@@ -971,6 +981,13 @@ class PageVirtualization {
 
       Logger.info(`_transitionToFullRender → page ${pageInfo.pageNumber}`);
       await this._renderPageContent(pageInfo, viewport);
+
+      // FIX: Only set isFullyRendered if render succeeded
+      if (pageInfo.renderFailed) {
+        Logger.error(`_transitionToFullRender: render failed for page ${pageInfo.pageNumber}`);
+        console.log(`Render failed for page ${pageInfo.pageNumber}, skipping high-res image append.`);
+        return; // Don't set isFullyRendered
+      }
 
       if (!pageInfo.renderFailed && this.state.scale != 1) {
         await this.appendHighResImage(pageInfo, viewport);
@@ -1238,6 +1255,7 @@ class PageVirtualization {
     } catch (e) {
       reportError(`getting page ${pageNumber} for placeholder size`, e);
       Logger.error(`_addPageToDom: failed placeholder size for page ${pageNumber}`, e);
+      console.log(e);
       placeholderViewport = { width: 200, height: 300, scale: this.state.scale, rotation: 0 } as PageViewport;
     }
 
