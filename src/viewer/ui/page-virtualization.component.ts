@@ -750,22 +750,15 @@ class PageVirtualization {
     this._isScaleChangeInProgress = true;
     
     try {
-      // CRITICAL FIX: Update page positions first
-      await this.calculatePagePositions();
-      
-      // CRITICAL FIX: Immediately update CSS dimensions for ALL visible pages
-      // This prevents pages from being "lost" during rapid zoom operations
+      // Immediately update CSS dimensions for ALL visible pages
       await this._updatePageDimensionsImmediately();
       
-      // Emergency cancel all non-essential renders during scale change
       this._emergencyCancelAll();
       this._clearRenderQueue();
       
-      // Update buffers (now safer since dimensions are already correct)
       await this.updateVisiblePageBuffers();
       await this.refreshHighResForVisiblePages();
       
-      // Update scroll position handling
       await this._updateRenderedPagesOnScroll(this._scrollableContainer.scrollTop, false);
       this._debouncedEnsureVisiblePagesRendered();
       
@@ -779,7 +772,6 @@ class PageVirtualization {
 
   /**
    * Immediately updates CSS dimensions for ALL visible pages regardless of render state.
-   * This prevents pages from being "lost" during rapid zoom operations.
    */
   private async _updatePageDimensionsImmediately(): Promise<void> {
     if (!this._pagesParentDiv) return;
@@ -792,33 +784,23 @@ class PageVirtualization {
           const newViewport = pageInfo.pdfPageProxy.getViewport({ scale: this.state.scale });
           const pageNum = pageInfo.pageNumber;
 
-          // Always update wrapper dimensions
           pageInfo.pageWrapperDiv.style.width = `${newViewport.width}px`;
           pageInfo.pageWrapperDiv.style.height = `${newViewport.height}px`;
           pageInfo.pageWrapperDiv.style.top = `${this._pagePositions.get(pageNum) || 0}px`;
 
-          // Update canvas dimensions if canvas exists
           if (pageInfo.canvasElement) {
             pageInfo.canvasElement.style.width = `${newViewport.width}px`;
             pageInfo.canvasElement.style.height = `${newViewport.height}px`;
           }
 
-          // Resize existing layers
           this._resizeExistingLayerDivs(pageInfo, newViewport);
 
-          // Update image container
           const imageContainer = pageInfo.pageWrapperDiv.querySelector<HTMLElement>(`#zoomedImageContainer-${pageNum}`);
           if (imageContainer) {
             imageContainer.innerHTML = '';
             imageContainer.style.width = `${newViewport.width}px`;
             imageContainer.style.height = `${newViewport.height}px`;
           }
-
-          Logger.info(`Updated dimensions for page ${pageNum}`, {
-            width: newViewport.width,
-            height: newViewport.height,
-            scale: this.state.scale
-          });
         } catch (error) {
           Logger.error(`Failed to update dimensions for page ${pageInfo.pageNumber}`, error);
         }
@@ -835,8 +817,8 @@ class PageVirtualization {
     if (!this._pagesParentDiv) return;
 
     for (const pageInfo of this._cachedPages.values()) {
-      // Updated condition: removed isFullyRendered requirement
-      if (pageInfo.isVisible && pageInfo.pdfPageProxy) {
+      // console.log('pageInfo', pageInfo);
+      if (pageInfo.isVisible && pageInfo.isFullyRendered && pageInfo.pdfPageProxy && pageInfo.canvasElement) {
         const newViewport = pageInfo.pdfPageProxy.getViewport({ scale: this.state.scale });
         const pageNum = pageInfo.pageNumber;
 
@@ -844,11 +826,8 @@ class PageVirtualization {
         pageInfo.pageWrapperDiv.style.height = `${newViewport.height}px`;
         pageInfo.pageWrapperDiv.style.top = `${this._pagePositions.get(pageNum) || 0}px`;
 
-        // Only update canvas if it exists and is fully rendered
-        if (pageInfo.canvasElement && pageInfo.isFullyRendered) {
-          pageInfo.canvasElement.style.width = `${newViewport.width}px`;
-          pageInfo.canvasElement.style.height = `${newViewport.height}px`;
-        }
+        pageInfo.canvasElement.style.width = `${newViewport.width}px`;
+        pageInfo.canvasElement.style.height = `${newViewport.height}px`;
 
         this._resizeExistingLayerDivs(pageInfo, newViewport);
 
@@ -891,24 +870,16 @@ class PageVirtualization {
         const currentWidth = parseInt(pageInfo.pageWrapperDiv.style.width || '0');
         const currentHeight = parseInt(pageInfo.pageWrapperDiv.style.height || '0');
         
-        // Check if dimensions are significantly off (allow small rounding differences)
         const widthDiff = Math.abs(currentWidth - expectedViewport.width);
         const heightDiff = Math.abs(currentHeight - expectedViewport.height);
         
-        if (widthDiff > 2 || heightDiff > 2) {
-          Logger.warn(`Correcting incorrect dimensions for page ${pageInfo.pageNumber}`, {
-            current: { width: currentWidth, height: currentHeight },
-            expected: { width: expectedViewport.width, height: expectedViewport.height },
-            scale: this.state.scale
-          });
-          
-          // Fix the dimensions
+        if (widthDiff > 1 || heightDiff > 1) {
+
           const pageNum = pageInfo.pageNumber;
           pageInfo.pageWrapperDiv.style.width = `${expectedViewport.width}px`;
           pageInfo.pageWrapperDiv.style.height = `${expectedViewport.height}px`;
           pageInfo.pageWrapperDiv.style.top = `${this._pagePositions.get(pageNum) || 0}px`;
           
-          // Update canvas if it exists
           if (pageInfo.canvasElement) {
             pageInfo.canvasElement.style.width = `${expectedViewport.width}px`;
             pageInfo.canvasElement.style.height = `${expectedViewport.height}px`;
