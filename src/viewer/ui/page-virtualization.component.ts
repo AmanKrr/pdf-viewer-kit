@@ -45,6 +45,7 @@ interface CachedPageInfo {
   isFullyRendered: boolean;
   renderFailed: boolean;
   isTransitioningToFullRender: boolean;
+  renderedScale?: number; // Track the scale at which this page was last fully rendered
 }
 
 /**
@@ -304,8 +305,10 @@ class PageVirtualization {
           continue; // Skip if now too far away
         }
 
-        // Skip if page is no longer visible, already rendered
-        if (!pageInfo.isVisible || pageInfo.isFullyRendered || pageInfo.isTransitioningToFullRender) {
+        // Skip if page is no longer visible, already rendered at current scale, or already transitioning
+        if (!pageInfo.isVisible || 
+            (pageInfo.isFullyRendered && pageInfo.renderedScale === this.state.scale) || 
+            pageInfo.isTransitioningToFullRender) {
           continue;
         }
 
@@ -750,12 +753,14 @@ class PageVirtualization {
     this._isScaleChangeInProgress = true;
     
     try {
-      // Immediately update CSS dimensions for ALL visible pages
-      await this._updatePageDimensionsImmediately();
       
       this._emergencyCancelAll();
       this._clearRenderQueue();
       
+      // Recalculate page positions for new scale
+      await this.calculatePagePositions();
+      
+      // Update CSS dimensions immediately for visible pages
       await this.updateVisiblePageBuffers();
       await this.refreshHighResForVisiblePages();
       
@@ -815,27 +820,33 @@ class PageVirtualization {
    */
   public async updateVisiblePageBuffers(): Promise<void> {
     if (!this._pagesParentDiv) return;
-
+    
     for (const pageInfo of this._cachedPages.values()) {
-      // console.log('pageInfo', pageInfo);
-      if (pageInfo.isVisible && pageInfo.isFullyRendered && pageInfo.pdfPageProxy && pageInfo.canvasElement) {
-        const newViewport = pageInfo.pdfPageProxy.getViewport({ scale: this.state.scale });
-        const pageNum = pageInfo.pageNumber;
+      if (pageInfo.isVisible && pageInfo.pdfPageProxy) {
+        try {
+          const newViewport = pageInfo.pdfPageProxy.getViewport({ scale: this.state.scale });
+          const pageNum = pageInfo.pageNumber;
 
-        pageInfo.pageWrapperDiv.style.width = `${newViewport.width}px`;
-        pageInfo.pageWrapperDiv.style.height = `${newViewport.height}px`;
-        pageInfo.pageWrapperDiv.style.top = `${this._pagePositions.get(pageNum) || 0}px`;
+          pageInfo.pageWrapperDiv.style.width = `${newViewport.width}px`;
+          pageInfo.pageWrapperDiv.style.height = `${newViewport.height}px`;
+          pageInfo.pageWrapperDiv.style.top = `${this._pagePositions.get(pageNum) || 0}px`;
 
-        pageInfo.canvasElement.style.width = `${newViewport.width}px`;
-        pageInfo.canvasElement.style.height = `${newViewport.height}px`;
+          if (pageInfo.canvasElement) {
+            pageInfo.canvasElement.style.width = `${newViewport.width}px`;
+            pageInfo.canvasElement.style.height = `${newViewport.height}px`;
+          }
 
-        this._resizeExistingLayerDivs(pageInfo, newViewport);
+          this._resizeExistingLayerDivs(pageInfo, newViewport);
 
-        const imageContainer = pageInfo.pageWrapperDiv.querySelector<HTMLElement>(`#zoomedImageContainer-${pageNum}`);
-        if (imageContainer) {
-          imageContainer.innerHTML = '';
-          imageContainer.style.width = `${newViewport.width}px`;
-          imageContainer.style.height = `${newViewport.height}px`;
+          const imageContainer = pageInfo.pageWrapperDiv.querySelector<HTMLElement>(`#zoomedImageContainer-${pageNum}`);
+          if (imageContainer) {
+            console.log('Clearing high-res image container for page', pageNum);
+            imageContainer.innerHTML = '';
+            imageContainer.style.width = `${newViewport.width}px`;
+            imageContainer.style.height = `${newViewport.height}px`;
+          }
+        } catch (error) {
+          Logger.error(`Failed to update dimensions for page ${pageInfo.pageNumber}`, error);
         }
       }
     }
@@ -905,7 +916,7 @@ class PageVirtualization {
     const pagesToRefresh = Array.from(this._cachedPages.values()).filter((pInfo) => pInfo.isVisible && pInfo.isFullyRendered && pInfo.pdfPageProxy);
 
     for (const pageInfo of pagesToRefresh) {
-      if (pageInfo.isVisible && pageInfo.isFullyRendered && pageInfo.pdfPageProxy) {
+      if (pageInfo.isVisible && (pageInfo.isFullyRendered && pageInfo.renderedScale == this.state.scale) && pageInfo.pdfPageProxy) {
         const newViewport = pageInfo.pdfPageProxy.getViewport({ scale: this.state.scale });
         await this.appendHighResImage(pageInfo, newViewport);
       }
@@ -989,14 +1000,21 @@ class PageVirtualization {
     if (this._isScaleChangeInProgress) return;
 
     // Safety net: ensure correct dimensions before queuing renders
-    await this._ensureCorrectDimensions();
+    // await this._ensureCorrectDimensions();
 
     const currentPage = this.state.currentPage;
     const pagesToQueue: Array<{ pageInfo: CachedPageInfo; priority: number }> = [];
 
+    // Helper function to check if a page needs rendering
+    const needsRendering = (pageInfo: CachedPageInfo): boolean => {
+      return !pageInfo.isFullyRendered || 
+             pageInfo.renderedScale == null || 
+             pageInfo.renderedScale !== this.state.scale;
+    };
+
     // **Highest Priority (0)**: Current page
     const currentPageInfo = this._cachedPages.get(currentPage);
-    if (currentPageInfo && currentPageInfo.isVisible && !currentPageInfo.isFullyRendered) {
+    if (currentPageInfo && currentPageInfo.isVisible && needsRendering(currentPageInfo)) {
       pagesToQueue.push({ pageInfo: currentPageInfo, priority: 0 });
     }
 
@@ -1004,20 +1022,20 @@ class PageVirtualization {
     for (let i = 1; i <= this._pageBuffer; i++) {
       // Next pages (priority increases with distance)
       const nextPage = this._cachedPages.get(currentPage + i);
-      if (nextPage && nextPage.isVisible && !nextPage.isFullyRendered) {
+      if (nextPage && nextPage.isVisible && needsRendering(nextPage)) {
         pagesToQueue.push({ pageInfo: nextPage, priority: i });
       }
 
       // Previous pages (same priority as corresponding next pages)
       const prevPage = this._cachedPages.get(currentPage - i);
-      if (prevPage && prevPage.isVisible && !prevPage.isFullyRendered) {
+      if (prevPage && prevPage.isVisible && needsRendering(prevPage)) {
         pagesToQueue.push({ pageInfo: prevPage, priority: i });
       }
     }
 
-    // **Lower Priority**: Any other visible but not fully rendered pages
+    // **Lower Priority**: Any other visible pages that need rendering
     this._cachedPages.forEach((pageInfo) => {
-      if (pageInfo.isVisible && !pageInfo.isFullyRendered && !pagesToQueue.some((item) => item.pageInfo.pageNumber === pageInfo.pageNumber)) {
+      if (pageInfo.isVisible && needsRendering(pageInfo) && !pagesToQueue.some((item) => item.pageInfo.pageNumber === pageInfo.pageNumber)) {
         const distance = Math.abs(pageInfo.pageNumber - currentPage);
         const priority = Math.max(this._pageBuffer + 1, distance);
         pagesToQueue.push({ pageInfo: pageInfo, priority });
@@ -1041,7 +1059,7 @@ class PageVirtualization {
    * @returns {Promise<void>}
    */
   private async _transitionToFullRender(pageInfo: CachedPageInfo): Promise<void> {
-    if (pageInfo.isFullyRendered || !pageInfo.isVisible || !pageInfo.pageWrapperDiv.parentElement) {
+    if ((pageInfo.isFullyRendered && pageInfo.renderedScale === this.state.scale) || !pageInfo.isVisible || !pageInfo.pageWrapperDiv.parentElement) {
       return;
     }
     // Prevent re-entrancy
@@ -1088,7 +1106,10 @@ class PageVirtualization {
       pageInfo.pageWrapperDiv.style.backgroundColor = '';
 
       pageInfo.isFullyRendered = true;
-      Logger.info(`_transitionToFullRender done page ${pageInfo.pageNumber}`);
+      pageInfo.renderedScale = this.state.scale; // Track scale at which page was rendered
+      Logger.info(`_transitionToFullRender done page ${pageInfo.pageNumber}`, {
+        renderedScale: pageInfo.renderedScale
+      });
     } catch (error) {
       Logger.error(`Unexpected error in _transitionToFullRender for page ${pageInfo.pageNumber}`, { rawError: error });
       pageInfo.renderFailed = true;
@@ -1319,6 +1340,7 @@ class PageVirtualization {
       this._searchHighlighter.deregisterPage(pageInfo.pageNumber);
     }
     pageInfo.isFullyRendered = false;
+    pageInfo.renderedScale = undefined; 
   }
 
   /**
@@ -1375,12 +1397,13 @@ class PageVirtualization {
 
     pageInfo = {
       pageNumber,
-      pdfPageProxy,  // CRITICAL FIX: Store the proxy immediately so dimensions can be updated
+      pdfPageProxy,  
       pageWrapperDiv,
       isVisible: true,
       isFullyRendered: false,
       renderFailed: false,
       isTransitioningToFullRender: false,
+      renderedScale: undefined, 
     };
     this._cachedPages.set(pageNumber, pageInfo);
 
@@ -1423,7 +1446,7 @@ class PageVirtualization {
         pageInfo.canvasElement = undefined;
       }
     }
-    if (!pageInfo.pdfPageProxy || !viewport || !pageInfo.isVisible || pageInfo.isFullyRendered) {
+    if (!pageInfo.pdfPageProxy || !viewport || !pageInfo.isVisible || (pageInfo.isFullyRendered && pageInfo.renderedScale == this.state.scale)) {
       return;
     }
 
@@ -1751,9 +1774,9 @@ class PageVirtualization {
       }
     } catch (error: any) {
       if (error && error.name === 'RenderingCancelledException') {
-        // console.log(`High-res rendering cancelled for page ${pageInfo.pageNumber}`);
+        console.log(`High-res rendering cancelled for page ${pageInfo.pageNumber}`);
       } else {
-        console.error(`Error rendering high-res image for page ${pageInfo.pageNumber}:`, error);
+        console.log(`Error rendering high-res image for page ${pageInfo.pageNumber}:`, error);
       }
       if (pageInfo.highResImageBitmap) {
         pageInfo.highResImageBitmap.close();
