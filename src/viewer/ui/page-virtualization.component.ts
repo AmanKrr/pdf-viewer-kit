@@ -591,7 +591,8 @@ class PageVirtualization {
           this.canvasPool.releaseCanvas(pageInfo.canvasElement);
           pageInfo.canvasElement = undefined;
         }
-
+        pageInfo.isFullyRendered = false; 
+        pageInfo.renderedScale = undefined;
         Logger.info(`Cancelled offscreen render for page ${pageInfo.pageNumber}`);
       }
     });
@@ -829,10 +830,10 @@ class PageVirtualization {
    * @returns {Promise<void>}
    */
   public async refreshHighResForVisiblePages(): Promise<void> {
-    const pagesToRefresh = Array.from(this._cachedPages.values()).filter((pInfo) => pInfo.isVisible && pInfo.isFullyRendered && pInfo.renderedScale == this.state.scale && pInfo.pdfPageProxy);
+    const pagesToRefresh = Array.from(this._cachedPages.values()).filter((pInfo) => pInfo.isVisible && pInfo.pdfPageProxy);
 
     for (const pageInfo of pagesToRefresh) {
-      if (pageInfo.isVisible && pageInfo.isFullyRendered && pageInfo.renderedScale == this.state.scale && pageInfo.pdfPageProxy) {
+      if (pageInfo.isVisible && pageInfo.pdfPageProxy) {
         await this.appendHighResImage(pageInfo);
       }
     }
@@ -968,7 +969,8 @@ class PageVirtualization {
    * @returns {Promise<void>}
    */
   private async _transitionToFullRender(pageInfo: CachedPageInfo): Promise<void> {
-    if ((pageInfo.isFullyRendered && pageInfo.renderedScale === this.state.scale) || !pageInfo.isVisible || !pageInfo.pageWrapperDiv.parentElement) {
+    const currentScale = this.state.scale;
+    if ((pageInfo.isFullyRendered && pageInfo.renderedScale === currentScale) || !pageInfo.isVisible || !pageInfo.pageWrapperDiv.parentElement) {
       return;
     }
     // Prevent re-entrancy
@@ -976,7 +978,6 @@ class PageVirtualization {
       Logger.info(`Page ${pageInfo.pageNumber} is already transitioning to full render. Skipping.`);
       return;
     }
-
     pageInfo.isTransitioningToFullRender = true; // Set lock
 
     try {
@@ -994,7 +995,7 @@ class PageVirtualization {
       }
       if (!pageInfo.pdfPageProxy || pageInfo.renderFailed) return;
 
-      const viewport = pageInfo.pdfPageProxy.getViewport({ scale: this.state.scale });
+      const viewport = pageInfo.pdfPageProxy.getViewport({ scale: currentScale });
 
       PageElement.createOrUpdatePageContainerDiv(pageInfo.pageNumber, viewport, this._pagePositions, this.instanceId, pageInfo.pageWrapperDiv);
 
@@ -1007,7 +1008,7 @@ class PageVirtualization {
         return;
       }
 
-      if (!pageInfo.renderFailed && this.state.scale != 1) {
+      if (!pageInfo.renderFailed && currentScale != 1) {
         await this.appendHighResImage(pageInfo);
       }
 
@@ -1015,7 +1016,7 @@ class PageVirtualization {
       pageInfo.pageWrapperDiv.style.backgroundColor = '';
 
       pageInfo.isFullyRendered = true;
-      pageInfo.renderedScale = this.state.scale; // Track scale at which page was rendered
+      pageInfo.renderedScale = currentScale;
       Logger.info(`_transitionToFullRender done page ${pageInfo.pageNumber}`, {
         renderedScale: pageInfo.renderedScale
       });
@@ -1508,6 +1509,8 @@ class PageVirtualization {
     }
 
     this._cachedPages.delete(pageNumber);
+    pageInfo.isFullyRendered = false;
+    pageInfo.renderedScale = undefined;
   }
 
   /**
@@ -1637,7 +1640,8 @@ class PageVirtualization {
     }
     
     // FIX: Recalculate viewport with current scale to avoid race conditions
-    const currentViewport = pageInfo.pdfPageProxy.getViewport({ scale: this.state.scale });
+    const currentScale = this.state.scale;
+    const currentViewport = pageInfo.pdfPageProxy.getViewport({ scale: currentScale });
       
     if (pageInfo.highResRenderTask) pageInfo.highResRenderTask.cancel();
     if (pageInfo.highResImageBitmap) pageInfo.highResImageBitmap.close();
@@ -1659,7 +1663,7 @@ class PageVirtualization {
     pageInfo.highResRenderTask = pageInfo.pdfPageProxy.render(renderParams);
     try {
       await pageInfo.highResRenderTask.promise;
-      Logger.info(`high-res render complete`, { page: pageInfo.pageNumber, scale: this.state.scale });
+      Logger.info(`high-res render complete`, { page: pageInfo.pageNumber, scale: currentScale });
       if (!pageInfo.isVisible) {
         this.canvasPool.releaseCanvas(offscreenCanvas);
         pageInfo.highResRenderTask = undefined;
@@ -1683,18 +1687,19 @@ class PageVirtualization {
         bitmap.close();
         pageInfo.highResImageBitmap = undefined;
       }
+      pageInfo.renderedScale = currentScale;
     } catch (error: any) {
       if (error && error.name === 'RenderingCancelledException') {
-        console.log(`High-res rendering cancelled for page ${pageInfo.pageNumber}`);
+        Logger.warn(`high-res render cancelled for page ${pageInfo.pageNumber}`);
       } else {
-        console.log(`Error rendering high-res image for page ${pageInfo.pageNumber}:`, error);
+        Logger.error(`High-res render failed for page ${pageInfo.pageNumber}`, { error });
       }
       if (pageInfo.highResImageBitmap) {
         pageInfo.highResImageBitmap.close();
         pageInfo.highResImageBitmap = undefined;
       }
     } finally {
-      pageInfo.highResRenderTask = undefined;
+      pageInfo.highResRenderTask = undefined; 
       this.canvasPool.releaseCanvas(offscreenCanvas);
     }
   }

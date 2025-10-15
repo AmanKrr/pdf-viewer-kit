@@ -1,0 +1,93 @@
+[33mcfff1d2[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mcanvas-pooling[m[33m, [m[1;31morigin/canvas-pooling[m[33m)[m fix-5: blank pages missing issue
+[33m9fe96d8[m fix-4
+[33m2b26001[m fix-3
+[33m283f4d8[m fix-2
+[33m7385cbf[m fix-1
+[33mfd9f70d[m Half Part done
+[33m6e47782[m chore(release): 1.0.0-canvas-pooling.6 [skip ci]
+[33mf972014[m fix(PageVirtualization): refine high-res cancellation logic for better performance on lower-end devices
+[33m2b64cd5[m chore(release): 1.0.0-canvas-pooling.5 [skip ci]
+[33m7e7b4cc[m fix(PageVirtualization): adjust high-res cancellation logic for improved performance on lower-end devices
+[33mc9cf093[m[33m ([m[1;33mtag: [m[1;33mv1.0.0-canvas-pooling.4[m[33m)[m chore(release): 1.0.0-canvas-pooling.4 [skip ci]
+[33m2f70a87[m fix: pdfjs internal image loading
+[33m7c155bf[m[33m ([m[1;33mtag: [m[1;33mv1.0.0-canvas-pooling.3[m[33m)[m chore(release): 1.0.0-canvas-pooling.3 [skip ci]
+[33m795c804[m refactor(AnnotationManager): integrate Shadow DOM for popup management
+[33m5c0d4a6[m feat(PageElement): integrate Shadow DOM for PDF viewer component styling
+[33m8ed5f70[m[33m ([m[1;33mtag: [m[1;33mv1.0.0-canvas-pooling.2[m[33m)[m chore(release): 1.0.0-canvas-pooling.2 [skip ci]
+[33mcd9ab57[m refactor(TextLayer): comment out selection handler initialization for future implementation
+[33me9fcb2d[m fix(RectangleAnnotation): adjust SVG positioning and dimensions for accurate rendering
+[33mb447df0[m fix: enhance annotation configuration with modern rectangle coordinates
+[33m05ebcc4[m docs(README): overhaul documentation for PDF Viewer Kit with enhanced features and usage examples
+[33md5edac5[m refactor(PDFViewerKit): remove unused event constants for cleaner code
+[33m0e309c3[m[33m ([m[1;33mtag: [m[1;33mv1.0.0-canvas-pooling.1[m[33m)[m chore(release): 1.0.0-canvas-pooling.1 [skip ci]
+[33m0748f3d[m feat: implement comprehensive annotation system improvements and architecture refactoring
+[33m10f2271[m[33m ([m[1;31morigin/refactor[m[33m)[m refactor: rename Annotation.ts to annotation.ts and Resizer.ts to resizer.ts for consistent lowercase naming
+[33m55a1b91[m[33m ([m[1;33mtag: [m[1;33mv0.2.0-canvas-pooling.3[m[33m)[m chore(release): 0.2.0-canvas-pooling.3 [skip ci]
+[33m73967fe[m refactor(main.ts): simplify annotation creation and remove unused code
+[33m8fff955[m feat(PDFViewerKit): enhance PDF viewer instance management and public API
+[33m6304f46[m feat(Delete Confirmation): implement delete confirmation popup and enhance delete button functionality
+[33m42b0b36[m refactor(SearchBar): comment out Escape key handling logic
+[33m10f2950[m refactor(Styling): unify color variables and enhance UI consistency across styles
+[33m2c2f677[m refactor(Error Handling): implement user-friendly error handling for PDF loading
+[33m1efe86c[m refactor(PDFViewerInstance): integrate PasswordManagerService for handling password-protected PDFs
+[33m26f8b95[m refactor(WebViewer): rename web-viewer to web-viewer.component and enhance documentation
+[33m621a9da[m chore(PDF Viewer): enhance documentation and modularity across core components
+[33m0b23fd5[m refactor(PDFViewerKit, MultiInstancePDFViewer): streamline exports and enhance modularity
+[33m19ef136[m refactor(SelectionManager): implement global click handler for deselection
+[33m156dc4b[m refactor(ColorPicker, AnnotationPropertiesPlugin, ShapeSelectionPlugin): improve dropdown click handling and UI consistency
+[33m503c46a[m chore(annotations): improve ellipse annotation handling with stroke padding adjustments
+[33m69b3f6d[m chore(annotations): add validity checks for annotations during drawing
+[33m07b33ac[m chore(utils): add scrollElementIntoView function for improved element visibility control
+[33m90c8d73[m chore(annotations): enhance annotation functionality and state management
+[33mb61f083[m refactor(ColorPicker, AnnotationPropertiesPlugin, ShapeSelectionPlugin): clean up dropdown management and comments
+[33m73559c6[m refactor(ColorPicker, AnnotationPropertiesPlugin): streamline dropdown management
+[33m398bbd7[m chore(annotations): introduce annotation toolbar with state management and plugins
+[33m55dfd54[m chore: Refactor
+[33m09893d1[m chore: refactor
+[33m202736e[m feat(annotations): enhance interactive effects and drawing management
+[33mdca1c7f[m feat(annotations): update RectangleAnnotation attributes for enhanced customization
+[33mb2379c5[m feat(annotations): enhance annotation handling with modern and legacy coordinate support
+[33mcf38b7f[m feat(annotations): enhance rectangle annotation functionality and improve PDF viewer styles
+[33m5cc9943[m feat(pdf-viewer): enhance page rendering with improved queue management and aggressive cancellation
+[33m0de1828[m feat(canvas-pooling): implement canvas bucketing and memory management enhancements
+[33m0103b8f[m feat(pdf-viewer): enhance PDF loading experience with progress updates and improved configuration
+[33m175d657[m[33m ([m[1;33mtag: [m[1;33mv0.2.0-canvas-pooling.2[m[33m)[m chore(release): 0.2.0-canvas-pooling.2 [skip ci]
+[33me3835b7[m fix: Update main and module paths in package.json for correct file references
+[33mddeff86[m fix: Update PDF viewer container dimensions for better responsiveness
+[33m4feb225[m fix: Safely cancel scroll handler in destroy method to prevent potential errors
+[33m040f6f2[m chore: Temporary disable ellipse and line annotation
+[33m9a081e8[m fix: Update rectangle drawing parameters to use width and height for better clarity
+[33m334850e[m feat(annotations): add method to retrieve annotation shape configuration by ID
+[33mfe3cfad[m fix: Adjust rectangle annotation padding based on dimensions for better rendering
+[33me752ba4[m[33m ([m[1;33mtag: [m[1;33mv0.2.0-canvas-pooling.1[m[33m)[m chore(release): 0.2.0-canvas-pooling.1 [skip ci]
+[33m1ad009f[m fix: Improve text layer font family and font weight
+[33m8fadfad[m chore: Update example with add annotation functionality with rectangle support
+[33medd18c4[m feat(annotations): enhance drawing functionality with interactive option
+[33md54587f[m chore: Update PDF viewer documentation and remove obsolete files
+[33mea208bc[m refactor: remove minification script and integrate Vite for build process
+[33mfbec9a7[m chore: update dependencies and change beta branch name
+[33m5d1701b[m feat(pdf-viewer): unify performance, rendering, and build enhancements
+[33ma18ec48[m Update README.md
+[33m1bc499d[m Update README.md
+[33m5b03ab3[m Update README.md
+[33md4c064a[m[33m ([m[1;33mtag: [m[1;33mv0.1.2[m[33m)[m chore(release): 0.1.2 [skip ci]
+[33m69d5c99[m chore: disable npm publishing in semantic-release configuration and comment out unused Node.js setup
+[33m97d0bb3[m chore: add npm authentication verification step in release workflow
+[33m651fa05[m fix: NPM Publish bump
+[33m17bc4e8[m chore: update release workflow to correct npm token configuration
+[33mb3b4be2[m chore: update release workflow to streamline npm authentication configuration
+[33m078fd83[m chore: streamline release workflow configuration and improve comments
+[33m3557c68[m chore: enable npm publishing in semantic release configuration
+[33ma2d2fe5[m chore: update package name and description to reflect new branding
+[33md293900[m[33m ([m[1;33mtag: [m[1;33mv0.1.1[m[33m)[m chore(release): 0.1.1 [skip ci]
+[33m97a1ce1[m fix: rename src/Viewer → src/viewer (case-sensitive fix)
+[33m57d6bcc[m chore: add GitHub Actions workflow for releases and update .gitignore to include /dist
+[33m491c1ae[m chore: remove dist/ from repo; CI will build on push
+[33m7e8b0e2[m chore: Add GitHub Actions workflow for automated releases
+[33m30484e2[m chore: update doc
+[33me1e8865[m chore: reset CHANGELOG for new v0.1.0 history
+[33m00c4a68[m chore: update package.json
+[33m509d79a[m[33m ([m[1;33mtag: [m[1;33mv0.1.0[m[33m)[m chore: reset version back to 0.1.0
+[33m6bed0e1[m Add HTML documentation for PDF_VIEWER_IDS and DEFAULT_LINK_REL variables in pdf-kit
+[33m6e6db4d[m chore: docs
+[33m643d063[m feat: Enha

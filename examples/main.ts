@@ -5,7 +5,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `<div id="view-pdf" 
 PdfViewerKit.unloadAll();
 
 PdfViewerKit.load({
-  document: './pdfs/SourceDocument-4.pdf',
+  document: './pdfs/pdf_commenting_new.pdf',
   containerId: 'view-pdf',
   toolbarOptions: {
     showThumbnail: false,
