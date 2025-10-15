@@ -943,7 +943,7 @@ class PageVirtualization {
       }
     }
 
-    // **Lower Priority**: Any other visible pages that need rendering
+    // **Lower Priority**: Any other visible but not fully rendered pages or rendered at wrong scale
     this._cachedPages.forEach((pageInfo) => {
       if (pageInfo.isVisible && needsRendering(pageInfo) && !pagesToQueue.some((item) => item.pageInfo.pageNumber === pageInfo.pageNumber)) {
         const distance = Math.abs(pageInfo.pageNumber - currentPage);
@@ -1263,7 +1263,7 @@ class PageVirtualization {
 
     if (pageInfo && pageInfo.pageWrapperDiv.parentElement) {
       pageInfo.isVisible = true;
-      // CRITICAL FIX: Ensure existing pages have correct dimensions
+      //  FIX: Ensure existing pages have correct dimensions
       if (pageInfo.pdfPageProxy) {
         const currentViewport = pageInfo.pdfPageProxy.getViewport({ scale: this.state.scale });
         const currentWidth = parseInt(pageInfo.pageWrapperDiv.style.width || '0');
@@ -1663,7 +1663,7 @@ class PageVirtualization {
     pageInfo.highResRenderTask = pageInfo.pdfPageProxy.render(renderParams);
     try {
       await pageInfo.highResRenderTask.promise;
-      Logger.info(`high-res render complete`, { page: pageInfo.pageNumber, scale: currentScale });
+      Logger.info(`base render complete`, { page: pageInfo.pageNumber, scale: currentScale });
       if (!pageInfo.isVisible) {
         this.canvasPool.releaseCanvas(offscreenCanvas);
         pageInfo.highResRenderTask = undefined;
@@ -1690,9 +1690,9 @@ class PageVirtualization {
       pageInfo.renderedScale = currentScale;
     } catch (error: any) {
       if (error && error.name === 'RenderingCancelledException') {
-        Logger.warn(`high-res render cancelled for page ${pageInfo.pageNumber}`);
+        // console.log(`High-res rendering cancelled for page ${pageInfo.pageNumber}`);
       } else {
-        Logger.error(`High-res render failed for page ${pageInfo.pageNumber}`, { error });
+        console.error(`Error rendering high-res image for page ${pageInfo.pageNumber}:`, error);
       }
       if (pageInfo.highResImageBitmap) {
         pageInfo.highResImageBitmap.close();

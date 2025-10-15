@@ -53,11 +53,11 @@ export default defineConfig(({ command }) => {
         viteStaticCopy({
           targets: [
             {
-              src: `src/viewer/assets/`,
+              src: viewerAssetsAbs,
               dest: 'viewer',
             },
             {
-              src: `node_modules/pdfjs-dist/web/images/`,
+              src: `${pdfjsImagesAbs}/*`,
               dest: 'pdfjs/web/images',
             },
           ],
