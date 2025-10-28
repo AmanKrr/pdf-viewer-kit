@@ -240,7 +240,11 @@ class SearchHighlighter {
         });
       });
     this._flatResults = [];
+    this._allFlatResults = [];
     this._currentMatchIndex = -1;
+    // Ensure future page mounts do not re-apply highlights
+    this._currentSearchTerm = '';
+    this._currentOptions = { matchCase: false, wholeWord: false, regex: false };
   }
 
   /**
