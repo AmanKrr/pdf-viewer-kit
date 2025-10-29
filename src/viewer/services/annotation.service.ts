@@ -385,6 +385,31 @@ export class AnnotationService {
   }
 
   /**
+   * Wait until a specific annotation's SVG element is present in the DOM.
+   * Navigates to the annotation's page if necessary and resolves with the element.
+   */
+  public async waitForAnnotationElement(annotationId: string, timeoutMs = 5000): Promise<SVGGraphicsElement> {
+    // Locate page number for the annotation
+    let pageNumber: number | undefined;
+    for (const [page, configs] of this._annotations.entries()) {
+      if (configs.some((c) => c.id === annotationId)) {
+        pageNumber = page;
+        break;
+      }
+    }
+    if (pageNumber == null) {
+      throw new Error(`Annotation with id "${annotationId}" not found in current state`);
+    }
+
+    // Ensure page is visible and mounted
+    this._goTo(pageNumber);
+    const pageContainer = await this._waitForPageContainer(pageNumber, timeoutMs);
+    // Wait for the annotation element inside the page container
+    const el = await this._waitForAnnotationEl(pageContainer, annotationId, timeoutMs);
+    return el;
+  }
+
+  /**
    * Removes event listeners and destroys all managers.
    */
   public destroy(): void {
@@ -492,42 +517,54 @@ export class AnnotationService {
    * Convenience method that automatically computes the rect from the element.
    */
   public scrollHighlightIntoView(annotationId: string): void {
-    const shadowRoot = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
-    if (!shadowRoot) {
-      console.warn(`Shadow root not found for container "${this.containerId}"`);
-      return;
-    }
+    this.waitForAnnotationElement(annotationId)
+      .then((annotationElement: SVGGraphicsElement) => {
+        const shadowRoot = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
+        if (!shadowRoot) {
+          console.warn(`Shadow root not found for container "${this.containerId}"`);
+          return;
+        }
 
-    // Try to find by annotation-id attribute first (SVG annotations)
-    let highlightElement = shadowRoot.querySelector(`[annotation-id="${annotationId}"]`) as HTMLElement | null;
+        if (annotationElement) {
+          const scrollElement = shadowRoot?.querySelector(`#${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`) as HTMLElement | null;
+          if (!scrollElement) return;
+          scrollElementIntoView(annotationElement, { block: 'center', inline: 'center', container: scrollElement });
+        } else {
+          // Try to find by annotation-id attribute first (SVG annotations)
+          let highlightElement = shadowRoot.querySelector(`[annotation-id="${annotationId}"]`) as HTMLElement | null;
 
-    // If not found, try by regular ID attribute
-    if (!highlightElement) {
-      highlightElement = shadowRoot.querySelector(`#${annotationId}`) as HTMLElement | null;
-    }
+          // If not found, try by regular ID attribute
+          if (!highlightElement) {
+            highlightElement = shadowRoot.querySelector(`#${annotationId}`) as HTMLElement | null;
+          }
 
-    if (!highlightElement) {
-      console.warn(`Element with annotation-id or id="${annotationId}" not found`);
-      return;
-    }
+          if (!highlightElement) {
+            console.warn(`Element with annotation-id or id="${annotationId}" not found`);
+            return;
+          }
 
-    // Find the page container that contains this annotation
-    const pageContainer = highlightElement.closest(`[id^="pageContainer-${this.instanceId}-"][data-page-number]`) as HTMLElement | null;
-    if (!pageContainer) {
-      console.warn(`Page container not found for annotation "${annotationId}"`);
-      return;
-    }
+          // Find the page container that contains this annotation
+          const pageContainer = highlightElement.closest(`[id^="pageContainer-${this.instanceId}-"][data-page-number]`) as HTMLElement | null;
+          if (!pageContainer) {
+            console.warn(`Page container not found for annotation "${annotationId}"`);
+            return;
+          }
 
-    const pageNumber = parseInt(pageContainer.getAttribute('data-page-number') || '0', 10);
-    if (!pageNumber) {
-      console.warn(`Invalid page number for annotation "${annotationId}"`);
-      return;
-    }
+          const pageNumber = parseInt(pageContainer.getAttribute('data-page-number') || '0', 10);
+          if (!pageNumber) {
+            console.warn(`Invalid page number for annotation "${annotationId}"`);
+            return;
+          }
 
-    // Center the annotation element directly within the scroll container
-    const scrollElement = shadowRoot?.querySelector(`#${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`) as HTMLElement | null;
-    if (!scrollElement) return;
-    scrollElementIntoView(highlightElement, { block: 'center', inline: 'center', container: scrollElement });
+          // Center the annotation element directly within the scroll container
+          const scrollElement = shadowRoot?.querySelector(`#${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`) as HTMLElement | null;
+          if (!scrollElement) return;
+          scrollElementIntoView(highlightElement, { block: 'center', inline: 'center', container: scrollElement });
+        }
+      })
+      .catch((err) => {
+        console.warn(`scrollHighlightIntoView: ${String(err)}`);
+      });
   }
 
   /**

@@ -344,6 +344,13 @@ class PDFViewerAnnotationsFacade implements IPDFViewerAnnotations {
     }
     throw new Error('PDF viewer not yet initialized');
   }
+
+  async waitForAnnotationElement(annotationId: string, timeoutMs?: number): Promise<HTMLElement> {
+    if (this._instance.webViewer?.annotation) {
+      return this._instance.webViewer.annotation.waitForAnnotationElement(annotationId, timeoutMs);
+    }
+    throw new Error('Annotation service not available');
+  }
 }
 
 /**

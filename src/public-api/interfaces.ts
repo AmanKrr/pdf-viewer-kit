@@ -139,6 +139,9 @@ export interface IPDFViewerAnnotations {
 
   /** Scroll a known annotation/highlight element into view (no lookups) */
   scrollHighlightElementIntoView(element: HTMLElement): void;
+
+  /** Wait until the annotation's DOM element is rendered and available */
+  waitForAnnotationElement(annotationId: string, timeoutMs?: number): Promise<HTMLElement>;
 }
 
 /**
