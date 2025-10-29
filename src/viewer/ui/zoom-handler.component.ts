@@ -102,14 +102,16 @@ export default class ZoomHandler {
   public async applyZoom(newScaleInput: number): Promise<void> {
     const oldScale = this._webViewer.state.scale;
 
+    const clampedNewScale = Math.min(Math.max(newScaleInput, this._options.minScale), this._options.maxScale);
+
     const page = this._webViewer.state.currentPage;
     const offset = this._getScrollOffsetRelativeToPage(page);
 
-    this._webViewer.state.scale = newScaleInput;
-    this._applyCssScale(newScaleInput);
+    this._webViewer.state.scale = clampedNewScale;
+    this._applyCssScale(clampedNewScale);
 
     await this._pageVirtualization.calculatePagePositions();
-    this._adjustScrollPosition(page, offset, oldScale, newScaleInput);
+    this._adjustScrollPosition(page, offset, oldScale, clampedNewScale);
 
     this._webViewer.events.emit('scaleChange');
   }

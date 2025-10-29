@@ -183,6 +183,14 @@ class WebViewer {
       // Set up page observation once page virtualization is ready, add observer since we know that now pages are present.
       this._setupPageObserver();
 
+      // Clamp initial scale to maxDefaultZoomLevel if provided
+      if (typeof this._options.maxDefaultZoomLevel === 'number') {
+        const maxScale = this._options.maxDefaultZoomLevel;
+        if (this.state.scale > maxScale) {
+          await this._zoomHandler.applyZoom(maxScale);
+        }
+      }
+
       this._isInitialized = true;
       console.log(`InstanceWebViewer initialized for instance ${this._instance.instanceId}`);
     } catch (error) {
@@ -251,7 +259,12 @@ class WebViewer {
       }
     }
 
-    this._zoomHandler = new ZoomHandler(this, this._pageVirtualization);
+    const maxScaleFromOptions = typeof this._options.maxDefaultZoomLevel === 'number' ? this._options.maxDefaultZoomLevel : 5.0;
+    this._zoomHandler = new ZoomHandler(this, this._pageVirtualization, {
+      minScale: 0.25,
+      maxScale: maxScaleFromOptions,
+      zoomStep: 0.25,
+    });
     this._annotationService = new AnnotationService(this);
 
     // Subscribe to drawing events to manage interactive effects through SelectionManager
