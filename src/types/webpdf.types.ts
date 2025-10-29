@@ -36,6 +36,9 @@ export interface LoadOptions extends DocumentInitParameters {
   /** The maximum zoom level allowed in the viewer (optional). */
   maxDefaultZoomLevel?: number;
 
+  /** The initial zoom level to apply when the viewer loads (optional). */
+  initialZoomLevel?: number;
+
   /** The password required to open an encrypted PDF (optional). */
   password?: string;
 

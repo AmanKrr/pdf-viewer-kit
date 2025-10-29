@@ -183,9 +183,14 @@ class WebViewer {
       // Set up page observation once page virtualization is ready, add observer since we know that now pages are present.
       this._setupPageObserver();
 
-      // Clamp initial scale to maxDefaultZoomLevel if provided
-      if (typeof this._options.maxDefaultZoomLevel === 'number') {
-        const maxScale = this._options.maxDefaultZoomLevel;
+      // Apply initial zoom if provided, clamped by maxDefaultZoomLevel
+      const hasInitial = typeof this._options.initialZoomLevel === 'number';
+      const hasMax = typeof this._options.maxDefaultZoomLevel === 'number';
+      if (hasInitial) {
+        const target = hasMax ? Math.min(this._options.initialZoomLevel as number, this._options.maxDefaultZoomLevel as number) : (this._options.initialZoomLevel as number);
+        await this._zoomHandler.applyZoom(target);
+      } else if (hasMax) {
+        const maxScale = this._options.maxDefaultZoomLevel as number;
         if (this.state.scale > maxScale) {
           await this._zoomHandler.applyZoom(maxScale);
         }
