@@ -1,3 +1,19 @@
+# [1.0.0-canvas-pooling.7](https://github.com/AmanKrr/pdf-kit/compare/v1.0.0-canvas-pooling.6...v1.0.0-canvas-pooling.7) (2025-10-29)
+
+
+### Bug Fixes
+
+* **PageVirtualization:** added renderScale prop to fix blank pages issue during rapid scroll/zoom ([0981baf](https://github.com/AmanKrr/pdf-kit/commit/0981baf21674bcdb2968fee4fe8cc27689173a7f))
+* **SearchHighlighter:** initialize properties for search term and options to prevent highlight re-application ([23351a5](https://github.com/AmanKrr/pdf-kit/commit/23351a5772ca4fbc60cb38845d0dd43d8ddb6e3d))
+
+
+### Features
+
+* **Annotations:** add methods to scroll annotations and rectangles into view ([391274a](https://github.com/AmanKrr/pdf-kit/commit/391274ac8522adbc39c27659d1733e066c91610d))
+* **Annotations:** add waitForAnnotationElement method to retrieve annotation elements in the DOM ([c098b1c](https://github.com/AmanKrr/pdf-kit/commit/c098b1c39b77979a680689de78b685918fd56b17))
+* **WebViewer, ZoomHandler:** implement zoom clamping based on maxDefaultZoomLevel option ([aeb7631](https://github.com/AmanKrr/pdf-kit/commit/aeb76318cd9b57f3231a48a305a1a0fab867b37f))
+* **WebViewer:** enhance zoom functionality to support initial zoom level with clamping by maxDefaultZoomLevel ([af5a3d4](https://github.com/AmanKrr/pdf-kit/commit/af5a3d43fe28df189a5cb433e4fe4b8b90b3b812))
+
 # [1.0.0-canvas-pooling.6](https://github.com/AmanKrr/pdf-kit/compare/v1.0.0-canvas-pooling.5...v1.0.0-canvas-pooling.6) (2025-10-08)
 
 
