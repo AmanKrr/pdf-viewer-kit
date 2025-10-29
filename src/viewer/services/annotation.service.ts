@@ -19,7 +19,8 @@ import WebViewer from '../ui/web-viewer.component';
 import { AnnotationManager } from '../managers/annotation-manager.manager';
 import { ShapeAnno } from './annotation-export.service';
 import { toShapeAnnos } from '../../utils/annotation-utils';
-import { PDF_VIEWER_CLASSNAMES } from '../../constants/pdf-viewer-selectors';
+import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
+import { scrollElementIntoView } from '../../internal';
 
 /**
  * Service to manage annotations across pages.
@@ -448,5 +449,96 @@ export class AnnotationService {
    */
   private _generateUniqueId(): string {
     return 'anno-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now().toString();
+  }
+
+  /**
+   * Programmatically scrolls a rectangle on a page into the viewport (centered).
+   * The rect should be in CSS pixels relative to the top-left of the page container
+   * at the current zoom level.
+   */
+  public scrollRectIntoView(pageNumber: number, rect: { top: number; left: number; width: number; height: number }): void {
+    const shadowRoot = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
+    const scrollElement = shadowRoot?.querySelector(`#${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`) as HTMLElement | null;
+    const pageContainer = shadowRoot?.querySelector(`#pageContainer-${this.instanceId}-${pageNumber}[data-page-number="${pageNumber}"]`) as HTMLElement | null;
+
+    if (!scrollElement || !pageContainer) {
+      // Ensure page is present, then retry shortly
+      this._goTo(pageNumber);
+      setTimeout(() => this.scrollRectIntoView(pageNumber, rect), 250);
+      return;
+    }
+
+    const pageTop = pageContainer.offsetTop;
+    const pageLeft = pageContainer.offsetLeft;
+
+    // Compute desired centered positions (vertical and horizontal)
+    const targetCenterTop = pageTop + rect.top + rect.height / 2;
+    const targetCenterLeft = pageLeft + rect.left + rect.width / 2;
+
+    const desiredTop = targetCenterTop - scrollElement.clientHeight / 2;
+    const desiredLeft = targetCenterLeft - scrollElement.clientWidth / 2;
+
+    // Clamp within scrollable bounds
+    const maxTop = Math.max(0, scrollElement.scrollHeight - scrollElement.clientHeight);
+    const maxLeft = Math.max(0, scrollElement.scrollWidth - scrollElement.clientWidth);
+
+    scrollElement.scrollTop = Math.min(Math.max(0, desiredTop), maxTop);
+    scrollElement.scrollLeft = Math.min(Math.max(0, desiredLeft), maxLeft);
+  }
+
+  /**
+   * Scrolls an annotation/highlight element into view by its annotation ID.
+   * Supports both annotation-id attribute format and regular ID attribute.
+   * Convenience method that automatically computes the rect from the element.
+   */
+  public scrollHighlightIntoView(annotationId: string): void {
+    const shadowRoot = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
+    if (!shadowRoot) {
+      console.warn(`Shadow root not found for container "${this.containerId}"`);
+      return;
+    }
+
+    // Try to find by annotation-id attribute first (SVG annotations)
+    let highlightElement = shadowRoot.querySelector(`[annotation-id="${annotationId}"]`) as HTMLElement | null;
+
+    // If not found, try by regular ID attribute
+    if (!highlightElement) {
+      highlightElement = shadowRoot.querySelector(`#${annotationId}`) as HTMLElement | null;
+    }
+
+    if (!highlightElement) {
+      console.warn(`Element with annotation-id or id="${annotationId}" not found`);
+      return;
+    }
+
+    // Find the page container that contains this annotation
+    const pageContainer = highlightElement.closest(`[id^="pageContainer-${this.instanceId}-"][data-page-number]`) as HTMLElement | null;
+    if (!pageContainer) {
+      console.warn(`Page container not found for annotation "${annotationId}"`);
+      return;
+    }
+
+    const pageNumber = parseInt(pageContainer.getAttribute('data-page-number') || '0', 10);
+    if (!pageNumber) {
+      console.warn(`Invalid page number for annotation "${annotationId}"`);
+      return;
+    }
+
+    // Center the annotation element directly within the scroll container
+    const scrollElement = shadowRoot?.querySelector(`#${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`) as HTMLElement | null;
+    if (!scrollElement) return;
+    scrollElementIntoView(highlightElement, { block: 'center', inline: 'center', container: scrollElement });
+  }
+
+  /**
+   * Scrolls an annotation/highlight element into view when you already have the element.
+   * Avoids any DOM lookup for best performance.
+   */
+  public scrollHighlightElementIntoView(element: HTMLElement): void {
+    const viewerShadowRoot = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
+    if (!viewerShadowRoot) return;
+    const scrollElement = viewerShadowRoot?.querySelector(`#${PDF_VIEWER_IDS['MAIN_VIEWER_CONTAINER']}-${this.instanceId}`) as HTMLElement | null;
+    if (!scrollElement) return;
+    scrollElementIntoView(element, { block: 'center', inline: 'center', container: scrollElement });
   }
 }

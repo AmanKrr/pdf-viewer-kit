@@ -130,6 +130,15 @@ export interface IPDFViewerAnnotations {
 
   /** Get list of pages with registered annotation managers */
   getRegisteredPages(): number[];
+
+  /** Scroll a rectangle on a page into view (centered) */
+  scrollRectIntoView(pageNumber: number, rect: { top: number; left: number; width: number; height: number }): void;
+
+  /** Scroll an annotation/highlight into view using annotation-id or DOM id */
+  scrollHighlightIntoView(annotationId: string): void;
+
+  /** Scroll a known annotation/highlight element into view (no lookups) */
+  scrollHighlightElementIntoView(element: HTMLElement): void;
 }
 
 /**

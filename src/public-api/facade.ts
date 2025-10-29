@@ -323,6 +323,27 @@ class PDFViewerAnnotationsFacade implements IPDFViewerAnnotations {
     }
     return [];
   }
+
+  scrollRectIntoView(pageNumber: number, rect: { top: number; left: number; width: number; height: number }): void {
+    if (this._instance.webViewer?.annotation) {
+      return this._instance.webViewer.annotation.scrollRectIntoView(pageNumber, rect);
+    }
+    throw new Error('PDF viewer not yet initialized');
+  }
+
+  scrollHighlightIntoView(annotationId: string): void {
+    if (this._instance.webViewer?.annotation) {
+      return this._instance.webViewer.annotation.scrollHighlightIntoView(annotationId);
+    }
+    throw new Error('PDF viewer not yet initialized');
+  }
+
+  scrollHighlightElementIntoView(element: HTMLElement): void {
+    if (this._instance.webViewer?.annotation) {
+      return this._instance.webViewer.annotation.scrollHighlightElementIntoView(element);
+    }
+    throw new Error('PDF viewer not yet initialized');
+  }
 }
 
 /**
