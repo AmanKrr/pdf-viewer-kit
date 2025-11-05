@@ -7,12 +7,6 @@
 
 **PDF Viewer Kit** is a modern, high-performance, framework-agnostic, lightweight PDF viewer and annotation library built with TypeScript. Built on top of **pdf.js**, it provides PDF viewing capabilities with basic annotation features, canvas pooling, and a robust public API.
 
-> ⚠️ **Note**
->
-> `1.0.0-canvas-pooling.1` is a **beta release**.
->
-> It is highly recommended to use this version, as it is mostly stable and will be promoted to a **stable release** soon.
-
 ## ✨ Features
 
 ### 🎯 **Core PDF Viewing**
