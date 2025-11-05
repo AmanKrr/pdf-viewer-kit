@@ -59,11 +59,7 @@
   "release": {
     "repositoryUrl": "https://github.com/AmanKrr/pdf-kit.git",
     "branches": [
-      "main",
-      {
-        "name": "canvas-pooling",
-        "prerelease": true
-      }
+      "main"
     ],
     "plugins": [
       [
