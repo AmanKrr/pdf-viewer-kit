@@ -173,6 +173,15 @@ class SearchHighlighter {
   }
 
   /**
+   * Escapes special HTML characters in a string to prevent XSS in highlight rendering.
+   * @param str The input string to escape.
+   * @returns The HTML-escaped string.
+   */
+  private escapeHtml(str: string): string {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /**
    * Applies inline highlighting to a specific page.
    * This method waits for the page container to exist (up to a timeout) and then processes its text layer.
    */
@@ -187,7 +196,10 @@ class SearchHighlighter {
       if (span.textContent) {
         const regex = this._buildRegex(searchTerm, options);
         // Replace matching text with a span that has the "search-highlight" class.
-        span.innerHTML = span.textContent.replace(regex, (match) => `<span class="search-highlight" style="position: relative; display: inline-block;">${match}</span>`);
+        span.innerHTML = span.textContent.replace(
+          regex,
+          (match) => `<span class="search-highlight" style="position: relative; display: inline-block;">${this.escapeHtml(match)}</span>`,
+        );
       }
     });
 
