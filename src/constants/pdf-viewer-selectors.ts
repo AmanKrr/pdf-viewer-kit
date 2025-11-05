@@ -1,3 +1,33 @@
+/*
+  Copyright 2025 Aman Kumar
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+/**
+ * CSS selectors and class names used throughout the PDF viewer.
+ *
+ * This file centralizes all DOM element identifiers and CSS class names
+ * to ensure consistency and make maintenance easier. These constants
+ * are used for DOM queries, styling, and element identification.
+ */
+
+/**
+ * DOM element IDs for major viewer components.
+ *
+ * These IDs are used to identify specific containers and elements
+ * within the PDF viewer structure.
+ */
 export const PDF_VIEWER_IDS = {
   TOOLBAR_CONTAINER: 'toolbar-container',
   TOOLBAR_GROUP_ONE: 'toolbar-group-one',
@@ -8,13 +38,25 @@ export const PDF_VIEWER_IDS = {
   ANNOTATION_LAYER: 'annotation-layer',
   ANNOTATION_DRAWING_LAYER: 'annotation-drawing-layer',
   LOADING_CONTAINER: 'loading-container',
+  ERROR_CONTAINER: 'error-container',
   INPUT_PAGE_NUMBER: 'input-page-number-container',
   CURRENT_PAGE_INPUT: 'current-page-input',
 };
 
+/**
+ * CSS class names for styling and element identification.
+ *
+ * These class names are used for:
+ * - Styling elements with CSS
+ * - Identifying elements in JavaScript
+ * - Applying visual states and themes
+ * - Managing responsive behavior
+ */
 export const PDF_VIEWER_CLASSNAMES = {
   PDF_LOADING: 'pdf-loading',
+  PDF_ERROR: 'pdf-error',
   A_PDF_VIEWER: 'a-pdf-viewer',
+  A_TOOLBAR_CONTAINER: 'a-toolbar-container',
   A_TOOLBAR_ITEMS: 'a-toolbar-items',
   A_VIEWER_WRAPPER: 'a-viewer-wrapper',
   A_VIEWER_CONTAINER: 'a-viewer-container',

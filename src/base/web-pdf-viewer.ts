@@ -14,184 +14,168 @@
   limitations under the License.
 */
 
-// If using Webpack to create the build, use the Webpack-referenced file instead of /pdf.js.
-import { PDFDocumentProxy } from 'pdfjs-dist';
-import WebViewer from '../viewer/ui/WebViewer';
-import WebUiUtils from '../utils/web-ui-utils';
-import PdfState from '../viewer/ui/PDFState';
-import PageElement from '../viewer/ui/PDFPageElement';
-import PasswordManager from '../viewer/manager/PDFPasswordManager';
-
-// Import stylesheets for different PDF UI layers.
-import '../style/toolbar.css';
-import '../style/global.css';
-import '../style/text-layer.css';
-import '../style/thumbnail.css';
-import '../style/annotation-layer.css';
-import '../style/annotation-drawer-layer.css';
-
-import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist';
+import { PDFViewerInstance } from '../internal';
 import { LoadOptions } from '../types/webpdf.types';
-import { getPdfWorkerSrc } from '../utils/worker-factory';
-GlobalWorkerOptions.workerSrc = getPdfWorkerSrc();
+import { PDFViewerInstanceFacade } from '../public-api/facade';
+import { IPDFViewerInstance } from '../public-api/interfaces';
 
 /**
- * Class responsible for loading and managing PDF documents within a web viewer.
- * Extends functionalities from `WebViewer` and integrates PDF.js for rendering.
+ * Main entry point for the PDF viewer library.
+ * Provides static methods for managing PDF viewer instances.
  */
-class PdfKit {
-  private static _loadingTasks = new Map<string, any>();
-  private static _viewers = new Map<string, WebViewer>();
+export default class PdfViewerKit {
+  private static _instances = new Map<string, PDFViewerInstance>();
+  private static _containerToInstance = new Map<string, string>();
+  private static _isDestroyed = false;
 
   /**
-   * Loads a PDF document into the web viewer.
-   *
-   * @param {LoadOptions} options - Configuration options for loading the document.
-   * @returns {Promise<WebViewer | undefined>} Resolves to a `WebViewer` instance upon successful load or `undefined` on failure.
+   * Load a PDF document in a specified container.
+   * Returns a runtime-protected facade that implements IPDFViewerInstance.
    */
-  static async load(options: LoadOptions): Promise<WebViewer | undefined> {
-    // Default options for configuring the PDF viewer during the load process.
-    let loadOptions: LoadOptions = {
-      containerId: '', // ID of the container where the PDF will be displayed
-      document: '', // URL or file source of the PDF document
-      disableTextSelection: false, // Option to enable/disable text selection
-      maxDefaultZoomLevel: 5, // Maximum zoom level allowed
-      password: undefined, // Password for encrypted PDFs
-      toolbarItems: {}, // Custom toolbar items
-      preventTextCopy: false, // Disable text copying in PDF
-      renderSpecificPageOnly: null, // Load only a specific page
-      customToolbarItems: [], // Additional toolbar buttons
-    };
-    const pdfStates = PdfState.getInstance(options.containerId);
-    pdfStates.containerId = options.containerId;
+  static async load(options: LoadOptions): Promise<IPDFViewerInstance> {
+    if (this._isDestroyed) {
+      throw new Error('PdfViewerKit has been destroyed. Cannot create new instances.');
+    }
 
-    // Create the necessary container elements for the PDF viewer.
-    const internalContainers = PageElement.containerCreation(options.containerId, pdfStates.scale);
-    const container = document.querySelector(`#${options.containerId} #${internalContainers.injectElementId}`)! as HTMLElement;
+    const { containerId } = options;
 
-    // Display a loading spinner in the viewer container.
-    const uiLoading = WebUiUtils.showLoading();
-    pdfStates.uiLoading = uiLoading;
-    internalContainers.parent.prepend(uiLoading.parentNode!);
+    if (this.isContainerInUse(containerId)) {
+      throw new Error(`Container '${containerId}' is already in use by another PDF viewer instance.`);
+    }
 
     try {
-      // Merge user-specified options with default options.
-      const { password, ...rest } = options;
-      loadOptions = {
-        ...rest,
-        ...options,
-      };
+      const instance = new PDFViewerInstance(containerId, options);
+      await instance.load();
 
-      /**
-       * Initiates loading of the PDF document.
-       * Supports fetching from URLs, local files, and encrypted PDFs.
-       */
-      const initiateLoadPdf = getDocument({
-        url: options.document, // PDF source URL
-        password: password, // Password (if required)
-        withCredentials: options.withCredentials, // Send credentials if needed
-        data: options.data, // Raw binary PDF data
-        httpHeaders: options.httpHeaders, // Custom HTTP headers
-        // disableRange: true,
-        // disableStream: true,
-      });
-      PdfKit._loadingTasks.set(options.containerId, initiateLoadPdf);
+      this._instances.set(instance.instanceId, instance);
+      this._containerToInstance.set(containerId, instance.instanceId);
 
-      // Track progress while fetching the PDF (Commented out but can be enabled for debugging)
-      /*
-      initiateLoadPdf.onProgress = function (data: any) {
-        console.log('Data:', data);
-        console.log('Loaded:', data.loaded);
-        console.log('Total:', data.total);
-      };
-      */
-
-      let passwordManager: PasswordManager | null = null;
-
-      /**
-       * Handles password-protected PDFs.
-       * If a password is required, prompts the user for input.
-       */
-      initiateLoadPdf.onPassword = function (updatePassword: (pass: string) => void, reason: any) {
-        if (reason === 1) {
-          // Request password from the user.
-          if (!passwordManager) {
-            passwordManager = new PasswordManager(internalContainers['parent'], updatePassword);
-          }
-        } else {
-          // Handle incorrect password attempt.
-          if (passwordManager) {
-            passwordManager.onError = 'Incorrect! Enter password again:';
-          }
-        }
-      };
-
-      // Load the PDF document and store its instance.
-      const pdf: PDFDocumentProxy = await initiateLoadPdf.promise;
-      pdfStates.pdfInstance = pdf;
-
-      // Once the correct password is entered and the PDF is opened, destroy the password prompt to free memory.
-      if (passwordManager) {
-        (passwordManager as PasswordManager).destroy();
-      }
-
-      // Initialize the WebViewer instance with the loaded PDF.
-      const viewer = new WebViewer(pdf, loadOptions, internalContainers['parent'], container);
-      await viewer.ready;
-      WebUiUtils.hideLoading(uiLoading, options.containerId);
-      PdfKit._viewers.set(options.containerId, viewer);
-      return viewer;
-    } catch (err: any) {
-      // swallow the “Worker was destroyed” cancellation:
-      if (err.message?.includes('Worker was destroyed')) {
-        console.warn('Worker destroyed. If you unload your pdf ignore.');
-        return undefined;
-      }
-      // Handle errors during the document loading process.
-      console.error('Error loading PDF:', err);
-      return undefined;
+      // Return the protected facade instead of the internal instance
+      return new PDFViewerInstanceFacade(instance);
+    } catch (error) {
+      throw new Error(`Failed to load PDF: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   /**
-   * Completely tears down everything for the given container:
-   *  • stops any in-flight PDF.js loads
-   *  • destroys the PDFDocumentProxy
-   *  • removes UI spinners
-   *  • unsubscribes PdfState
-   *  • destroys the WebViewer and its sub-components
-   *  • clears out any injected DOM
+   * Get an existing instance by ID.
+   * Returns a runtime-protected facade.
    */
-  static unload(containerId: string): void {
-    const task = PdfKit._loadingTasks.get(containerId);
-    if (task) {
-      task.destroy();
-      task.worker?.terminate();
-      PdfKit._loadingTasks.delete(containerId);
+  static getInstance(instanceId: string): IPDFViewerInstance | undefined {
+    const instance = this._instances.get(instanceId);
+    return instance ? new PDFViewerInstanceFacade(instance) : undefined;
+  }
+
+  /**
+   * Get an existing instance by container ID.
+   * Returns a runtime-protected facade.
+   */
+  static getInstanceByContainer(containerId: string): IPDFViewerInstance | undefined {
+    const instanceId = this._containerToInstance.get(containerId);
+    if (!instanceId) return undefined;
+
+    const instance = this._instances.get(instanceId);
+    return instance ? new PDFViewerInstanceFacade(instance) : undefined;
+  }
+
+  /**
+   * Get all active instances.
+   * Returns runtime-protected facades.
+   */
+  static getAllInstances(): IPDFViewerInstance[] {
+    return Array.from(this._instances.values()).map((instance) => new PDFViewerInstanceFacade(instance));
+  }
+
+  /**
+   * Get the count of active instances.
+   */
+  static getInstanceCount(): number {
+    return this._instances.size;
+  }
+
+  /**
+   * Unload and destroy an instance by ID.
+   */
+  static async unload(instanceId: string): Promise<void> {
+    const instance = this._instances.get(instanceId);
+    if (!instance) {
+      throw new Error(`Instance '${instanceId}' not found.`);
     }
 
-    const pdfState = PdfState.getInstance(containerId);
-    pdfState.pdfInstance?.destroy();
-
-    (pdfState.uiLoading?.parentNode as HTMLElement)?.remove();
-
-    // 5) destroy the viewer and its children
-    const viewer = PdfKit._viewers.get(containerId);
-    viewer?.destroy();
-    PdfKit._viewers.delete(containerId);
-
-    const root = document.getElementById(containerId);
-    if (root) {
-      root.innerHTML = '';
+    try {
+      await instance.destroy();
+      this._instances.delete(instanceId);
+      this._containerToInstance.delete(instance.containerId);
+    } catch (error) {
+      throw new Error(`Failed to unload instance '${instanceId}': ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  static unloadAll(): void {
-    // unload every containerId
-    for (const id of PdfKit._loadingTasks.keys()) {
-      PdfKit.unload(id);
+  /**
+   * Unload and destroy an instance by container ID.
+   */
+  static async unloadByContainer(containerId: string): Promise<void> {
+    const instanceId = this._containerToInstance.get(containerId);
+    if (!instanceId) {
+      throw new Error(`No instance found for container '${containerId}'.`);
     }
+
+    await this.unload(instanceId);
+  }
+
+  /**
+   * Unload and destroy all instances.
+   */
+  static async unloadAll(): Promise<void> {
+    const unloadPromises = Array.from(this._instances.keys()).map((id) => this.unload(id));
+    await Promise.all(unloadPromises);
+  }
+
+  /**
+   * Check if a container is in use.
+   */
+  static isContainerInUse(containerId: string): boolean {
+    return this._containerToInstance.has(containerId);
+  }
+
+  /**
+   * Get system statistics.
+   */
+  static getStats() {
+    return {
+      instanceCount: this.getInstanceCount(),
+      containersInUse: Array.from(this._containerToInstance.keys()),
+      isDestroyed: this._isDestroyed,
+      memoryUsage: this._getMemoryUsage(),
+    };
+  }
+
+  /**
+   * Destroy the entire system and all instances.
+   */
+  static async destroy(): Promise<void> {
+    if (this._isDestroyed) return;
+
+    try {
+      await this.unloadAll();
+      this._isDestroyed = true;
+    } catch (error) {
+      throw new Error(`Failed to destroy PdfViewerKit: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Get memory usage statistics.
+   */
+  private static _getMemoryUsage() {
+    if (typeof performance !== 'undefined' && 'memory' in performance) {
+      const memory = (performance as any).memory;
+      return {
+        usedJSHeapSize: memory.usedJSHeapSize,
+        totalJSHeapSize: memory.totalJSHeapSize,
+        jsHeapSizeLimit: memory.jsHeapSizeLimit,
+      };
+    }
+    return null;
   }
 }
-
-export default PdfKit;
