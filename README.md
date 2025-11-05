@@ -1,6 +1,6 @@
 # PDF Viewer Kit 🚀
 
-![npm version](https://img.shields.io/npm/v/pdf-viewer-kit)
+[![npm version](https://img.shields.io/npm/v/pdf-viewer-kit)](https://www.npmjs.com/package/pdf-viewer-kit)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue.svg)](https://www.typescriptlang.org/)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/AmanKrr/pdf-viewer-kit)
