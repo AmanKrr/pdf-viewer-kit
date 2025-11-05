@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/AmanKrr/pdf-viewer-kit/compare/v1.0.0...v1.0.1) (2025-11-05)
+
+
+### Bug Fixes
+
+* replace innerHTML assignment to prevent XSS (CodeQL js/xss-through-dom) ([522c2a9](https://github.com/AmanKrr/pdf-viewer-kit/commit/522c2a90d1a917689e9e6ed744ef7a688376579e))
+
 # [1.0.0](https://github.com/AmanKrr/pdf-kit/compare/v0.1.2...v1.0.0) (2025-11-05)
 
 
