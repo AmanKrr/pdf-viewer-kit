@@ -5,8 +5,10 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `<div id="view-pdf" 
 PdfViewerKit.unloadAll();
 
 PdfViewerKit.load({
-  document: './pdfs/pdf_commenting_new.pdf',
+  document: './pdfs/1750501324621.pdf',
   containerId: 'view-pdf',
+  maxDefaultZoomLevel: 6,
+  initialZoomLevel: 2,
   toolbarOptions: {
     showThumbnail: false,
     showSearch: true,
@@ -28,6 +30,6 @@ PdfViewerKit.load({
       type: 'rectangle',
       interactive: true,
     } as IAnnotationConfig);
-    instances.goToPage(84);
+    instances.annotations.scrollHighlightIntoView(id);
   }
 });
