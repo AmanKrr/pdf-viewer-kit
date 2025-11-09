@@ -4,6 +4,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue.svg)](https://www.typescriptlang.org/)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/AmanKrr/pdf-viewer-kit)
+[![npm weekly downloads](https://img.shields.io/npm/dw/pdf-viewer-kit)](https://www.npmjs.com/package/pdf-viewer-kit)
 
 **PDF Viewer Kit** is a modern, high-performance, framework-agnostic, lightweight PDF viewer and annotation library built with TypeScript. Built on top of **pdf.js**, it provides PDF viewing capabilities with basic annotation features, canvas pooling, and a robust public API.
 
@@ -786,7 +787,7 @@ npm test
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License, Version 2.0 - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
