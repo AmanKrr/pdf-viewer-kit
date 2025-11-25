@@ -222,6 +222,14 @@ export class PDFLinkService {
   }
 
   /**
+   * Minimal support for IPDFLinkService.goToXY.
+   * Currently delegates to goToPage while we add fine-grained positioning later.
+   */
+  goToXY(pageNumber: number, _x: number, _y: number): void {
+    this.goToPage(pageNumber);
+  }
+
+  /**
    * Adds hyperlink attributes to the provided anchor element.
    *
    * @param {HTMLAnchorElement} link - The link element.

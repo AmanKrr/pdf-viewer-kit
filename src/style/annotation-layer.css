@@ -113,10 +113,23 @@
   pointer-events: auto;
   box-sizing: border-box;
   transform-origin: 0 0;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
 }
 
 :is(.a-annotation-layer section):has(div.annotationContent) canvas.annotationContent {
   display: none;
+}
+
+:is(.a-annotation-layer section) .overlaidText {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  display: inline-block;
+  overflow: hidden;
 }
 
 .textLayer.selecting~.a-annotation-layer section {
@@ -323,8 +336,9 @@
   display: inline-block;
 }
 
-.a-annotation-layer .popup>.header h1 {
+.a-annotation-layer .popup>.header>.title {
   display: inline;
+  font-weight: bold;
 }
 
 .a-annotation-layer .popup>.header .popupDate {
@@ -347,6 +361,11 @@
 
 .a-annotation-layer .popupTriggerArea {
   cursor: pointer;
+}
+
+:is(.a-annotation-layer .popupTriggerArea):hover {
+  -webkit-backdrop-filter: var(--hcm-highlight-filter);
+  backdrop-filter: var(--hcm-highlight-filter);
 }
 
 .a-annotation-layer section svg {
