@@ -45,7 +45,7 @@
     "@popperjs/core": "^2.11.8",
     "lodash": "^4.17.21",
     "pdf-lib": "^1.17.1",
-    "pdfjs-dist": "5.2.133"
+    "pdfjs-dist": "5.4.394"
   },
   "devDependencies": {
     "@semantic-release/changelog": "^6.0.3",

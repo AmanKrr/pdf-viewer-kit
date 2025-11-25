@@ -65,6 +65,8 @@ export default class AnnotationLayer {
     this._annotationLayerDiv = PageElement.createLayers(PDF_VIEWER_CLASSNAMES.AANNOTATION_LAYER, PDF_VIEWER_IDS.ANNOTATION_LAYER, this._viewport, webViewer.instanceId);
     this._pageWrapper.appendChild(this._annotationLayerDiv);
 
+    const linkSerivce = new PDFLinkService({ pdfDocument, pdfViewer: webViewer });
+
     // Instantiate the internal PDF.js AnnotationLayer.
     this._pdfJsInternalAnnotationLayerInstance = new PdfJsAnnotationLayerInternal({
       div: this._annotationLayerDiv,
@@ -74,6 +76,9 @@ export default class AnnotationLayer {
       accessibilityManager: null,
       annotationEditorUIManager: null,
       structTreeLayer: null,
+      annotationStorage: null,
+      commentManager: null,
+      linkService: linkSerivce,
     });
 
     if (this._isDestroyed) {
@@ -89,7 +94,7 @@ export default class AnnotationLayer {
       annotations,
       div: this._annotationLayerDiv,
       page: this._page,
-      linkService: new PDFLinkService({ pdfDocument, pdfViewer: webViewer }),
+      linkService: linkSerivce as any,
       renderForms: false,
       imageResourcesPath: '/pdfjs/web/images/',
     });
