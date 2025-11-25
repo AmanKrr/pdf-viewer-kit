@@ -15,7 +15,7 @@
 */
 
 import { PDFDocumentProxy } from 'pdfjs-dist';
-import { InstanceEventEmitter } from './event-emitter.core';
+import { InstanceEventEmitter } from '../event/event-emitter.core';
 
 /**
  * Manages state for a single PDF viewer instance.

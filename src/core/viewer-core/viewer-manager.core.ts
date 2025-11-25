@@ -14,7 +14,7 @@
   limitations under the License.
 */
 
-import { LoadOptions } from '../types/webpdf.types';
+import { LoadOptions } from '../../types/webpdf.types';
 import { PDFViewerInstance } from './viewer-instance.core';
 
 /**

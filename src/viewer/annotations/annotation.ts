@@ -14,7 +14,7 @@
   limitations under the License.
 */
 
-import { InstanceEventEmitter } from '../../core/event-emitter.core';
+import { InstanceEventEmitter } from '../../core/event/event-emitter.core';
 import { InstanceState } from '../../core/viewer-state.core';
 import { IAnnotation } from '../../interface/IAnnotation';
 import { EllipseConfig, RectangleConfig } from '../../types/geometry.types';

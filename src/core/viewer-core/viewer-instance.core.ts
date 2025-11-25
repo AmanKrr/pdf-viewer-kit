@@ -15,16 +15,16 @@
 */
 
 import { GlobalWorkerOptions, PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist';
-import { LoadOptions } from '../types/webpdf.types';
+import { LoadOptions } from '../../types/webpdf.types';
 import { InstanceState } from './viewer-state.core';
-import { InstanceEventEmitter } from './event-emitter.core';
-import { InstanceCanvasPool } from './canvas-pool.core';
+import { InstanceEventEmitter } from '../event/event-emitter.core';
+import { InstanceCanvasPool } from '../canvas/canvas-pool.core';
 import { InstanceWebViewer } from './viewer.core';
-import { getPdfWorkerSrc } from '../utils/worker-factory';
-import PageElement from '../viewer/ui/page-element.component';
-import { InstanceWebUiUtils } from '../utils/web-ui-utils';
-import { PasswordManagerService } from '../viewer/services/password-manager.service';
-import { ErrorHandlerService } from '../viewer/services/error-handler.service';
+import { getPdfWorkerSrc } from '../../utils/worker-factory';
+import PageElement from '../../viewer/ui/page-element.component';
+import { InstanceWebUiUtils } from '../../utils/web-ui-utils';
+import { PasswordManagerService } from '../../viewer/services/password-manager.service';
+import { ErrorHandlerService } from '../../viewer/services/error-handler.service';
 
 /**
  * Manages a single, completely isolated PDF viewer instance.

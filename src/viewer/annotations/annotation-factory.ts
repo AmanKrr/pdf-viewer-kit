@@ -19,7 +19,7 @@ import { ShapeType } from '../../types/geometry.types';
 import { RectangleAnnotation } from './rectangle-annotation';
 import { EllipseAnnotation } from './ellipse-annotation';
 import { LineAnnotation } from './line-annotation';
-import { InstanceEventEmitter } from '../../core/event-emitter.core';
+import { InstanceEventEmitter } from '../../core/event/event-emitter.core';
 import { InstanceState } from '../../core/viewer-state.core';
 
 /**

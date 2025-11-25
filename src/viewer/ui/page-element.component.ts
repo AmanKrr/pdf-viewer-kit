@@ -16,7 +16,7 @@
 
 import { PageViewport } from 'pdfjs-dist';
 import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
-import { InstanceCanvasPool } from '../../core/canvas-pool.core';
+import { InstanceCanvasPool } from '../../core/canvas/canvas-pool.core';
 import baseCss from '../../index.css?inline';
 
 /**

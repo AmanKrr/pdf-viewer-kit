@@ -26,12 +26,12 @@
  */
 
 // Core internal classes
-export { PDFViewerInstance } from '../core/viewer-instance.core';
-export { PDFViewerManager } from '../core/viewer-manager.core';
-export { InstanceWebViewer } from '../core/viewer.core';
-export { InstanceState } from '../core/viewer-state.core';
-export { InstanceEventEmitter } from '../core/event-emitter.core';
-export { InstanceCanvasPool } from '../core/canvas-pool.core';
+export { PDFViewerInstance } from '../core/viewer-core/viewer-instance.core';
+export { PDFViewerManager } from '../core/viewer-core/viewer-manager.core';
+export { InstanceWebViewer } from '../core/viewer-core/viewer.core';
+export { InstanceState } from '../core/viewer-core/viewer-state.core';
+export { InstanceEventEmitter } from '../core/event/event-emitter.core';
+export { InstanceCanvasPool } from '../core/canvas/canvas-pool.core';
 
 // UI components
 export { default as WebViewer } from '../viewer/ui/web-viewer.component';
