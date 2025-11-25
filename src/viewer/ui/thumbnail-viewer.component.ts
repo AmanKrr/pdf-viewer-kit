@@ -144,7 +144,7 @@ class ThumbnailViewer {
     const transform = [upscaleFactor, 0, 0, upscaleFactor, 0, 0];
 
     // Render the page onto the canvas
-    await page.render({ canvasContext: ctx, viewport, transform }).promise;
+    await page.render({ canvas: this._canvas, canvasContext: ctx, viewport, transform }).promise;
 
     // snapshot to an <img>
     const img = document.createElement('img');

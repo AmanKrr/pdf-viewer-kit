@@ -18,7 +18,7 @@ import { EllipseConfig } from '../../types/geometry.types';
 import { Resizer } from './resizer';
 import { Annotation } from './annotation';
 import { InstanceEventEmitter } from '../../core/event/event-emitter.core';
-import { InstanceState } from '../../core/viewer-state.core';
+import { InstanceState } from '../../core/viewer-core/viewer-state.core';
 import { scrollElementIntoView } from '../../utils/web-ui-utils';
 
 /**

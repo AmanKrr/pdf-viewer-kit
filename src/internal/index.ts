@@ -37,6 +37,7 @@ export { InstanceCanvasPool } from '../core/canvas/canvas-pool.core';
 export { default as WebViewer } from '../viewer/ui/web-viewer.component';
 export { default as PageElement } from '../viewer/ui/page-element.component';
 export { default as PageVirtualization } from '../viewer/ui/page-virtualization.component';
+export { default as PageVirtualizationEngine } from '../core/engine/page-virtualization/page-virtualization.engine';
 export { default as ZoomHandler } from '../viewer/ui/zoom-handler.component';
 export { default as SearchBar } from '../viewer/ui/searchbar.component';
 export { default as ThumbnailViewer } from '../viewer/ui/thumbnail-viewer.component';

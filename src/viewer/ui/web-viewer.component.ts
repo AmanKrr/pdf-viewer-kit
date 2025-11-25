@@ -29,7 +29,7 @@ import {
 } from '../../internal';
 import { LoadOptions, ViewerLoadOptions } from '../../types/webpdf.types';
 import { IToolbar } from '../../interface/IToolbar';
-import { PDFViewerInstance } from '../../core/viewer-instance.core';
+import { PDFViewerInstance } from '../../core/viewer-core/viewer-instance.core';
 import { scrollElementIntoView } from '../../utils/web-ui-utils';
 
 /**

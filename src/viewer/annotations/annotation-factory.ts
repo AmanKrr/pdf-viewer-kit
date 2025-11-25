@@ -20,7 +20,7 @@ import { RectangleAnnotation } from './rectangle-annotation';
 import { EllipseAnnotation } from './ellipse-annotation';
 import { LineAnnotation } from './line-annotation';
 import { InstanceEventEmitter } from '../../core/event/event-emitter.core';
-import { InstanceState } from '../../core/viewer-state.core';
+import { InstanceState } from '../../core/viewer-core/viewer-state.core';
 
 /**
  * Options for creating a new annotation via AnnotationFactory.

@@ -14,7 +14,7 @@
   limitations under the License.
 */
 
-import { PageViewport } from 'pdfjs-dist';
+import { PageViewport, PDFPageProxy } from 'pdfjs-dist';
 import { PdfExportService } from '../services/annotation-export.service';
 import { AnnotationService } from '../services/annotation.service';
 import WebViewer from '../ui/web-viewer.component';
@@ -158,7 +158,7 @@ export class DownloadManager {
     const pagePromises: Promise<void>[] = [];
     for (let p = 1; p <= pdf.numPages; p++) {
       pagePromises.push(
-        pdf.getPage(p).then((page) => {
+        pdf.getPage(p).then((page: PDFPageProxy) => {
           const vp = page.getViewport({ scale });
           map.set(p, vp);
         }),
