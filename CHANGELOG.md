@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/AmanKrr/pdf-viewer-kit/compare/v1.0.1...v1.1.0) (2025-11-25)
+
+
+### Features
+
+* update dependencies and license information in package.json and package-lock.json ([e4569b2](https://github.com/AmanKrr/pdf-viewer-kit/commit/e4569b28e80e73a9ccd01bf361de5be66636c9da))
+
 ## [1.0.1](https://github.com/AmanKrr/pdf-viewer-kit/compare/v1.0.0...v1.0.1) (2025-11-05)
 
 
