@@ -30,6 +30,16 @@ import SearchHighlighter from '../managers/search-highlighter.manager';
 import { debugWarn, reportError } from '../../utils/debug-utils';
 import Logger from '../../utils/logger-utils';
 import { PDFLinkService } from '../services/link.service';
+import {
+  PageRenderer,
+  ScaleManager,
+  MemoryManager,
+  MemoryPressure,
+  RenderScheduler,
+  type MemoryStats,
+  type RenderTask as EngineRenderTask,
+  type RenderResult as EngineRenderResult,
+} from '../../core/engine';
 
 interface CachedPageInfo {
   pageNumber: number;
@@ -75,23 +85,15 @@ class PageVirtualization {
   private _searchHighlighter: SearchHighlighter;
 
   private _boundOnScaleChange = this._onScaleChange.bind(this);
-  private _isScaleChangeInProgress = false;
 
   private _pageIntersectionObserver: IntersectionObserver | null = null;
   private _intersectionObserver: IntersectionObserver | null = null;
 
-  // Render Priority Queue properties
-  private _renderQueue: Array<{ pageInfo: CachedPageInfo; priority: number; timestamp: number }> = [];
-  private _isProcessingQueue = false;
-  private _currentRenderPromise: Promise<void> | null = null;
-
-  // Aggressive Cancellation properties
-  private _lastCancelCheck = 0;
-  private _cancelCheckInterval = 100; // ms
-  private _aggressiveCancelDistance = 8; // Pages beyond this distance get cancelled immediately
-  private _isRapidScrolling = false;
-  private _rapidScrollThreshold = 500; // ms between scroll events to detect rapid scrolling
-  private _lastScrollTime = 0;
+  // Engine modules
+  private _pageRenderer!: PageRenderer;
+  private _scaleManager!: ScaleManager;
+  private _memoryManager!: MemoryManager;
+  private _renderScheduler!: RenderScheduler<CachedPageInfo>;
 
   public readonly bufferReady: Promise<void>;
   private _resolveBufferReady!: () => void;
@@ -126,6 +128,49 @@ class PageVirtualization {
     this._pdfDocument = this._webViewer.pdfDocument;
     this._selectionManager = selectionManager;
     this._searchHighlighter = searchHighlighter;
+
+    // Initialize engine modules
+    this._pageRenderer = new PageRenderer();
+    this._scaleManager = new ScaleManager();
+    this._memoryManager = new MemoryManager({
+      pressureThreshold: 0.75,
+      checkInterval: 5000,
+      detectWebGL: true,
+      fallbackMemoryLimit: 100,
+    });
+    this._renderScheduler = new RenderScheduler<CachedPageInfo>({
+      maxConcurrentRenders: 2,
+      cancelCheckInterval: 100,
+      aggressiveCancelDistance: 8,
+      rapidScrollThreshold: 500,
+      debug: false,
+    });
+
+    // Set up render task executor
+    this._renderScheduler.setExecutor(async (task, signal) => {
+      const pageInfo = task.data;
+      if (!pageInfo) {
+        return { pageNumber: task.pageNumber, success: false, error: new Error('No page info') };
+      }
+
+      try {
+        await this._transitionToFullRender(pageInfo);
+        return { pageNumber: task.pageNumber, success: true };
+      } catch (error: any) {
+        return { pageNumber: task.pageNumber, success: false, error };
+      }
+    });
+
+    // Register layer resize callback with ScaleManager
+    this._scaleManager.registerLayerResizeCallback((pageNumber, viewport) => {
+      // Resize annotation drawing layer
+      const annotationLayerId = `annotation-drawing-layer-${this.instanceId}`;
+      const annotationLayer = document.querySelector<HTMLElement>(`#${annotationLayerId}`);
+      if (annotationLayer) {
+        annotationLayer.style.width = `${viewport.width}px`;
+        annotationLayer.style.height = `${viewport.height}px`;
+      }
+    });
 
     // Signal readiness after initialization completes
     // this._webViewer.ready = new Promise<void>((res) => (this._resolveReadyPromise = res));
@@ -166,6 +211,27 @@ class PageVirtualization {
    * Initializes page wrapper pool, computes positions, and sets up scroll/observer.
    */
   private async _initAsync(): Promise<void> {
+    // Start memory monitoring
+    this._memoryManager.startMonitoring();
+    this._memoryManager.onPressureChange((pressure, stats) => {
+      Logger.info('Memory pressure changed', { pressure, stats });
+
+      // Adjust page buffer based on memory pressure
+      const recommendedBuffer = MemoryManager.getRecommendedBuffer(this._pageBuffer, pressure);
+      if (recommendedBuffer !== this._pageBuffer) {
+        Logger.info('Adjusting page buffer due to memory pressure', {
+          old: this._pageBuffer,
+          new: recommendedBuffer,
+          pressure,
+        });
+      }
+
+      // Emergency cleanup on high/critical pressure
+      if (pressure === MemoryPressure.HIGH || pressure === MemoryPressure.CRITICAL) {
+        this._emergencyCancelAll();
+      }
+    });
+
     const initialPagesToFillViewport = await this._calculateInitialPagesToRender();
     const calculatedWrappers = initialPagesToFillViewport * 2 + 5;
     this._maxPooledWrappers = Math.min(this._totalPages > 0 ? this._totalPages : calculatedWrappers, calculatedWrappers);
@@ -245,11 +311,10 @@ class PageVirtualization {
 
     Logger.info('scroll event', {
       scrollTop: this._scrollableContainer.scrollTop,
-      isRapidScrolling: this._isRapidScrolling,
     });
 
     // Direct throttled handling - simple and effective
-    this._throttledScrollHandler(this._isScaleChangeInProgress);
+    this._throttledScrollHandler(this._scaleManager.isScaling());
   };
 
   /**
@@ -259,205 +324,36 @@ class PageVirtualization {
    * @param priority Priority level (0 = current page, higher = lower priority)
    */
   private _queuePageForRender(pageInfo: CachedPageInfo, priority: number = 1): void {
-    // Remove any existing queue entry for this page
-    this._renderQueue = this._renderQueue.filter((item) => item.pageInfo.pageNumber !== pageInfo.pageNumber);
-
-    // Add to queue with timestamp for tie-breaking
-    this._renderQueue.push({
-      pageInfo,
+    this._renderScheduler.enqueueTask({
+      pageNumber: pageInfo.pageNumber,
       priority,
-      timestamp: Date.now(),
+      data: pageInfo,
     });
-
-    // Sort by priority (ascending), then by timestamp for same priority
-    this._renderQueue.sort((a, b) => {
-      if (a.priority !== b.priority) {
-        return a.priority - b.priority;
-      }
-      return a.timestamp - b.timestamp; // Earlier timestamp = higher priority
-    });
-
-    // Start processing queue
-    this._processRenderQueue();
+    this._renderScheduler.startProcessing();
   }
 
-  /**
-   * Processes the render queue, rendering one page at a time in priority order.
-   */
-  private async _processRenderQueue(): Promise<void> {
-    if (this._isProcessingQueue || this._renderQueue.length === 0) {
-      return;
-    }
-
-    this._isProcessingQueue = true;
-
-    try {
-      while (this._renderQueue.length > 0) {
-        // Check for aggressive cancellation before processing each item
-        this._aggressiveCancelRenders();
-
-        const queueItem = this._renderQueue.shift()!;
-        const { pageInfo } = queueItem;
-
-        // Additional checks after aggressive cancellation
-        const distance = Math.abs(pageInfo.pageNumber - this.state.currentPage);
-        if (distance > this._aggressiveCancelDistance) {
-          continue; // Skip if now too far away
-        }
-
-        // Skip if page is no longer visible, already rendered at current scale, or already transitioning
-        if (!pageInfo.isVisible || 
-            (pageInfo.isFullyRendered && pageInfo.renderedScale === this.state.scale) || 
-            pageInfo.isTransitioningToFullRender) {
-          continue;
-        }
-
-        // FIX: Reset renderFailed and retry for visible pages
-        if (pageInfo.renderFailed) {
-          Logger.warn(`Retrying failed render for page ${pageInfo.pageNumber}`);
-          pageInfo.renderFailed = false;
-        }
-
-        // Check if page is still in DOM (might have been removed during queue wait)
-        if (!pageInfo.pageWrapperDiv.parentElement) {
-          continue;
-        }
-
-        Logger.info(`Processing render queue for page ${pageInfo.pageNumber}`, {
-          priority: queueItem.priority,
-          queueLength: this._renderQueue.length,
-        });
-
-        // Render this page
-        this._currentRenderPromise = this._transitionToFullRender(pageInfo);
-        await this._currentRenderPromise;
-        this._currentRenderPromise = null;
-
-        // Small delay to prevent blocking the main thread
-        await new Promise((resolve) => setTimeout(resolve, 5));
-      }
-    } catch (error) {
-      Logger.error('Error processing render queue', error);
-    } finally {
-      this._isProcessingQueue = false;
-      this._currentRenderPromise = null;
-    }
-  }
 
   /**
    * Detects rapid scrolling to enable more aggressive cancellation.
    */
   private _updateRapidScrollingState(): void {
-    const now = Date.now();
-    const timeSinceLastScroll = now - this._lastScrollTime;
-
-    // Consider it rapid scrolling if scrolling frequently
-    this._isRapidScrolling = timeSinceLastScroll < this._rapidScrollThreshold;
-    this._lastScrollTime = now;
-
-    // Auto-reset rapid scrolling state after inactivity
-    setTimeout(() => {
-      const timeSinceUpdate = Date.now() - this._lastScrollTime;
-      if (timeSinceUpdate >= this._rapidScrollThreshold * 2) {
-        this._isRapidScrolling = false;
-      }
-    }, this._rapidScrollThreshold * 2);
+    this._renderScheduler.onScroll();
   }
 
   /**
    * Aggressively cancels renders based on visibility, distance, and memory pressure.
    */
   private _aggressiveCancelRenders(): void {
-    const now = Date.now();
-
-    // Throttle cancellation checks to avoid excessive processing
-    if (now - this._lastCancelCheck < this._cancelCheckInterval) {
-      return;
-    }
-    this._lastCancelCheck = now;
-
     const currentPage = this.state.currentPage;
+
+    // Use RenderScheduler to cancel distant tasks
+    this._renderScheduler.cancelDistantTasks(currentPage);
+
+    // Keep memory pressure emergency cancel logic
     const isMemoryPressure = this._checkMemoryPressure();
-    const cancelledCount = { base: 0, highRes: 0, queued: 0 };
-
-    this._cachedPages.forEach((pageInfo) => {
-      const distance = Math.abs(pageInfo.pageNumber - currentPage);
-      const shouldCancel = this._shouldCancelPageRender(pageInfo, distance, isMemoryPressure);
-
-      if (shouldCancel.cancelBase && pageInfo.renderTask) {
-        this._cancelBaseRender(pageInfo);
-        cancelledCount.base++;
-      }
-
-      if (shouldCancel.cancelHighRes && pageInfo.highResRenderTask) {
-        this._cancelHighResRender(pageInfo);
-        cancelledCount.highRes++;
-      }
-
-      if (shouldCancel.removeFromQueue) {
-        const wasInQueue = this._removeFromRenderQueue(pageInfo.pageNumber);
-        if (wasInQueue) cancelledCount.queued++;
-      }
-    });
-
-    // Also remove from queue pages that are too far away
-    this._renderQueue = this._renderQueue.filter((item) => {
-      const distance = Math.abs(item.pageInfo.pageNumber - currentPage);
-      const tooFar = distance > this._aggressiveCancelDistance;
-      if (tooFar) cancelledCount.queued++;
-      return !tooFar;
-    });
-
-    if (cancelledCount.base > 0 || cancelledCount.highRes > 0 || cancelledCount.queued > 0) {
-      Logger.info('Aggressive render cancellation completed', {
-        cancelledBase: cancelledCount.base,
-        cancelledHighRes: cancelledCount.highRes,
-        removedFromQueue: cancelledCount.queued,
-        currentPage,
-        isMemoryPressure,
-        isRapidScrolling: this._isRapidScrolling,
-      });
+    if (isMemoryPressure) {
+      this._emergencyCancelAll();
     }
-  }
-
-  /**
-   * Determines if a page's renders should be cancelled based on various criteria.
-   */
-  private _shouldCancelPageRender(
-    pageInfo: CachedPageInfo,
-    distance: number,
-    isMemoryPressure: boolean,
-  ): { cancelBase: boolean; cancelHighRes: boolean; removeFromQueue: boolean } {
-    const currentPage = this.state.currentPage;
-
-    // Never cancel current page
-    if (pageInfo.pageNumber === currentPage) {
-      return { cancelBase: false, cancelHighRes: false, removeFromQueue: false };
-    }
-
-    // Basic visibility check
-    const isNotVisible = !pageInfo.isVisible;
-
-    // Distance-based cancellation
-    const isTooFar = distance > this._aggressiveCancelDistance;
-
-    // Cancel if beyond buffer during rapid scrolling
-    const beyondBufferDuringRapidScroll = this._isRapidScrolling && distance > this._pageBuffer;
-
-    // More aggressive high-res cancellation (Fix: Switched to moderate aggration / 2 = / 1 due to failing zoom on scroll on lower end devices)
-    const shouldCancelHighRes = isNotVisible || isTooFar || (isMemoryPressure && distance > 1) || (this._isRapidScrolling && distance > this._pageBuffer);
-
-    // Base render cancellation (more conservative)
-    const shouldCancelBase = isNotVisible || isTooFar || beyondBufferDuringRapidScroll || (isMemoryPressure && distance > this._pageBuffer);
-
-    // Queue removal (most aggressive)
-    const shouldRemoveFromQueue = isNotVisible || isTooFar || (this._isRapidScrolling && distance > this._pageBuffer) || (isMemoryPressure && distance > 1);
-
-    return {
-      cancelBase: shouldCancelBase,
-      cancelHighRes: shouldCancelHighRes,
-      removeFromQueue: shouldRemoveFromQueue,
-    };
   }
 
   /**
@@ -467,7 +363,8 @@ class PageVirtualization {
     if (pageInfo.renderTask) {
       Logger.info(`Aggressively cancelling base render for page ${pageInfo.pageNumber}`);
 
-      pageInfo.renderTask.cancel();
+      // Use PageRenderer to cancel
+      this._pageRenderer.cancelPageRender(pageInfo.pageNumber, 'base');
       pageInfo.renderTask = undefined;
 
       // Release canvas back to pool if it exists
@@ -491,7 +388,8 @@ class PageVirtualization {
     if (pageInfo.highResRenderTask) {
       Logger.info(`Aggressively cancelling high-res render for page ${pageInfo.pageNumber}`);
 
-      pageInfo.highResRenderTask.cancel();
+      // Use PageRenderer to cancel and cleanup bitmap
+      this._pageRenderer.cancelPageRender(pageInfo.pageNumber, 'high');
       pageInfo.highResRenderTask = undefined;
 
       // Clean up ImageBitmap
@@ -512,28 +410,15 @@ class PageVirtualization {
    * Removes a page from the render queue.
    */
   private _removeFromRenderQueue(pageNumber: number): boolean {
-    const initialLength = this._renderQueue.length;
-    this._renderQueue = this._renderQueue.filter((item) => item.pageInfo.pageNumber !== pageNumber);
-    return this._renderQueue.length < initialLength;
+    return this._renderScheduler.cancelTask(pageNumber);
   }
 
   /**
-   * Basic memory pressure detection.
+   * Basic memory pressure detection using MemoryManager.
    */
   private _checkMemoryPressure(): boolean {
-    // Use browser memory API if available
-    if ('memory' in performance) {
-      const memory = (performance as any).memory;
-      if (memory.usedJSHeapSize && memory.jsHeapSizeLimit) {
-        const usedPercent = memory.usedJSHeapSize / memory.jsHeapSizeLimit;
-        return usedPercent > 0.75; // 75% threshold
-      }
-    }
-
-    // Fallback: check pool stats
-    const poolStats = this.canvasPool.getPoolStats();
-    const estimatedMemoryMB = parseFloat(poolStats.memoryUsage.replace(/[^\d.]/g, ''));
-    return estimatedMemoryMB > 50; // 50MB threshold
+    const pressure = this._memoryManager.getCurrentPressure();
+    return pressure === MemoryPressure.MEDIUM || pressure === MemoryPressure.HIGH || pressure === MemoryPressure.CRITICAL;
   }
 
   /**
@@ -559,7 +444,7 @@ class PageVirtualization {
     });
 
     // Clear most of the render queue, keeping only high-priority items
-    this._renderQueue = this._renderQueue.filter((item) => item.priority <= 1);
+    // RenderScheduler will handle priority-based cancellation internally
 
     // Force memory cleanup
     this.canvasPool.handleMemoryPressure();
@@ -571,29 +456,16 @@ class PageVirtualization {
    * Cancels renders for pages that are no longer visible and removes them from queue.
    */
   private _cancelOffscreenRenders(): void {
-    // Remove invisible pages from queue
-    this._renderQueue = this._renderQueue.filter((item) => item.pageInfo.isVisible);
-
-    // Cancel active renders for invisible pages
     this._cachedPages.forEach((pageInfo) => {
-      if (!pageInfo.isVisible && (pageInfo.renderTask || pageInfo.highResRenderTask)) {
-        if (pageInfo.renderTask) {
-          pageInfo.renderTask.cancel();
-          pageInfo.renderTask = undefined;
-        }
-        if (pageInfo.highResRenderTask) {
-          pageInfo.highResRenderTask.cancel();
-          pageInfo.highResRenderTask = undefined;
-        }
+      if (!pageInfo.isVisible) {
+        // Remove from render queue
+        this._renderScheduler.cancelTask(pageInfo.pageNumber);
 
-        // Release canvas back to pool
-        if (pageInfo.canvasElement) {
-          this.canvasPool.releaseCanvas(pageInfo.canvasElement);
-          pageInfo.canvasElement = undefined;
+        // Cancel active renders
+        if (pageInfo.renderTask || pageInfo.highResRenderTask) {
+          this._cancelBaseRender(pageInfo);
+          this._cancelHighResRender(pageInfo);
         }
-        pageInfo.isFullyRendered = false; 
-        pageInfo.renderedScale = undefined;
-        Logger.info(`Cancelled offscreen render for page ${pageInfo.pageNumber}`);
       }
     });
   }
@@ -602,14 +474,14 @@ class PageVirtualization {
    * Clears the entire render queue (useful during scale changes or navigation).
    */
   private _clearRenderQueue(): void {
-    this._renderQueue = [];
+    this._renderScheduler.cancelAllTasks();
     Logger.info('Render queue cleared');
   }
 
   private _setupPeriodicCancellation(): void {
     // Run aggressive cancellation periodically
     setInterval(() => {
-      if (!this._isScaleChangeInProgress && !this.isRenderingSpecificPageOnly) {
+      if (!this._scaleManager.isScaling() && !this.isRenderingSpecificPageOnly) {
         this._aggressiveCancelRenders();
       }
     }, 2000); // Every 2 seconds
@@ -751,23 +623,23 @@ class PageVirtualization {
    */
   private async _onScaleChange(): Promise<void> {
     Logger.info('scale change start', { newScale: this.state.scale });
-    this._isScaleChangeInProgress = true;
-    
+    this._scaleManager.beginScaleChange();
+
     try {
-      
+
       this._emergencyCancelAll();
-      this._clearRenderQueue();      
+      this._clearRenderQueue();
       await this.updateVisiblePageBuffers();
       await this.refreshHighResForVisiblePages();
-      
+
       await this._updateRenderedPagesOnScroll(this._scrollableContainer.scrollTop, false);
       this._debouncedEnsureVisiblePagesRendered();
-      
+
       Logger.info('scale change end');
     } catch (error) {
       Logger.error('Error during scale change', error);
     } finally {
-      this._isScaleChangeInProgress = false;
+      this._scaleManager.endScaleChange();
     }
   }
 
@@ -910,7 +782,7 @@ class PageVirtualization {
    * Ensures that visible pages are queued for rendering with appropriate priorities.
    */
   private async   _ensureVisiblePagesRendered(): Promise<void> {
-    if (this._isScaleChangeInProgress) return;
+    if (this._scaleManager.isScaling()) return;
 
     const currentPage = this.state.currentPage;
     const pagesToQueue: Array<{ pageInfo: CachedPageInfo; priority: number }> = [];
@@ -952,14 +824,22 @@ class PageVirtualization {
       }
     });
 
-    // Queue all pages for rendering
+    // Queue all pages for rendering using RenderScheduler
     pagesToQueue.forEach(({ pageInfo, priority }) => {
-      this._queuePageForRender(pageInfo, priority);
+      this._renderScheduler.enqueueTask({
+        pageNumber: pageInfo.pageNumber,
+        priority,
+        data: pageInfo,
+      });
     });
+
+    // Start processing after queuing all
+    if (pagesToQueue.length > 0) {
+      this._renderScheduler.startProcessing();
+    }
 
     Logger.info(`Queued ${pagesToQueue.length} pages for rendering`, {
       currentPage,
-      queueLength: this._renderQueue.length,
     });
   }
 
@@ -1221,14 +1101,12 @@ class PageVirtualization {
    * @param destroyLayers Indicates if layers should be destroyed.
    */
   private _clearPageRenderArtifacts(pageInfo: CachedPageInfo, destroyLayers: boolean = true): void {
-    if (pageInfo.renderTask) {
-      pageInfo.renderTask.cancel();
-      pageInfo.renderTask = undefined;
-    }
-    if (pageInfo.highResRenderTask) {
-      pageInfo.highResRenderTask.cancel();
-      pageInfo.highResRenderTask = undefined;
-    }
+    // Use PageRenderer to cancel all renders for this page
+    this._pageRenderer.cancelPageRender(pageInfo.pageNumber, 'all');
+
+    pageInfo.renderTask = undefined;
+    pageInfo.highResRenderTask = undefined;
+
     if (pageInfo.canvasElement) {
       this.canvasPool.releaseCanvas(pageInfo.canvasElement);
       pageInfo.canvasElement = undefined;
@@ -1364,51 +1242,40 @@ class PageVirtualization {
     // Passing 'false' to not destroy layer instances if they might be reused (though unlikely here)
     this._clearPageRenderArtifacts(pageInfo, false);
 
-    const baseRenderScale = this.state.scale > 1 ? Math.min(1.0, this.state.scale / 2) : this.state.scale;
-    const baseViewport = pageInfo.pdfPageProxy.getViewport({ scale: baseRenderScale });
-
-    const [canvas, context] = this.canvasPool.getCanvas(baseViewport.width, baseViewport.height);
-    pageInfo.canvasElement = canvas;
-
     const canvasPresentationDiv = this._ensureCanvasPresentationDiv(pageInfo);
-    if (this.state.scale > 1) {
-      canvas.style.width = 'inherit';
-      canvas.style.height = 'inherit';
-    }
-    canvasPresentationDiv.appendChild(canvas);
     this._ensureImageContainerDiv(pageInfo, viewport, canvasPresentationDiv);
 
-    try {
-      const renderParams: RenderParameters = {
-        canvasContext: context,
-        viewport: baseViewport,
-        annotationMode: 2,
-      };
-      pageInfo.renderTask = pageInfo.pdfPageProxy.render(renderParams);
-      await pageInfo.renderTask.promise;
-      Logger.info(`base render complete`, { page: pageInfo.pageNumber });
-    } catch (error: any) {
-      pageInfo.renderTask = undefined;
-      this.canvasPool.releaseCanvas(canvas);
-      if (error && error.name === 'RenderingCancelledException') {
-        // debugWarn(`rendering base canvas for page ${pageInfo.pageNumber}`, error);
-        Logger.warn(`base render cancelled for page ${pageInfo.pageNumber}`, error);
+    // Use PageRenderer for base canvas rendering
+    const baseResult = await this._pageRenderer.renderBaseCanvas({
+      page: pageInfo.pdfPageProxy,
+      viewport,
+      canvasPool: this.canvasPool,
+      scale: this.state.scale,
+      pageNumber: pageInfo.pageNumber,
+    });
+
+    if (!baseResult.success) {
+      if (baseResult.cancelled) {
+        Logger.warn(`base render cancelled for page ${pageInfo.pageNumber}`);
       } else {
-        // console.error(`Error rendering base canvas for page ${pageInfo.pageNumber}:`, error);
-        Logger.error(`Base render failed for page ${pageInfo.pageNumber}`, {
-          page: pageInfo.pageNumber,
-          errName: error?.name,
-          errMessage: error?.message,
-          stack: error?.stack,
-          rawError: error, // Log the full error object
-        });
+        Logger.error(`Base render failed for page ${pageInfo.pageNumber}`, baseResult.error);
         Logger.download();
       }
-      pageInfo.renderFailed = true;
+      pageInfo.renderFailed = !baseResult.cancelled;
       return;
-    } finally {
-      pageInfo.renderTask = undefined;
     }
+
+    // Store canvas and render task
+    pageInfo.canvasElement = baseResult.canvas;
+    pageInfo.renderTask = baseResult.renderTask;
+
+    // Append canvas to presentation div
+    if (baseResult.canvas) {
+      canvasPresentationDiv.appendChild(baseResult.canvas);
+    }
+
+    // Clear render task after completion
+    pageInfo.renderTask = undefined;
 
     if (this._options && !this._options.disableTextSelection) {
       if (!pageInfo.pdfPageProxy || !viewport || !pageInfo.isVisible) return;
@@ -1642,113 +1509,62 @@ class PageVirtualization {
     // FIX: Recalculate viewport with current scale to avoid race conditions
     const currentScale = this.state.scale;
     const currentViewport = pageInfo.pdfPageProxy.getViewport({ scale: currentScale });
-      
-    if (pageInfo.highResRenderTask) pageInfo.highResRenderTask.cancel();
-    if (pageInfo.highResImageBitmap) pageInfo.highResImageBitmap.close();
-    pageInfo.highResImageBitmap = undefined; 
+
+    // Cancel any existing high-res render
+    this._pageRenderer.cancelPageRender(pageInfo.pageNumber, 'high');
+
     const imageContainer = pageInfo.pageWrapperDiv.querySelector(`#zoomedImageContainer-${pageInfo.pageNumber}`) as HTMLElement;
     if (!imageContainer) {
       return;
     }
     imageContainer.innerHTML = '';
 
-    const [offscreenCanvas, offscreenContext] = this.canvasPool.getCanvas(currentViewport.width, currentViewport.height);
+    // Use PageRenderer for high-res rendering
+    const highResResult = await this._pageRenderer.renderHighResImage({
+      page: pageInfo.pdfPageProxy,
+      viewport: currentViewport,
+      currentViewport,
+      canvasPool: this.canvasPool,
+      scale: currentScale,
+      pageNumber: pageInfo.pageNumber,
+    });
 
-    const renderParams: RenderParameters = {
-      canvasContext: offscreenContext,
-      viewport: currentViewport, 
-      annotationMode: 2,
-    };
-
-    pageInfo.highResRenderTask = pageInfo.pdfPageProxy.render(renderParams);
-    try {
-      await pageInfo.highResRenderTask.promise;
-      Logger.info(`base render complete`, { page: pageInfo.pageNumber, scale: currentScale });
-      if (!pageInfo.isVisible) {
-        this.canvasPool.releaseCanvas(offscreenCanvas);
-        pageInfo.highResRenderTask = undefined;
-        return;
+    if (!highResResult.success) {
+      if (!highResResult.cancelled) {
+        console.error(`Error rendering high-res image for page ${pageInfo.pageNumber}:`, highResResult.error);
       }
-      const bitmap = await createImageBitmap(offscreenCanvas);
-      pageInfo.highResImageBitmap = bitmap;
-
-      const displayCanvas = document.createElement('canvas');
-      const ratio = window.devicePixelRatio || 1;
-      displayCanvas.width = Math.floor(currentViewport.width * ratio);
-      displayCanvas.height = Math.floor(currentViewport.height * ratio);
-      displayCanvas.style.width = `${currentViewport.width}px`;
-      displayCanvas.style.height = `${currentViewport.height}px`;
-
-      const displayCtx = displayCanvas.getContext('2d');
-      if (displayCtx) {
-        displayCtx.drawImage(bitmap, 0, 0, displayCanvas.width, displayCanvas.height);
-        imageContainer.appendChild(displayCanvas);
-      } else {
-        bitmap.close();
-        pageInfo.highResImageBitmap = undefined;
-      }
-      pageInfo.renderedScale = currentScale;
-    } catch (error: any) {
-      if (error && error.name === 'RenderingCancelledException') {
-        // console.log(`High-res rendering cancelled for page ${pageInfo.pageNumber}`);
-      } else {
-        console.error(`Error rendering high-res image for page ${pageInfo.pageNumber}:`, error);
-      }
-      if (pageInfo.highResImageBitmap) {
-        pageInfo.highResImageBitmap.close();
-        pageInfo.highResImageBitmap = undefined;
-      }
-    } finally {
-      pageInfo.highResRenderTask = undefined; 
-      this.canvasPool.releaseCanvas(offscreenCanvas);
+      return;
     }
+
+    if (!pageInfo.isVisible || !highResResult.bitmap) {
+      return;
+    }
+
+    // Store bitmap and render task
+    pageInfo.highResImageBitmap = highResResult.bitmap;
+    pageInfo.highResRenderTask = highResResult.renderTask;
+
+    // Create display canvas from bitmap
+    const displayCanvas = this._pageRenderer.createDisplayCanvas(highResResult.bitmap, currentViewport);
+    imageContainer.appendChild(displayCanvas);
+
+    pageInfo.renderedScale = currentScale;
+    pageInfo.highResRenderTask = undefined;
   }
 
-  private _shouldUseWebGL(): boolean {
-    try {
-      const canvas = document.createElement('canvas');
-      const gl = canvas.getContext('webgl') || (canvas.getContext('experimental-webgl') as WebGLRenderingContext);
-
-      if (!gl) return false;
-
-      // Check for basic WebGL support
-      const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-      if (debugInfo) {
-        const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-
-        // Avoid WebGL on known problematic configurations
-        if (renderer.includes('Intel') && renderer.includes('HD Graphics')) {
-          // Intel integrated graphics often perform worse with WebGL
-          return false;
-        }
-
-        if (renderer.includes('Mali') || renderer.includes('PowerVR')) {
-          // Mobile GPUs often have WebGL performance issues
-          return false;
-        }
-      }
-
-      // Check for reasonable texture size support
-      const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-      if (maxTextureSize < 4096) {
-        // Very low texture size limit indicates weak GPU
-        return false;
-      }
-
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
 
   /**
    * Cleans up resources and removes event listeners.
    */
   destroy(): void {
+    // Clean up engine modules
+    this._pageRenderer.destroy();
+    this._scaleManager.destroy();
+    this._memoryManager.destroy();
+    this._renderScheduler.stopProcessing();
+
     // Clear render queue
     this._clearRenderQueue();
-    this._isProcessingQueue = false;
-    this._currentRenderPromise = null;
     this._thumbnailViewer?.destroy();
     this._thumbnailViewer = null;
     this._scrollableContainer.removeEventListener('scroll', this._scrollHandler);
