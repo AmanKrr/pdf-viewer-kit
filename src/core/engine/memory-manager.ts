@@ -168,8 +168,16 @@ export class MemoryManager {
    *
    * @param callback Callback to invoke on pressure change
    */
-  onPressureChange(callback: MemoryPressureCallback): void {
+  onPressureChange(callback: MemoryPressureCallback): () => void {
     this.pressureCallbacks.push(callback);
+
+    // Return unsubscribe function
+    return () => {
+      const index = this.pressureCallbacks.indexOf(callback);
+      if (index > -1) {
+        this.pressureCallbacks.splice(index, 1);
+      }
+    };
   }
 
   /**

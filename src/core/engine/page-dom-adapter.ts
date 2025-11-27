@@ -125,6 +125,10 @@ export class PageDomAdapter {
   private initializePool(): void {
     for (let i = 0; i < this.config.maxPooledWrappers; i++) {
       const wrapper = this.createFreshWrapper();
+      // Append to DOM with display: none (original behavior)
+      wrapper.element.style.display = 'none';
+      wrapper.element.classList.add('recycled-page-wrapper');
+      this.pagesParentDiv.appendChild(wrapper.element);
       this.wrapperPool.push(wrapper);
     }
   }
@@ -163,8 +167,11 @@ export class PageDomAdapter {
     let wrapper = this.wrapperPool.find((w) => !w.inUse);
 
     if (!wrapper) {
-      // Pool exhausted, create new wrapper
+      // Pool exhausted, create new transient wrapper
       wrapper = this.createFreshWrapper();
+      wrapper.element.classList.add('transient-page-wrapper');
+      // Transient wrappers need to be appended
+      this.pagesParentDiv.appendChild(wrapper.element);
     }
 
     // Configure wrapper
@@ -177,10 +184,10 @@ export class PageDomAdapter {
     // Add to active wrappers
     this.activeWrappers.set(options.pageNumber, wrapper);
 
-    // Add to DOM if not already present
-    if (!wrapper.element.parentElement) {
-      this.pagesParentDiv.appendChild(wrapper.element);
-    }
+    // Make wrapper visible (toggle display)
+    wrapper.element.style.display = '';
+    wrapper.element.classList.remove('recycled-page-wrapper');
+    wrapper.element.classList.add('pooled-page-wrapper');
 
     return wrapper;
   }
@@ -195,7 +202,8 @@ export class PageDomAdapter {
     element.style.width = `${options.width}px`;
     element.style.height = `${options.height}px`;
     element.style.top = `${options.top}px`;
-    element.style.left = `${options.left}px`;
+    // Don't set left - flexbox centering handles horizontal alignment
+    // element.style.left = `${options.left}px`;
   }
 
   /**
@@ -211,9 +219,19 @@ export class PageDomAdapter {
     // Clean up wrapper content
     this.cleanupWrapper(wrapper);
 
-    // Remove from DOM
-    if (wrapper.element.parentElement) {
-      wrapper.element.parentElement.removeChild(wrapper.element);
+    // Check if this is a pooled wrapper or transient
+    const isPooled = this.wrapperPool.includes(wrapper);
+
+    if (isPooled) {
+      // Pooled wrapper: Hide it (don't remove from DOM)
+      wrapper.element.style.display = 'none';
+      wrapper.element.classList.remove('pooled-page-wrapper');
+      wrapper.element.classList.add('recycled-page-wrapper');
+    } else {
+      // Transient wrapper: Remove from DOM completely
+      if (wrapper.element.parentElement) {
+        wrapper.element.parentElement.removeChild(wrapper.element);
+      }
     }
 
     // Mark as available

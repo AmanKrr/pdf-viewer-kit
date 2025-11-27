@@ -14,188 +14,56 @@
   limitations under the License.
 */
 
-import PageElement from './page-element.component';
-import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
 import { PageViewport, PDFPageProxy, TextLayer as PdfJsTextLayerInternal } from 'pdfjs-dist';
-import { debugWarn, reportError } from '../../utils/debug-utils';
-import { TextSelectionHandler } from '../annotations/text-selection-handler';
 import { TextContent } from 'pdfjs-dist/types/src/display/api';
+import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
+import { debugWarn, reportError } from '../../utils/debug-utils';
+import PageElement from './page-element.component';
 
-/**
- * Manages the rendering of the PDF.js text layer and a matching annotation layer.
- */
 class TextLayer {
+  private readonly _containerId: string;
+  private readonly _instanceId: string;
   private _pageWrapper: HTMLElement | null;
   private _page: PDFPageProxy | null;
   private _viewport: PageViewport | null;
   private _textLayerDiv: HTMLDivElement | null = null;
   private _annotationHostDiv: HTMLDivElement | null = null;
-  private _pdfJsInternalTextLayerInstance: PdfJsTextLayerInternal | null = null;
-  private _selectionHandler: TextSelectionHandler | null = null;
+  private _pdfJsTextLayer: PdfJsTextLayerInternal | null = null;
   private _isDestroyed = false;
-  private readonly _containerId: string;
-  private readonly _instanceId: string;
 
-  /**
-   * @param pageWrapper - Container element for this page's layers.
-   * @param page - PDFPageProxy for accessing text content.
-   * @param viewport - Viewport for coordinate mapping.
-   */
-  constructor(containerId: string, instanceId: string, pageWrapper: HTMLElement, page: PDFPageProxy, viewport: PageViewport) {
+  constructor(
+    containerId: string,
+    instanceId: string,
+    pageWrapper: HTMLElement,
+    page: PDFPageProxy,
+    viewport: PageViewport
+  ) {
     if (!viewport) {
-      reportError('TextLayer init: viewport is null or undefined', { pageNumber: page?.pageNumber });
+      reportError('TextLayer: viewport is required', { pageNumber: page?.pageNumber });
     }
+    this._containerId = containerId;
+    this._instanceId = instanceId;
     this._pageWrapper = pageWrapper;
     this._page = page;
     this._viewport = viewport;
-    this._containerId = containerId;
-    this._instanceId = instanceId;
   }
 
-  /**
-   * Creates and renders the text layer and annotation host layer.
-   *
-   * @returns A promise resolving to the text-layer and annotation-layer divs.
-   * @throws If called after destruction or if initialization failed.
-   */
-  public async createTextLayer(): Promise<[HTMLDivElement, HTMLDivElement]> {
-    if (this._isDestroyed) {
-      debugWarn(`TextLayer-${this._page?.pageNumber}: createTextLayer after destroy`);
-      throw new Error(`TextLayer for page ${this._page?.pageNumber} was destroyed.`);
-    }
-    if (!this._pageWrapper || !this._page || !this._viewport) {
-      reportError('TextLayer.createTextLayer init error', { page: this._page?.pageNumber, viewport: this._viewport });
-      throw new Error('TextLayer not properly initialized or already destroyed.');
-    }
+  async createTextLayer(): Promise<[HTMLDivElement, HTMLDivElement]> {
+    this._validateNotDestroyed();
+    this._validateInitialized();
 
-    this._textLayerDiv = PageElement.createLayers(PDF_VIEWER_CLASSNAMES.ATEXT_LAYER, PDF_VIEWER_IDS.TEXT_LAYER, this._viewport, this._instanceId);
-    this._pageWrapper.appendChild(this._textLayerDiv);
+    this._createLayerDivs();
+    const textContent = await this._fetchTextContent();
+    await this._renderTextLayer(textContent);
+    this._applyFontStyling(textContent);
+    this._wrapTextInParagraph();
 
-    this._annotationHostDiv = PageElement.createLayers(PDF_VIEWER_CLASSNAMES.AANNOTATION_DRAWING_LAYER, PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER, this._viewport, this._instanceId);
-    this._pageWrapper.appendChild(this._annotationHostDiv);
-
-    const textContent = await this._page.getTextContent();
-
-    if (this._isDestroyed) {
-      debugWarn(`TextLayer-${this._page?.pageNumber}: destroyed during getTextContent`);
-      this._textLayerDiv?.remove();
-      this._annotationHostDiv?.remove();
-      throw new Error(`TextLayer for page ${this._page?.pageNumber} was destroyed.`);
-    }
-    if (!this._viewport) {
-      reportError('TextLayer render: viewport unexpectedly null', { page: this._page?.pageNumber });
-      throw new Error('TextLayer critical error: Viewport became null unexpectedly.');
-    }
-
-    this._pdfJsInternalTextLayerInstance = new PdfJsTextLayerInternal({
-      textContentSource: textContent,
-      container: this._textLayerDiv,
-      viewport: this._viewport,
-    });
-    await this._pdfJsInternalTextLayerInstance.render();
-    this._wrapTextLayerIntoPTag();
-    this._putActualFonts(textContent, this._pdfJsInternalTextLayerInstance.textDivs ?? []);
-
-    if (this._isDestroyed) {
-      debugWarn(`TextLayer-${this._page?.pageNumber}: destroyed during render`);
-      throw new Error(`TextLayer for page ${this._page?.pageNumber} was destroyed.`);
-    }
-
-    // this._pdfJsInternalTextLayerInstance.textDivs.forEach((ele) => {
-    //   ele.onclick = (e) => console.log('Coming soon'); // Placeholder for future interaction
-    // });
-
-    // this._selectionHandler = new TextSelectionHandler(
-    //   this._containerId,
-    //   this._instanceId,
-    //   this._pageWrapper!,
-    //   this._textLayerDiv!,
-    //   this._annotationHostDiv!,
-    //   this._pdfJsInternalTextLayerInstance.textDivs,
-    //   this._viewport!,
-    // );
-
-    return [this._textLayerDiv, this._annotationHostDiv];
+    return [this._textLayerDiv!, this._annotationHostDiv!];
   }
 
-  private _putActualFonts(textContent: TextContent, textDivs: HTMLElement[] = []) {
-    textContent.items.forEach((item: any, index: number) => {
-      const div = textDivs[index];
-      if (!div) return;
-
-      const targetPx = div.getBoundingClientRect().width;
-
-      div.style.transform = 'none';
-
-      const fontId = item.fontName;
-      this._page!.commonObjs.get(fontId, (font: any) => {
-        if (font && font.name) {
-          const clean = this._getCleanFontName(font.name) || '';
-          if (clean) {
-            const [family, weight] = clean.split('-');
-            if (family) div.style.fontFamily = `'${family}', serif`;
-            if (weight) div.style.fontWeight = weight;
-            const measuredPx = div.getBoundingClientRect().width;
-            const newScaleX = targetPx / measuredPx;
-            div.style.transformOrigin = '0 0';
-            div.style.transform = `scaleX(${newScaleX})`;
-          }
-        }
-      });
-    });
-  }
-
-  private _getCleanFontName(pdfFontName: string) {
-    if (!pdfFontName) {
-      return null;
-    }
-    const plusIndex = pdfFontName.indexOf('+');
-    if (plusIndex !== -1) {
-      return pdfFontName.substring(plusIndex + 1);
-    }
-    // If no '+' is found, it might be a standard name already,
-    // or a name without a typical subset prefix.
-    return pdfFontName;
-  }
-
-  /**
-   * Wraps the rendered text spans into a single <p> for better formatting.
-   */
-  private _wrapTextLayerIntoPTag(): void {
-    const textLayer = this._pageWrapper?.querySelector<HTMLElement>(`.${PDF_VIEWER_CLASSNAMES.ATEXT_LAYER}`);
-    if (!textLayer) return;
-
-    const nodes = Array.from(textLayer.childNodes);
-    const p = document.createElement('p');
-    p.style.whiteSpace = 'pre-wrap';
-    p.style.margin = '0';
-
-    nodes.forEach((node) => {
-      if (node.nodeName !== 'BR') {
-        p.appendChild(node);
-      }
-    });
-
-    textLayer.innerHTML = '';
-    textLayer.appendChild(p);
-  }
-
-  /**
-   * Example keydown handler; replace or remove as needed.
-   */
-  private keyDown(event: KeyboardEvent): void {
-    console.log(event);
-  }
-
-  /**
-   * Destroys the text layer, annotation layer, and internal references.
-   */
-  public destroy(): void {
+  destroy(): void {
     if (this._isDestroyed) return;
     this._isDestroyed = true;
-
-    this._selectionHandler?.destroy();
-    this._selectionHandler = null;
 
     this._textLayerDiv?.remove();
     this._textLayerDiv = null;
@@ -206,7 +74,130 @@ class TextLayer {
     this._pageWrapper = null;
     this._page = null;
     this._viewport = null;
-    this._pdfJsInternalTextLayerInstance = null;
+    this._pdfJsTextLayer = null;
+  }
+
+  private _validateNotDestroyed(): void {
+    if (this._isDestroyed) {
+      const pageNum = this._page?.pageNumber;
+      debugWarn(`TextLayer-${pageNum}: operation called after destroy`);
+      throw new Error(`TextLayer for page ${pageNum} was destroyed.`);
+    }
+  }
+
+  private _validateInitialized(): void {
+    if (!this._pageWrapper || !this._page || !this._viewport) {
+      reportError('TextLayer: not properly initialized', { page: this._page?.pageNumber });
+      throw new Error('TextLayer not properly initialized or already destroyed.');
+    }
+  }
+
+  private _createLayerDivs(): void {
+    this._textLayerDiv = PageElement.createLayers(
+      PDF_VIEWER_CLASSNAMES.ATEXT_LAYER,
+      PDF_VIEWER_IDS.TEXT_LAYER,
+      this._viewport!,
+      this._instanceId
+    );
+    this._pageWrapper!.appendChild(this._textLayerDiv);
+
+    this._annotationHostDiv = PageElement.createLayers(
+      PDF_VIEWER_CLASSNAMES.AANNOTATION_DRAWING_LAYER,
+      PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER,
+      this._viewport!,
+      this._instanceId
+    );
+    this._pageWrapper!.appendChild(this._annotationHostDiv);
+  }
+
+  private async _fetchTextContent(): Promise<TextContent> {
+    const textContent = await this._page!.getTextContent();
+
+    if (this._isDestroyed) {
+      const pageNum = this._page?.pageNumber;
+      debugWarn(`TextLayer-${pageNum}: destroyed during getTextContent`);
+      this._textLayerDiv?.remove();
+      this._annotationHostDiv?.remove();
+      throw new Error(`TextLayer for page ${pageNum} was destroyed.`);
+    }
+
+    if (!this._viewport) {
+      reportError('TextLayer: viewport unexpectedly null', { page: this._page?.pageNumber });
+      throw new Error('TextLayer critical error: Viewport became null unexpectedly.');
+    }
+
+    return textContent;
+  }
+
+  private async _renderTextLayer(textContent: TextContent): Promise<void> {
+    this._pdfJsTextLayer = new PdfJsTextLayerInternal({
+      textContentSource: textContent,
+      container: this._textLayerDiv!,
+      viewport: this._viewport!,
+    });
+
+    await this._pdfJsTextLayer.render();
+
+    if (this._isDestroyed) {
+      const pageNum = this._page?.pageNumber;
+      debugWarn(`TextLayer-${pageNum}: destroyed during render`);
+      throw new Error(`TextLayer for page ${pageNum} was destroyed.`);
+    }
+  }
+
+  private _applyFontStyling(textContent: TextContent): void {
+    const textDivs = this._pdfJsTextLayer?.textDivs ?? [];
+
+    textContent.items.forEach((item: any, index: number) => {
+      const div = textDivs[index];
+      if (!div) return;
+
+      const targetWidth = div.getBoundingClientRect().width;
+      div.style.transform = 'none';
+
+      const fontId = item.fontName;
+      this._page!.commonObjs.get(fontId, (font: any) => {
+        if (!font?.name) return;
+
+        const cleanFontName = this._extractCleanFontName(font.name);
+        if (!cleanFontName) return;
+
+        const [family, weight] = cleanFontName.split('-');
+        if (family) div.style.fontFamily = `'${family}', serif`;
+        if (weight) div.style.fontWeight = weight;
+
+        const measuredWidth = div.getBoundingClientRect().width;
+        const scaleX = targetWidth / measuredWidth;
+        div.style.transformOrigin = '0 0';
+        div.style.transform = `scaleX(${scaleX})`;
+      });
+    });
+  }
+
+  private _extractCleanFontName(pdfFontName: string): string | null {
+    if (!pdfFontName) return null;
+
+    const plusIndex = pdfFontName.indexOf('+');
+    return plusIndex !== -1 ? pdfFontName.substring(plusIndex + 1) : pdfFontName;
+  }
+
+  private _wrapTextInParagraph(): void {
+    const textLayer = this._pageWrapper?.querySelector<HTMLElement>(`.${PDF_VIEWER_CLASSNAMES.ATEXT_LAYER}`);
+    if (!textLayer) return;
+
+    const nodes = Array.from(textLayer.childNodes);
+    const paragraph = document.createElement('p');
+    paragraph.style.whiteSpace = 'pre-wrap';
+    paragraph.style.margin = '0';
+
+    nodes.forEach((node) => {
+      if (node.nodeName !== 'BR') {
+        paragraph.appendChild(node);
+      }
+    });
+
+    textLayer.innerHTML = '';
+    textLayer.appendChild(paragraph);
   }
 }
 

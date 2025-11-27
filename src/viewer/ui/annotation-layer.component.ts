@@ -16,102 +16,112 @@
 
 import { AnnotationLayer as PdfJsAnnotationLayerInternal, PageViewport, PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
+import { debugWarn } from '../../utils/debug-utils';
 import { PDFLinkService } from '../services/link.service';
 import PageElement from './page-element.component';
 import WebViewer from './web-viewer.component';
-import { debugWarn } from '../../utils/debug-utils';
 
-/**
- * Renders PDF.js’s built-in annotations (links, forms, etc.)
- * into an overlay on a rendered PDF page.
- */
 export default class AnnotationLayer {
   private _pageWrapper: HTMLElement | null;
   private _page: PDFPageProxy | null;
   private _viewport: PageViewport | null;
   private _annotationLayerDiv: HTMLDivElement | null = null;
-  private _pdfJsInternalAnnotationLayerInstance: PdfJsAnnotationLayerInternal | null = null;
+  private _pdfJsAnnotationLayer: PdfJsAnnotationLayerInternal | null = null;
+  private _linkService: PDFLinkService | null = null;
   private _isDestroyed = false;
 
-  /**
-   * @param pageWrapper  Container element for the page.
-   * @param page         PDF.js page proxy.
-   * @param viewport     The PDF.js viewport at current scale/rotation.
-   */
   constructor(pageWrapper: HTMLElement, page: PDFPageProxy, viewport: PageViewport) {
     this._pageWrapper = pageWrapper;
     this._page = page;
     this._viewport = viewport;
   }
 
-  /**
-   * Creates and renders the annotation layer for this page.
-   *
-   * @param webViewer     Host WebViewer instance for link navigation.
-   * @param pdfDocument   The loaded PDF document.
-   * @param annotationHostDiv Optional element for freehand annotations (unused here).
-   * @returns The DIV containing rendered annotations.
-   */
-  public async createAnnotationLayer(webViewer: WebViewer, pdfDocument: PDFDocumentProxy, annotationHostDiv?: HTMLElement): Promise<HTMLDivElement> {
+  async createAnnotationLayer(
+    webViewer: WebViewer,
+    pdfDocument: PDFDocumentProxy,
+    _annotationHostDiv?: HTMLElement
+  ): Promise<HTMLDivElement> {
+    this._validateNotDestroyed();
+    this._validateInitialized();
+
+    this._linkService = new PDFLinkService({ pdfDocument, pdfViewer: webViewer });
+    this._createAnnotationDiv(webViewer);
+    await this._initializePdfJsLayer();
+    await this._renderAnnotations();
+
+    return this._annotationLayerDiv!;
+  }
+
+  destroy(): void {
+    if (this._isDestroyed) return;
+    this._isDestroyed = true;
+
+    this._pdfJsAnnotationLayer = null;
+    this._linkService = null;
+    this._annotationLayerDiv?.remove();
+    this._annotationLayerDiv = null;
+    this._pageWrapper = null;
+    this._page = null;
+    this._viewport = null;
+  }
+
+  private _validateNotDestroyed(): void {
     if (this._isDestroyed) {
-      debugWarn(`AnnotationLayer-${this._page?.pageNumber}: createAnnotationLayer after destroy`);
-      throw new Error(`AnnotationLayer for page ${this._page?.pageNumber} was destroyed.`);
+      const pageNum = this._page?.pageNumber;
+      debugWarn(`AnnotationLayer-${pageNum}: operation called after destroy`);
+      throw new Error(`AnnotationLayer for page ${pageNum} was destroyed.`);
     }
+  }
+
+  private _validateInitialized(): void {
     if (!this._pageWrapper || !this._page || !this._viewport) {
       throw new Error('AnnotationLayer not properly initialized.');
     }
+  }
 
-    // Create container DIV for PDF.js annotations.
-    this._annotationLayerDiv = PageElement.createLayers(PDF_VIEWER_CLASSNAMES.AANNOTATION_LAYER, PDF_VIEWER_IDS.ANNOTATION_LAYER, this._viewport, webViewer.instanceId);
-    this._pageWrapper.appendChild(this._annotationLayerDiv);
+  private _createAnnotationDiv(webViewer: WebViewer): void {
+    this._annotationLayerDiv = PageElement.createLayers(
+      PDF_VIEWER_CLASSNAMES.AANNOTATION_LAYER,
+      PDF_VIEWER_IDS.ANNOTATION_LAYER,
+      this._viewport!,
+      webViewer.instanceId
+    );
+    this._pageWrapper!.appendChild(this._annotationLayerDiv);
+  }
 
-    // Instantiate the internal PDF.js AnnotationLayer.
-    this._pdfJsInternalAnnotationLayerInstance = new PdfJsAnnotationLayerInternal({
-      div: this._annotationLayerDiv,
-      page: this._page,
-      viewport: this._viewport,
+  private async _initializePdfJsLayer(): Promise<void> {
+    this._pdfJsAnnotationLayer = new PdfJsAnnotationLayerInternal({
+      div: this._annotationLayerDiv!,
+      page: this._page!,
+      viewport: this._viewport!,
       annotationCanvasMap: null,
       accessibilityManager: null,
       annotationEditorUIManager: null,
       structTreeLayer: null,
+      annotationStorage: undefined,
+      commentManager: undefined,
+      linkService: this._linkService!,
     });
 
     if (this._isDestroyed) {
-      debugWarn(`AnnotationLayer-${this._page?.pageNumber}: destroyed during render`);
+      const pageNum = this._page?.pageNumber;
+      debugWarn(`AnnotationLayer-${pageNum}: destroyed during initialization`);
       this._annotationLayerDiv?.remove();
-      throw new Error(`AnnotationLayer for page ${this._page?.pageNumber} was destroyed.`);
+      throw new Error(`AnnotationLayer for page ${pageNum} was destroyed.`);
     }
+  }
 
-    // Fetch annotations and render them into the DIV.
-    const annotations = await this._page.getAnnotations();
-    await this._pdfJsInternalAnnotationLayerInstance.render({
-      viewport: this._viewport.clone({ dontFlip: true }),
+  private async _renderAnnotations(): Promise<void> {
+    const annotations = await this._page!.getAnnotations();
+
+    await this._pdfJsAnnotationLayer!.render({
+      viewport: this._viewport!.clone({ dontFlip: true }),
       annotations,
-      div: this._annotationLayerDiv,
-      page: this._page,
-      linkService: new PDFLinkService({ pdfDocument, pdfViewer: webViewer }),
+      div: this._annotationLayerDiv!,
+      page: this._page!,
+      linkService: this._linkService!,
       renderForms: false,
       imageResourcesPath: '/pdfjs/web/images/',
     });
-
-    return this._annotationLayerDiv;
-  }
-
-  /**
-   * Cleans up the annotation layer, removing DOM elements
-   * and clearing references for garbage collection.
-   */
-  public destroy(): void {
-    if (this._isDestroyed) return;
-    this._isDestroyed = true;
-
-    this._pdfJsInternalAnnotationLayerInstance = null;
-    if (this._annotationLayerDiv) {
-      this._annotationLayerDiv.remove();
-      this._annotationLayerDiv = null;
-    }
-    this._pageWrapper = null;
-    this._page = null;
-    this._viewport = null;
   }
 }

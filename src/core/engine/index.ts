@@ -27,12 +27,17 @@
  * - ScaleManager: Zoom/scale change handling (CSS updates, re-rendering)
  * - MemoryManager: Memory pressure detection and management
  *
+ * Layer Management:
+ * Text and annotation layers are managed directly by PageVirtualization component
+ * using TextLayer and AnnotationLayer UI components from viewer/ui/.
+ *
  * Benefits:
  * - Each module is independently testable
  * - Clear separation of concerns
  * - Easy to swap rendering strategies
  * - No tight coupling between logic and DOM
  * - Performance optimizations isolated
+ * - Independent layer lifecycle management
  */
 
 // VirtualizationEngine exports
