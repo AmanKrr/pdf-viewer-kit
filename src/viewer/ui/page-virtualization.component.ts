@@ -742,8 +742,10 @@ class PageVirtualization {
   public async refreshHighResForVisiblePages(): Promise<void> {
     const pagesToRefresh = Array.from(this._cachedPages.values()).filter((pInfo) => pInfo.isVisible && pInfo.pdfPageProxy);
 
-    // 🎨 TILING FLAG: Use tiles for high-res or ImageBitmap (configurable via options)
-    const useTiling = this._options.enableTiling ?? true;
+    // 🎨 SMART TILING: Use tiles only when scale > 1 (zoomed in)
+    // At scale <= 1, use ImageBitmap since entire page is usually visible
+    const currentScale = this.state.scale;
+    const useTiling = (this._options.enableTiling ?? true) && currentScale > 1;
 
     for (const pageInfo of pagesToRefresh) {
       if (pageInfo.isVisible && pageInfo.pdfPageProxy) {
@@ -973,14 +975,15 @@ class PageVirtualization {
 
       // Render high-resolution content (only if zoom > 1x)
       if (!pageInfo.renderFailed && currentScale != 1) {
-        // 🎨 TILING FLAG: Use tiles for high-res or ImageBitmap (configurable via options)
-        const useTiling = this._options.enableTiling ?? true;
+        // 🎨 SMART TILING: Use tiles only when scale > 1 (zoomed in)
+        // At scale <= 1, use ImageBitmap since entire page is usually visible
+        const useTiling = (this._options.enableTiling ?? true) && currentScale > 1;
 
         if (useTiling) {
-          // Use tiles (memory efficient, only visible tiles)
+          // Use tiles (memory efficient, only visible tiles when zoomed)
           await this._appendHighResToTiles(pageInfo);
         } else {
-          // Use ImageBitmap (original approach, full page bitmap)
+          // Use ImageBitmap (original approach, better for full page view)
           await this.appendHighResImage(pageInfo);
         }
       }
@@ -1215,20 +1218,20 @@ class PageVirtualization {
     }
 
     // 🎨 UPDATE TILES ON SCROLL: Re-render tiles for visible pages when scrolling
-    if (this._options.enableTiling ?? true) {
-      const useTiling = this._options.enableTiling ?? true;
+    // Only update tiles if tiling is enabled AND scale > 1 (zoomed in)
+    const currentScale = this.state.scale;
+    const useTiling = (this._options.enableTiling ?? true) && currentScale > 1;
 
-      if (useTiling) {
-        // Update tiles for all visible pages (horizontal/vertical scroll)
-        this._cachedPages.forEach((pageInfo) => {
-          if (pageInfo.isVisible && pageInfo.isFullyRendered && pageInfo.pdfPageProxy) {
-            // Update tile visibility and render new visible tiles
-            this._updateTilesForVisiblePage(pageInfo).catch(err => {
-              Logger.warn(`Failed to update tiles for page ${pageInfo.pageNumber}`, err);
-            });
-          }
-        });
-      }
+    if (useTiling) {
+      // Update tiles for all visible pages (horizontal/vertical scroll)
+      this._cachedPages.forEach((pageInfo) => {
+        if (pageInfo.isVisible && pageInfo.isFullyRendered && pageInfo.pdfPageProxy) {
+          // Update tile visibility and render new visible tiles
+          this._updateTilesForVisiblePage(pageInfo).catch(err => {
+            Logger.warn(`Failed to update tiles for page ${pageInfo.pageNumber}`, err);
+          });
+        }
+      });
     }
 
     // AGGRESSIVE CACHE CLEANUP: If cache is still too large, remove oldest pages
