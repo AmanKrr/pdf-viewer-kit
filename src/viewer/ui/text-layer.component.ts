@@ -65,16 +65,27 @@ class TextLayer {
     if (this._isDestroyed) return;
     this._isDestroyed = true;
 
+    // Cancel PDF.js text layer if it has a cancel method
+    if (this._pdfJsTextLayer) {
+      try {
+        (this._pdfJsTextLayer as any).cancel?.();
+      } catch (e) {
+        // Ignore cancellation errors
+      }
+      this._pdfJsTextLayer = null;
+    }
+
+    // Remove DOM elements
     this._textLayerDiv?.remove();
     this._textLayerDiv = null;
 
     this._annotationHostDiv?.remove();
     this._annotationHostDiv = null;
 
+    // Clear references to allow garbage collection
     this._pageWrapper = null;
     this._page = null;
     this._viewport = null;
-    this._pdfJsTextLayer = null;
   }
 
   private _validateNotDestroyed(): void {

@@ -56,10 +56,26 @@ export default class AnnotationLayer {
     if (this._isDestroyed) return;
     this._isDestroyed = true;
 
-    this._pdfJsAnnotationLayer = null;
+    // Cleanup PDF.js annotation layer internal state
+    if (this._pdfJsAnnotationLayer) {
+      try {
+        // PDF.js AnnotationLayer might have cleanup methods
+        (this._pdfJsAnnotationLayer as any).cancel?.();
+        (this._pdfJsAnnotationLayer as any).destroy?.();
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+      this._pdfJsAnnotationLayer = null;
+    }
+
+    // Cleanup link service
     this._linkService = null;
+
+    // Remove DOM elements
     this._annotationLayerDiv?.remove();
     this._annotationLayerDiv = null;
+
+    // Clear references to allow garbage collection
     this._pageWrapper = null;
     this._page = null;
     this._viewport = null;

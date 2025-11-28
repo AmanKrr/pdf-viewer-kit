@@ -1156,18 +1156,22 @@ class PageVirtualization {
       pagesToKeepInDom.add(pageNum);
     }
 
+    // MEMORY OPTIMIZATION: Remove ALL pages not in the keep set
     const pagesToRemoveFromDom: number[] = [];
-    this._cachedPages.forEach((pageInfo, pageNum) => {
-      if (!pagesToKeepInDom.has(pageNum) && pageInfo.isVisible) {
+    this._cachedPages.forEach((_pageInfo, pageNum) => {
+      if (!pagesToKeepInDom.has(pageNum)) {
         pagesToRemoveFromDom.push(pageNum);
       }
     });
+
+    // Remove pages from DOM and cache
     for (const pageNum of pagesToRemoveFromDom) {
       this._removePageFromDom(pageNum);
     }
 
     this._cancelOffscreenRenders();
 
+    // Add or restore pages that should be visible
     for (const pageNum of pagesToKeepInDom) {
       let pageInfo = this._cachedPages.get(pageNum);
       if (!pageInfo) {
@@ -1175,6 +1179,49 @@ class PageVirtualization {
       } else {
         pageInfo.isVisible = true;
       }
+    }
+
+    // AGGRESSIVE CACHE CLEANUP: If cache is still too large, remove oldest pages
+    const MAX_CACHE_SIZE = (this._pageBuffer * 2) + 10; // Keep buffer + some margin
+    if (this._cachedPages.size > MAX_CACHE_SIZE) {
+      const pagesToPurge: number[] = [];
+      this._cachedPages.forEach((_pageInfo, pageNum) => {
+        if (!pagesToKeepInDom.has(pageNum)) {
+          pagesToPurge.push(pageNum);
+        }
+      });
+
+      // Remove excess pages
+      const excessCount = this._cachedPages.size - MAX_CACHE_SIZE;
+      for (let i = 0; i < Math.min(excessCount, pagesToPurge.length); i++) {
+        this._removePageFromDom(pagesToPurge[i]);
+      }
+
+      Logger.info(`Aggressive cache cleanup: removed ${Math.min(excessCount, pagesToPurge.length)} pages, cache size: ${this._cachedPages.size}`);
+
+      // MEMORY OPTIMIZATION: Shrink canvas and wrapper pools after cleanup
+      this._shrinkMemoryPools();
+    }
+  }
+
+  /**
+   * Aggressively shrink memory pools to free up memory
+   * Called after removing many pages from cache
+   */
+  private _shrinkMemoryPools(): void {
+    try {
+      // Shrink canvas pool to minimal size (keep minimum for visible pages)
+      const currentVisiblePages = Array.from(this._cachedPages.values()).filter(p => p.isVisible).length;
+      const minCanvasPool = Math.max(5, currentVisiblePages + 2);
+      if (this.canvasPool && this.canvasPool.maxPoolSize > minCanvasPool) {
+        this.canvasPool.maxPoolSize = minCanvasPool;
+        Logger.info(`Reduced canvas pool size to ${minCanvasPool} (visible: ${currentVisiblePages})`);
+      }
+
+      // Note: PageDomAdapter manages its own pool internally
+    } catch (e) {
+      // Ignore pool shrinking errors
+      Logger.warn('Failed to shrink memory pools', e);
     }
   }
 
@@ -1415,9 +1462,14 @@ class PageVirtualization {
       try {
         Logger.info(`Rendering text layer for page ${pageInfo.pageNumber}`);
 
-        // Clean up existing text layer if present
+        // CRITICAL: Clean up ALL existing text layer references to prevent memory leak
+        if (pageInfo.textLayer) {
+          Logger.warn(`Destroying pageInfo.textLayer for page ${pageInfo.pageNumber}`);
+          pageInfo.textLayer.destroy();
+          pageInfo.textLayer = undefined;
+        }
         if (this._activeTextLayers.has(pageInfo.pageNumber)) {
-          Logger.warn(`Destroying existing text layer for page ${pageInfo.pageNumber}`);
+          Logger.warn(`Destroying active text layer for page ${pageInfo.pageNumber}`);
           const existingTextLayer = this._activeTextLayers.get(pageInfo.pageNumber);
           existingTextLayer?.destroy();
           this._activeTextLayers.delete(pageInfo.pageNumber);
@@ -1466,9 +1518,14 @@ class PageVirtualization {
       try {
         Logger.info(`Rendering annotation layer for page ${pageInfo.pageNumber}`);
 
-        // Clean up existing annotation layer if present
+        // CRITICAL: Clean up ALL existing annotation layer references to prevent memory leak
+        if (pageInfo.annotationLayer) {
+          Logger.warn(`Destroying pageInfo.annotationLayer for page ${pageInfo.pageNumber}`);
+          pageInfo.annotationLayer.destroy();
+          pageInfo.annotationLayer = undefined;
+        }
         if (this._activeAnnotationLayers.has(pageInfo.pageNumber)) {
-          Logger.warn(`Destroying existing annotation layer for page ${pageInfo.pageNumber}`);
+          Logger.warn(`Destroying active annotation layer for page ${pageInfo.pageNumber}`);
           const existingAnnotLayer = this._activeAnnotationLayers.get(pageInfo.pageNumber);
           existingAnnotLayer?.destroy();
           this._activeAnnotationLayers.delete(pageInfo.pageNumber);
@@ -1553,7 +1610,11 @@ class PageVirtualization {
       Logger.info(`Retrying text layer for page ${pageInfo.pageNumber} (attempt ${pageInfo.textLayerState.renderAttempts + 1}/3)`);
 
       try {
-        // Clean up existing text layer if present
+        // CRITICAL: Clean up ALL existing text layer references
+        if (pageInfo.textLayer) {
+          pageInfo.textLayer.destroy();
+          pageInfo.textLayer = undefined;
+        }
         if (this._activeTextLayers.has(pageInfo.pageNumber)) {
           const existingTextLayer = this._activeTextLayers.get(pageInfo.pageNumber);
           existingTextLayer?.destroy();
@@ -1595,7 +1656,11 @@ class PageVirtualization {
       Logger.info(`Retrying annotation layer for page ${pageInfo.pageNumber} (attempt ${pageInfo.annotationLayerState.renderAttempts + 1}/3)`);
 
       try {
-        // Clean up existing annotation layer if present
+        // CRITICAL: Clean up ALL existing annotation layer references
+        if (pageInfo.annotationLayer) {
+          pageInfo.annotationLayer.destroy();
+          pageInfo.annotationLayer = undefined;
+        }
         if (this._activeAnnotationLayers.has(pageInfo.pageNumber)) {
           const existingAnnotLayer = this._activeAnnotationLayers.get(pageInfo.pageNumber);
           existingAnnotLayer?.destroy();
