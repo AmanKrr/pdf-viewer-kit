@@ -1432,20 +1432,29 @@ class PageVirtualization {
     // Clear old high-res content (bitmap or tiles)
     imageContainer.innerHTML = '';
 
-    // Calculate viewport bounds relative to page
+    // Calculate viewport bounds relative to page (only the visible portion)
     const pageBounds = pageInfo.pageWrapperDiv.getBoundingClientRect();
     const containerBounds = this._scrollableContainer.getBoundingClientRect();
 
+    // Calculate intersection between page and container
+    const intersectionTop = Math.max(pageBounds.top, containerBounds.top);
+    const intersectionLeft = Math.max(pageBounds.left, containerBounds.left);
+    const intersectionBottom = Math.min(pageBounds.bottom, containerBounds.bottom);
+    const intersectionRight = Math.min(pageBounds.right, containerBounds.right);
+
+    // Convert to page-relative coordinates
     const viewportBounds: ViewportBounds = {
-      top: Math.max(0, containerBounds.top - pageBounds.top),
-      left: Math.max(0, containerBounds.left - pageBounds.left),
-      width: Math.min(currentViewport.width, containerBounds.width),
-      height: Math.min(currentViewport.height, containerBounds.height),
+      top: Math.max(0, intersectionTop - pageBounds.top),
+      left: Math.max(0, intersectionLeft - pageBounds.left),
+      width: Math.max(0, intersectionRight - intersectionLeft),
+      height: Math.max(0, intersectionBottom - intersectionTop),
     };
 
     Logger.info(`Rendering HIGH-RES TILES for page ${pageInfo.pageNumber}`, {
       scale: currentScale,
-      viewport: `${currentViewport.width}×${currentViewport.height}`,
+      pageViewport: `${currentViewport.width}×${currentViewport.height}`,
+      visibleBounds: `${viewportBounds.width}×${viewportBounds.height}`,
+      visibleArea: `top:${viewportBounds.top}, left:${viewportBounds.left}`,
     });
 
     // Render visible tiles at full resolution
@@ -1495,15 +1504,22 @@ class PageVirtualization {
       return;
     }
 
-    // Calculate viewport bounds (what's currently visible in the scroll container)
-    const containerBounds = this._scrollableContainer.getBoundingClientRect();
+    // Calculate viewport bounds (only the visible portion of the page)
     const pageBounds = pageInfo.pageWrapperDiv.getBoundingClientRect();
+    const containerBounds = this._scrollableContainer.getBoundingClientRect();
 
+    // Calculate intersection between page and container
+    const intersectionTop = Math.max(pageBounds.top, containerBounds.top);
+    const intersectionLeft = Math.max(pageBounds.left, containerBounds.left);
+    const intersectionBottom = Math.min(pageBounds.bottom, containerBounds.bottom);
+    const intersectionRight = Math.min(pageBounds.right, containerBounds.right);
+
+    // Convert to page-relative coordinates
     const viewportBounds: ViewportBounds = {
-      top: Math.max(0, containerBounds.top - pageBounds.top),
-      left: Math.max(0, containerBounds.left - pageBounds.left),
-      width: Math.min(currentViewport.width, containerBounds.width),
-      height: Math.min(currentViewport.height, containerBounds.height),
+      top: Math.max(0, intersectionTop - pageBounds.top),
+      left: Math.max(0, intersectionLeft - pageBounds.left),
+      width: Math.max(0, intersectionRight - intersectionLeft),
+      height: Math.max(0, intersectionBottom - intersectionTop),
     };
 
     // Get currently rendered tiles from the DOM
