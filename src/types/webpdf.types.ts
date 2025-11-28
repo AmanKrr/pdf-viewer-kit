@@ -67,6 +67,27 @@ export interface LoadOptions extends DocumentInitParameters {
 
   /** HTTP headers to be used for fetching the PDF document (optional). */
   httpHeaders?: Record<string, string>;
+
+  /** Enable tile-based rendering for high-resolution pages (default: true). */
+  enableTiling?: boolean;
+
+  /** Configuration for tile rendering when tiling is enabled. */
+  tileConfig?: {
+    /** Tile size in pixels (default: 512). */
+    tileSize?: number;
+
+    /** Enable progressive rendering (show low-res first) (default: true). */
+    progressiveRendering?: boolean;
+
+    /** Maximum number of tiles to keep in cache (default: 100). */
+    maxCachedTiles?: number;
+
+    /** Enable high-DPI rendering for retina displays (default: true). */
+    enableHighDPI?: boolean;
+
+    /** Enable debug mode to visualize tiles with red borders (default: false). */
+    debug?: boolean;
+  };
 }
 
 /**

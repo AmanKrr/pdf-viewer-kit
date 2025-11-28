@@ -37,10 +37,12 @@ import {
   RenderScheduler,
   PageDomAdapter,
   VirtualizationEngine,
+  TileManager,
   type MemoryStats,
   type RenderTask as EngineRenderTask,
   type RenderResult as EngineRenderResult,
   type PageDimensions,
+  type ViewportBounds,
 } from '../../core/engine';
 
 /**
@@ -154,6 +156,7 @@ class PageVirtualization {
   private _memoryManager!: MemoryManager;
   private _renderScheduler!: RenderScheduler<CachedPageInfo>;
   private _pageDomAdapter!: PageDomAdapter;
+  private _tileManager!: TileManager;
 
   // Direct layer tracking (no manager wrappers)
   private _activeTextLayers: Map<number, TextLayer> = new Map();
@@ -224,6 +227,19 @@ class PageVirtualization {
         maxPooledWrappers: 10, // Initial pool size, can be expanded
       }
     );
+    this._tileManager = new TileManager({
+      tileSize: this._options.tileConfig?.tileSize ?? 512,
+      progressiveRendering: this._options.tileConfig?.progressiveRendering ?? true,
+      maxCachedTiles: this._options.tileConfig?.maxCachedTiles ?? 100,
+      enableHighDPI: this._options.tileConfig?.enableHighDPI ?? true,
+      debug: this._options.tileConfig?.debug ?? false, // Configurable via options
+    });
+
+    // Connect TileManager to canvas pool
+    this._tileManager.setCanvasPool({
+      getTileCanvas: (w, h) => this.canvasPool.getCanvas(w, h),
+      releaseTileCanvas: (c) => this.canvasPool.releaseCanvas(c),
+    });
 
     // Set up render task executor
     this._renderScheduler.setExecutor(async (task, signal) => {
@@ -726,9 +742,16 @@ class PageVirtualization {
   public async refreshHighResForVisiblePages(): Promise<void> {
     const pagesToRefresh = Array.from(this._cachedPages.values()).filter((pInfo) => pInfo.isVisible && pInfo.pdfPageProxy);
 
+    // 🎨 TILING FLAG: Use tiles for high-res or ImageBitmap (configurable via options)
+    const useTiling = this._options.enableTiling ?? true;
+
     for (const pageInfo of pagesToRefresh) {
       if (pageInfo.isVisible && pageInfo.pdfPageProxy) {
-        await this.appendHighResImage(pageInfo);
+        if (useTiling) {
+          await this._appendHighResToTiles(pageInfo);
+        } else {
+          await this.appendHighResImage(pageInfo);
+        }
       }
     }
   }
@@ -948,8 +971,18 @@ class PageVirtualization {
         await this._retryFailedLayers(pageInfo);
       }
 
+      // Render high-resolution content (only if zoom > 1x)
       if (!pageInfo.renderFailed && currentScale != 1) {
-        await this.appendHighResImage(pageInfo);
+        // 🎨 TILING FLAG: Use tiles for high-res or ImageBitmap (configurable via options)
+        const useTiling = this._options.enableTiling ?? true;
+
+        if (useTiling) {
+          // Use tiles (memory efficient, only visible tiles)
+          await this._appendHighResToTiles(pageInfo);
+        } else {
+          // Use ImageBitmap (original approach, full page bitmap)
+          await this.appendHighResImage(pageInfo);
+        }
       }
 
       pageInfo.pageWrapperDiv.classList.remove('page-placeholder');
@@ -1181,6 +1214,23 @@ class PageVirtualization {
       }
     }
 
+    // 🎨 UPDATE TILES ON SCROLL: Re-render tiles for visible pages when scrolling
+    if (this._options.enableTiling ?? true) {
+      const useTiling = this._options.enableTiling ?? true;
+
+      if (useTiling) {
+        // Update tiles for all visible pages (horizontal/vertical scroll)
+        this._cachedPages.forEach((pageInfo) => {
+          if (pageInfo.isVisible && pageInfo.isFullyRendered && pageInfo.pdfPageProxy) {
+            // Update tile visibility and render new visible tiles
+            this._updateTilesForVisiblePage(pageInfo).catch(err => {
+              Logger.warn(`Failed to update tiles for page ${pageInfo.pageNumber}`, err);
+            });
+          }
+        });
+      }
+    }
+
     // AGGRESSIVE CACHE CLEANUP: If cache is still too large, remove oldest pages
     const MAX_CACHE_SIZE = (this._pageBuffer * 2) + 10; // Keep buffer + some margin
     if (this._cachedPages.size > MAX_CACHE_SIZE) {
@@ -1355,6 +1405,147 @@ class PageVirtualization {
   }
 
   /**
+   * Render high-res tiles (replaces appendHighResImage when tiling enabled)
+   * Tiles are rendered into zoomedImageContainer, same as high-res ImageBitmap
+   */
+  private async _appendHighResToTiles(pageInfo: CachedPageInfo): Promise<void> {
+    if (!pageInfo.pdfPageProxy || !pageInfo.isVisible) {
+      return;
+    }
+
+    // Recalculate viewport with current scale
+    const currentScale = this.state.scale;
+    const currentViewport = pageInfo.pdfPageProxy.getViewport({ scale: currentScale });
+
+    // Get zoomedImageContainer (same as in appendHighResImage)
+    const imageContainer = pageInfo.pageWrapperDiv.querySelector<HTMLElement>(
+      `#zoomedImageContainer-${pageInfo.pageNumber}`
+    );
+
+    if (!imageContainer) {
+      return;
+    }
+
+    // Clear old high-res content (bitmap or tiles)
+    imageContainer.innerHTML = '';
+
+    // Calculate viewport bounds relative to page
+    const pageBounds = pageInfo.pageWrapperDiv.getBoundingClientRect();
+    const containerBounds = this._scrollableContainer.getBoundingClientRect();
+
+    const viewportBounds: ViewportBounds = {
+      top: Math.max(0, containerBounds.top - pageBounds.top),
+      left: Math.max(0, containerBounds.left - pageBounds.left),
+      width: Math.min(currentViewport.width, containerBounds.width),
+      height: Math.min(currentViewport.height, containerBounds.height),
+    };
+
+    Logger.info(`Rendering HIGH-RES TILES for page ${pageInfo.pageNumber}`, {
+      scale: currentScale,
+      viewport: `${currentViewport.width}×${currentViewport.height}`,
+    });
+
+    // Render visible tiles at full resolution
+    const tiles = await this._tileManager.renderVisibleTiles(
+      pageInfo.pageNumber,
+      pageInfo.pdfPageProxy,
+      currentViewport,
+      viewportBounds
+    );
+
+    // Append tiles to imageContainer (they replace the high-res bitmap)
+    tiles.forEach(tile => {
+      if (tile.canvas && tile.isRendered) {
+        tile.canvas.id = tile.id;
+        imageContainer.appendChild(tile.canvas);
+      }
+    });
+
+    pageInfo.renderedScale = currentScale;
+
+    Logger.info(`✅ Rendered ${tiles.length} high-res tiles for page ${pageInfo.pageNumber}`, {
+      tileStats: this._tileManager.getStats(),
+    });
+  }
+
+  /**
+   * Updates tiles for a visible page when scrolling reveals new areas.
+   * This ensures high-res tiles are rendered for newly visible portions.
+   * @param pageInfo The page information object.
+   * @returns {Promise<void>}
+   */
+  private async _updateTilesForVisiblePage(pageInfo: CachedPageInfo): Promise<void> {
+    const currentScale = this.state.scale;
+
+    // Get current viewport for this page
+    const currentViewport = pageInfo.pdfPageProxy!.getViewport({
+      scale: currentScale,
+    });
+
+    // Get the zoomedImageContainer
+    const imageContainer = pageInfo.pageWrapperDiv.querySelector<HTMLElement>(
+      `#zoomedImageContainer-${pageInfo.pageNumber}`
+    );
+
+    if (!imageContainer) {
+      Logger.warn(`No zoomedImageContainer found for page ${pageInfo.pageNumber}`);
+      return;
+    }
+
+    // Calculate viewport bounds (what's currently visible in the scroll container)
+    const containerBounds = this._scrollableContainer.getBoundingClientRect();
+    const pageBounds = pageInfo.pageWrapperDiv.getBoundingClientRect();
+
+    const viewportBounds: ViewportBounds = {
+      top: Math.max(0, containerBounds.top - pageBounds.top),
+      left: Math.max(0, containerBounds.left - pageBounds.left),
+      width: Math.min(currentViewport.width, containerBounds.width),
+      height: Math.min(currentViewport.height, containerBounds.height),
+    };
+
+    // Get currently rendered tiles from the DOM
+    const existingTileIds = new Set<string>();
+    const existingTileElements = imageContainer.querySelectorAll<HTMLCanvasElement>('canvas[id^="tile-"]');
+    existingTileElements.forEach((canvas) => {
+      existingTileIds.add(canvas.id);
+    });
+
+    // Update tile visibility based on new viewport bounds
+    this._tileManager.updateTileVisibility(pageInfo.pageNumber, viewportBounds);
+
+    // Render any new visible tiles
+    const tiles = await this._tileManager.renderVisibleTiles(
+      pageInfo.pageNumber,
+      pageInfo.pdfPageProxy!,
+      currentViewport,
+      viewportBounds
+    );
+
+    // Add new tiles to the container (skip tiles that are already in DOM)
+    let newTilesAdded = 0;
+    tiles.forEach((tile) => {
+      if (tile.canvas && tile.isRendered && !existingTileIds.has(tile.canvas.id)) {
+        imageContainer.appendChild(tile.canvas);
+        newTilesAdded++;
+      }
+    });
+
+    // Remove tiles that are no longer visible
+    const visibleTileIds = new Set<string>(tiles.map(t => t.canvas?.id).filter(Boolean) as string[]);
+    existingTileElements.forEach((canvas) => {
+      if (!visibleTileIds.has(canvas.id)) {
+        canvas.remove();
+      }
+    });
+
+    if (newTilesAdded > 0) {
+      Logger.info(`Updated tiles for page ${pageInfo.pageNumber}: added ${newTilesAdded} new tiles`, {
+        totalVisible: tiles.length,
+      });
+    }
+  }
+
+  /**
    * Renders the page content.
    * @param pageInfo The page information object.
    * @param viewport The viewport for rendering.
@@ -1374,14 +1565,14 @@ class PageVirtualization {
       try {
         await oldTask.promise;
       } catch (err: any) {
-        // expected RenderingCancelledException—ignore, but log if it’s something else
+        // expected RenderingCancelledException—ignore, but log if it's something else
         if (err.name !== 'RenderingCancelledException') {
           Logger.error(`unexpected error while cancelling`, { page: pageInfo.pageNumber, err });
         }
       }
       pageInfo.renderTask = undefined;
 
-      // also put that canvas back into the pool if it hasn’t been already
+      // also put that canvas back into the pool if it hasn't been already
       if (pageInfo.canvasElement) {
         this.canvasPool.releaseCanvas(pageInfo.canvasElement);
         pageInfo.canvasElement = undefined;
@@ -1997,6 +2188,7 @@ class PageVirtualization {
     this._scaleManager.destroy();
     this._memoryManager.destroy();
     this._pageDomAdapter.destroy();
+    this._tileManager.destroy();
 
     // Destroy all active layers
     this._activeTextLayers.forEach((textLayer, pageNumber) => {

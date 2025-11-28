@@ -95,3 +95,15 @@ export {
   type MemoryManagerConfig,
   type MemoryPressureCallback,
 } from './memory-manager';
+
+// TileManager exports
+export {
+  TileManager,
+  TileQuality,
+  type TileConfig,
+  type Tile,
+  type TileGrid,
+  type ViewportBounds,
+  type TileRenderResult,
+  type TileCanvasPool,
+} from './tile-manager';
