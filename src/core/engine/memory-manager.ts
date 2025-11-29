@@ -14,8 +14,6 @@
   limitations under the License.
 */
 
-import Logger from '../../utils/logger-utils';
-
 /**
  * MemoryManager - Memory and Performance Management
  *
@@ -119,25 +117,14 @@ export class MemoryManager {
    */
   startMonitoring(): void {
     if (this.monitoringInterval) {
-      Logger.warn('Memory monitoring already started');
       return;
     }
-
-    Logger.info('Starting memory monitoring', {
-      interval: this.config.checkInterval,
-      threshold: this.config.pressureThreshold,
-    });
 
     this.monitoringInterval = setInterval(() => {
       const pressure = this.getCurrentPressure();
 
       // Invoke callbacks if pressure level changed
       if (pressure !== this.lastPressureLevel) {
-        Logger.info('Memory pressure changed', {
-          from: this.lastPressureLevel,
-          to: pressure,
-        });
-
         this.lastPressureLevel = pressure;
 
         const stats = this.getMemoryStats();
@@ -145,7 +132,7 @@ export class MemoryManager {
           try {
             callback(pressure, stats);
           } catch (error) {
-            Logger.error('Memory pressure callback error', error);
+            // Ignore callback errors
           }
         });
       }
@@ -159,7 +146,6 @@ export class MemoryManager {
     if (this.monitoringInterval) {
       clearInterval(this.monitoringInterval);
       this.monitoringInterval = undefined;
-      Logger.info('Stopped memory monitoring');
     }
   }
 
@@ -447,27 +433,7 @@ export class MemoryManager {
    * Log current memory status
    */
   logStatus(): void {
-    const stats = this.getMemoryStats();
-    const pressure = this.getCurrentPressure();
-    const webgl = this.getWebGLCapabilities();
-
-    Logger.info('Memory Manager Status', {
-      pressure,
-      stats: stats
-        ? {
-            used: `${(stats.usedJSHeapSize / (1024 * 1024)).toFixed(2)} MB`,
-            limit: `${(stats.jsHeapSizeLimit / (1024 * 1024)).toFixed(2)} MB`,
-            percent: `${(stats.usedPercent * 100).toFixed(1)}%`,
-          }
-        : 'unavailable',
-      webgl: webgl
-        ? {
-            supported: webgl.supported,
-            recommended: webgl.recommended,
-            renderer: webgl.renderer,
-          }
-        : 'not detected',
-    });
+    // Method kept for backward compatibility but does nothing
   }
 
   /**

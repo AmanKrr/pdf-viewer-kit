@@ -16,7 +16,6 @@
 
 import type { PDFPageProxy, PageViewport } from 'pdfjs-dist';
 import type { RenderParameters } from 'pdfjs-dist/types/src/display/api';
-import Logger from '../../utils/logger-utils';
 
 /**
  * TileManager - Progressive Tile Rendering System
@@ -185,8 +184,6 @@ export class TileManager {
       debug: false,
       ...config,
     };
-
-    Logger.info('TileManager initialized', this.config);
   }
 
   /**
@@ -271,13 +268,6 @@ export class TileManager {
 
     this.grids.set(pageNumber, grid);
 
-    Logger.info(`Tile grid calculated for page ${pageNumber}`, {
-      rows,
-      cols,
-      totalTiles: tiles.size,
-      pageSize: `${viewport.width}×${viewport.height}`,
-    });
-
     return grid;
   }
 
@@ -312,12 +302,21 @@ export class TileManager {
       const tileRight = tile.x + tile.width;
       const tileBottom = tile.y + tile.height;
 
-      // Check if tile intersects viewport
-      const isVisible =
-        tile.x < scaledViewport.right &&
-        tileRight > scaledViewport.left &&
-        tile.y < scaledViewport.bottom &&
-        tileBottom > scaledViewport.top;
+      // Calculate visible area of tile
+      const visibleLeft = Math.max(tile.x, scaledViewport.left);
+      const visibleTop = Math.max(tile.y, scaledViewport.top);
+      const visibleRight = Math.min(tileRight, scaledViewport.right);
+      const visibleBottom = Math.min(tileBottom, scaledViewport.bottom);
+
+      const visibleWidth = Math.max(0, visibleRight - visibleLeft);
+      const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+      const visibleArea = visibleWidth * visibleHeight;
+      const tileArea = tile.width * tile.height;
+      const visibilityPercentage = tileArea > 0 ? (visibleArea / tileArea) * 100 : 0;
+
+      // Render all tiles that have any visible portion (good UX - no blurry edges)
+      // We'll manage memory by cleaning up old tiles on scroll
+      const isVisible = visibilityPercentage > 0;
 
       tile.isVisible = isVisible;
 
@@ -326,8 +325,6 @@ export class TileManager {
         visibleTiles.push(tile);
       }
     });
-
-    Logger.info(`Visible tiles for page ${pageNumber}: ${visibleTiles.length}/${grid.tiles.size}`);
 
     return visibleTiles;
   }
@@ -354,7 +351,6 @@ export class TileManager {
     }
 
     if (tile.isRendering) {
-      Logger.warn(`Tile ${tile.id} is already rendering`);
       return { success: false, tile };
     }
 
@@ -404,19 +400,12 @@ export class TileManager {
       tile.isRendered = true;
       tile.lastAccessTime = Date.now();
 
-      Logger.info(`Tile ${tile.id} rendered successfully`, {
-        position: `${tile.x},${tile.y}`,
-        size: `${tile.width}×${tile.height}`,
-      });
-
       return { success: true, tile };
     } catch (error: any) {
       if (error?.name === 'RenderingCancelledException') {
-        Logger.info(`Tile ${tile.id} render cancelled`);
         return { success: false, tile, cancelled: true };
       }
 
-      Logger.error(`Tile ${tile.id} render failed`, error);
       return { success: false, tile, error };
     } finally {
       tile.isRendering = false;
@@ -454,7 +443,10 @@ export class TileManager {
           renderedTiles.push(tile);
         }
       } else if (tile.isRendered) {
-        renderedTiles.push(tile);
+        // Only include already-rendered tiles if they're still visible
+        if (tile.isVisible) {
+          renderedTiles.push(tile);
+        }
       }
     }
 
@@ -486,7 +478,6 @@ export class TileManager {
     });
 
     this.grids.delete(pageNumber);
-    Logger.info(`Cleared tiles for page ${pageNumber}`);
   }
 
   /**
@@ -518,8 +509,6 @@ export class TileManager {
     const tilesToEvict = allTiles.length - this.config.maxCachedTiles;
 
     if (tilesToEvict > 0) {
-      Logger.info(`Evicting ${tilesToEvict} old tiles`);
-
       for (let i = 0; i < tilesToEvict; i++) {
         const tile = allTiles[i];
         if (tile.canvas && this.canvasPool) {
@@ -592,6 +581,5 @@ export class TileManager {
    */
   destroy(): void {
     this.clearAllTiles();
-    Logger.info('TileManager destroyed');
   }
 }

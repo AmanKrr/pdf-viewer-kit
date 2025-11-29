@@ -16,7 +16,6 @@
 
 import type { PDFPageProxy, PageViewport, RenderTask } from 'pdfjs-dist';
 import type { RenderParameters } from 'pdfjs-dist/types/src/display/api';
-import Logger from '../../utils/logger-utils';
 
 /**
  * PageRenderer - PDF Page Rendering Module
@@ -138,12 +137,6 @@ export class PageRenderer {
 
       await renderTask.promise;
 
-      Logger.info(`Base render complete for page ${pageNumber}`, {
-        scale: baseRenderScale,
-        width: baseViewport.width,
-        height: baseViewport.height,
-      });
-
       // Remove from active renders
       this.activeRenders.delete(pageNumber);
 
@@ -160,18 +153,11 @@ export class PageRenderer {
       canvasPool.releaseCanvas(canvas);
 
       if (error?.name === 'RenderingCancelledException') {
-        Logger.warn(`Base render cancelled for page ${pageNumber}`);
         return {
           success: false,
           cancelled: true,
         };
       }
-
-      Logger.error(`Base render failed for page ${pageNumber}`, {
-        errName: error?.name,
-        errMessage: error?.message,
-        stack: error?.stack,
-      });
 
       return {
         success: false,
@@ -224,12 +210,6 @@ export class PageRenderer {
 
       await renderTask.promise;
 
-      Logger.info(`High-res render complete for page ${pageNumber}`, {
-        scale: currentViewport.scale,
-        width: currentViewport.width,
-        height: currentViewport.height,
-      });
-
       // Create ImageBitmap from offscreen canvas
       const bitmap = await createImageBitmap(offscreenCanvas);
 
@@ -255,14 +235,11 @@ export class PageRenderer {
       canvasPool.releaseCanvas(offscreenCanvas);
 
       if (error?.name === 'RenderingCancelledException') {
-        Logger.info(`High-res render cancelled for page ${pageNumber}`);
         return {
           success: false,
           cancelled: true,
         };
       }
-
-      Logger.error(`High-res render failed for page ${pageNumber}`, error);
 
       return {
         success: false,
@@ -311,8 +288,6 @@ export class PageRenderer {
     if (activeRender) {
       // Check if we should cancel this quality level
       if (quality === 'all' || quality === activeRender.quality) {
-        Logger.info(`Cancelling ${activeRender.quality} render for page ${pageNumber}`);
-
         // Cancel the render task
         activeRender.renderTask.cancel();
 
@@ -335,8 +310,6 @@ export class PageRenderer {
    * Cancel all active renders
    */
   cancelAllRenders(): void {
-    Logger.info(`Cancelling all active renders (${this.activeRenders.size} active)`);
-
     this.activeRenders.forEach((activeRender, pageNumber) => {
       activeRender.renderTask.cancel();
     });

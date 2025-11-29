@@ -16,7 +16,6 @@
 
 import type { PDFPageProxy, PageViewport } from 'pdfjs-dist';
 import type { PageDimensions } from './virtualization-engine';
-import Logger from '../../utils/logger-utils';
 
 /**
  * ScaleManager - Zoom/Scale Change Management
@@ -99,7 +98,6 @@ export class ScaleManager {
    */
   beginScaleChange(): void {
     this.isScaleChangeInProgress = true;
-    Logger.info('Scale change started');
   }
 
   /**
@@ -107,7 +105,6 @@ export class ScaleManager {
    */
   endScaleChange(): void {
     this.isScaleChangeInProgress = false;
-    Logger.info('Scale change completed');
   }
 
   /**
@@ -121,10 +118,6 @@ export class ScaleManager {
    */
   async quickDimensionUpdate(options: ScaleChangeOptions): Promise<void> {
     const { newScale, pagePositions, visiblePages, instanceId } = options;
-
-    Logger.info(`Quick dimension update for ${visiblePages.length} visible pages`, {
-      newScale,
-    });
 
     for (const pageInfo of visiblePages) {
       if (!pageInfo.isVisible || !pageInfo.pageProxy) {
@@ -156,7 +149,7 @@ export class ScaleManager {
         // Clear high-res image container (will be re-rendered later)
         this.clearHighResContainer(pageInfo.pageNumber, newViewport);
       } catch (error) {
-        Logger.error(`Failed to update dimensions for page ${pageInfo.pageNumber}`, error);
+        // Ignore dimension update errors
       }
     }
   }
@@ -178,7 +171,7 @@ export class ScaleManager {
       try {
         await callback(pageNumber, viewport);
       } catch (error) {
-        Logger.error(`Layer resize callback failed for page ${pageNumber}`, error);
+        // Ignore callback errors
       }
     }
 

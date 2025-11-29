@@ -73,7 +73,17 @@ export interface LoadOptions extends DocumentInitParameters {
 
   /** Configuration for tile rendering when tiling is enabled. */
   tileConfig?: {
-    /** Tile size in pixels (default: 512). */
+    /**
+     * Tile size in pixels (default: 512).
+     *
+     * Larger tiles = fewer tiles but more memory per tile
+     * Smaller tiles = more tiles but less memory per tile
+     *
+     * Examples:
+     * - 512: Good balance, ~9 tiles for typical viewport on retina
+     * - 768: Fewer tiles (~6), good for memory-constrained devices
+     * - 1024: Very few tiles (~4), but large memory per tile
+     */
     tileSize?: number;
 
     /** Enable progressive rendering (show low-res first) (default: true). */

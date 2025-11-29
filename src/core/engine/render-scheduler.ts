@@ -432,10 +432,8 @@ export class RenderScheduler<T = any> {
   /**
    * Log debug message
    */
-  private log(message: string): void {
-    if (this.config.debug) {
-      console.log(`[RenderScheduler] ${message}`);
-    }
+  private log(_message: string): void {
+    // Debug logging disabled
   }
 }
 

@@ -27,7 +27,6 @@ import { AnnotationManager } from '../managers/annotation-manager.manager';
 import { SelectionManager } from '../managers/selection.manager';
 import SearchHighlighter from '../managers/search-highlighter.manager';
 import { reportError } from '../../utils/debug-utils';
-import Logger from '../../utils/logger-utils';
 import { PDFLinkService } from '../services/link.service';
 import {
   PageRenderer,
@@ -49,10 +48,10 @@ import {
  * Lifecycle state for individual rendering layers
  */
 interface LayerState {
-  isRendered: boolean;        // Is this layer successfully rendered?
-  renderFailed: boolean;       // Did this layer fail to render?
-  renderAttempts: number;      // Number of render attempts for this layer
-  lastError?: Error;           // Last error encountered for this layer
+  isRendered: boolean; // Is this layer successfully rendered?
+  renderFailed: boolean; // Did this layer fail to render?
+  renderAttempts: number; // Number of render attempts for this layer
+  lastError?: Error; // Last error encountered for this layer
 }
 
 interface CachedPageInfo {
@@ -68,17 +67,17 @@ interface CachedPageInfo {
   isVisible: boolean;
 
   // DECOUPLED layer states - each layer has independent lifecycle
-  canvasState: LayerState;        // Base canvas render state
-  textLayerState: LayerState;     // Text layer (for selection) state
+  canvasState: LayerState; // Base canvas render state
+  textLayerState: LayerState; // Text layer (for selection) state
   annotationLayerState: LayerState; // Annotation layer (for interactions) state
 
   // Legacy fields - kept for backward compatibility during transition
-  isFullyRendered: boolean;    // TRUE only when ALL layers are rendered
-  renderFailed: boolean;        // TRUE if ANY critical layer failed (canvas only)
+  isFullyRendered: boolean; // TRUE only when ALL layers are rendered
+  renderFailed: boolean; // TRUE if ANY critical layer failed (canvas only)
   isTransitioningToFullRender: boolean;
-  renderedScale?: number;       // Track the scale at which this page was last fully rendered
-  renderAttempts?: number;      // Deprecated - use canvasState.renderAttempts
-  lastRenderError?: Error;      // Deprecated - use canvasState.lastError
+  renderedScale?: number; // Track the scale at which this page was last fully rendered
+  renderAttempts?: number; // Deprecated - use canvasState.renderAttempts
+  lastRenderError?: Error; // Deprecated - use canvasState.lastError
 }
 
 /**
@@ -88,8 +87,8 @@ interface CachedPageInfo {
  * They are handled separately in _renderPageContent() and don't set renderFailed.
  */
 enum RenderErrorType {
-  TRANSIENT,      // Network issues, temporary resource exhaustion → RETRY with limit (3 attempts)
-  PERMANENT,      // Corrupt PDF, invalid page, parse errors → DON'T RETRY
+  TRANSIENT, // Network issues, temporary resource exhaustion → RETRY with limit (3 attempts)
+  PERMANENT, // Corrupt PDF, invalid page, parse errors → DON'T RETRY
 }
 
 /**
@@ -105,13 +104,15 @@ function classifyError(error: Error | undefined): RenderErrorType {
   const errorMessage = error.message || '';
 
   // Permanent errors - never retry
-  if (errorMessage.includes('Invalid PDF') ||
-      errorMessage.includes('Page not found') ||
-      errorMessage.includes('Corrupt') ||
-      errorMessage.includes('parse error') ||
-      errorMessage.includes('malformed') ||
-      errorMessage.includes('Missing PDF') ||
-      errorMessage.includes('Invalid object')) {
+  if (
+    errorMessage.includes('Invalid PDF') ||
+    errorMessage.includes('Page not found') ||
+    errorMessage.includes('Corrupt') ||
+    errorMessage.includes('parse error') ||
+    errorMessage.includes('malformed') ||
+    errorMessage.includes('Missing PDF') ||
+    errorMessage.includes('Invalid object')
+  ) {
     return RenderErrorType.PERMANENT;
   }
 
@@ -217,16 +218,12 @@ class PageVirtualization {
       rapidScrollThreshold: 500,
       debug: false,
     });
-    this._pageDomAdapter = new PageDomAdapter(
-      this._pagesParentDiv,
-      this._scrollableContainer,
-      {
-        instanceId: this.instanceId,
-        containerId: this._options.containerId,
-        pageGap: 10,
-        maxPooledWrappers: 10, // Initial pool size, can be expanded
-      }
-    );
+    this._pageDomAdapter = new PageDomAdapter(this._pagesParentDiv, this._scrollableContainer, {
+      instanceId: this.instanceId,
+      containerId: this._options.containerId,
+      pageGap: 10,
+      maxPooledWrappers: 10, // Initial pool size, can be expanded
+    });
     this._tileManager = new TileManager({
       tileSize: this._options.tileConfig?.tileSize ?? 512,
       progressiveRendering: this._options.tileConfig?.progressiveRendering ?? true,
@@ -309,16 +306,10 @@ class PageVirtualization {
     // Start memory monitoring
     this._memoryManager.startMonitoring();
     this._memoryPressureUnsubscribe = this._memoryManager.onPressureChange((pressure, stats) => {
-      Logger.info('Memory pressure changed', { pressure, stats });
-
       // Adjust page buffer based on memory pressure
       const recommendedBuffer = MemoryManager.getRecommendedBuffer(this._pageBuffer, pressure);
       if (recommendedBuffer !== this._pageBuffer) {
-        Logger.info('Adjusting page buffer due to memory pressure', {
-          old: this._pageBuffer,
-          new: recommendedBuffer,
-          pressure,
-        });
+        // Page buffer adjusted due to memory pressure
       }
 
       // Emergency cleanup on high/critical pressure
@@ -404,10 +395,6 @@ class PageVirtualization {
     // Aggressive cancellation during scroll (keep this optimization)
     this._aggressiveCancelRenders();
 
-    Logger.info('scroll event', {
-      scrollTop: this._scrollableContainer.scrollTop,
-    });
-
     // Direct throttled handling - simple and effective
     this._throttledScrollHandler(this._scaleManager.isScaling());
   };
@@ -455,8 +442,6 @@ class PageVirtualization {
    */
   private _cancelBaseRender(pageInfo: CachedPageInfo): void {
     if (pageInfo.renderTask) {
-      Logger.info(`Aggressively cancelling base render for page ${pageInfo.pageNumber}`);
-
       // Use PageRenderer to cancel
       this._pageRenderer.cancelPageRender(pageInfo.pageNumber, 'base');
       pageInfo.renderTask = undefined;
@@ -480,8 +465,6 @@ class PageVirtualization {
    */
   private _cancelHighResRender(pageInfo: CachedPageInfo): void {
     if (pageInfo.highResRenderTask) {
-      Logger.info(`Aggressively cancelling high-res render for page ${pageInfo.pageNumber}`);
-
       // Use PageRenderer to cancel and cleanup bitmap
       this._pageRenderer.cancelPageRender(pageInfo.pageNumber, 'high');
       pageInfo.highResRenderTask = undefined;
@@ -519,9 +502,6 @@ class PageVirtualization {
    * Emergency cancellation for extreme memory pressure or performance issues.
    */
   private _emergencyCancelAll(): void {
-    Logger.warn('Emergency render cancellation triggered');
-
-    let cancelledCount = 0;
     const currentPage = this.state.currentPage;
 
     this._cachedPages.forEach((pageInfo) => {
@@ -533,7 +513,6 @@ class PageVirtualization {
       if (pageInfo.renderTask || pageInfo.highResRenderTask) {
         this._cancelBaseRender(pageInfo);
         this._cancelHighResRender(pageInfo);
-        cancelledCount++;
       }
     });
 
@@ -542,8 +521,6 @@ class PageVirtualization {
 
     // Force memory cleanup
     this.canvasPool.handleMemoryPressure();
-
-    Logger.warn(`Emergency cancellation completed: ${cancelledCount} renders cancelled`);
   }
 
   /**
@@ -569,7 +546,6 @@ class PageVirtualization {
    */
   private _clearRenderQueue(): void {
     this._renderScheduler.cancelAllTasks();
-    Logger.info('Render queue cleared');
   }
 
   private _setupPeriodicCancellation(): void {
@@ -654,7 +630,6 @@ class PageVirtualization {
    * Handles PDF scaleChange events.
    */
   private async _onScaleChange(): Promise<void> {
-    Logger.info('scale change start', { newScale: this.state.scale });
     this._scaleManager.beginScaleChange();
 
     // Reset retry tracking for all pages on scale change (new rendering context)
@@ -672,10 +647,8 @@ class PageVirtualization {
 
       await this._updateRenderedPagesOnScroll(this._scrollableContainer.scrollTop, false);
       this._debouncedEnsureVisiblePagesRendered();
-
-      Logger.info('scale change end');
     } catch (error) {
-      Logger.error('Error during scale change', error);
+      // Ignore errors during scale change
     } finally {
       this._scaleManager.endScaleChange();
     }
@@ -713,7 +686,7 @@ class PageVirtualization {
             imageContainer.style.height = `${newViewport.height}px`;
           }
         } catch (error) {
-          Logger.error(`Failed to update dimensions for page ${pageInfo.pageNumber}`, error);
+          // Ignore errors updating dimensions
         }
       }
     }
@@ -769,7 +742,6 @@ class PageVirtualization {
         pageInfo.pdfPageProxy = await this._pdfDocument.getPage(pageInfo.pageNumber);
       } catch (error) {
         // reportError(`getting page ${pageInfo.pageNumber} for scale update`, error);
-        Logger.error(`_updatePageForNewScale: failed to fetch page ${pageInfo.pageNumber}`, error);
         return;
       }
     }
@@ -777,7 +749,6 @@ class PageVirtualization {
     // If still no proxy (e.g. error above, or it's a fundamental issue), we can't get a viewport.
     if (!pageInfo.pdfPageProxy) {
       // debugWarn(`no PDFPageProxy for page ${pageInfo.pageNumber} during scale update, using placeholder`);
-      Logger.warn(`no proxy for page ${pageInfo.pageNumber} on scale update`);
       // We can still try to resize the placeholder div if pagePositions are available
       const placeholderViewportAttempt = PageElement.createLayers('', '', { width: 100, height: 100, scale: 1, rotation: 0 } as any, this.instanceId).getBoundingClientRect();
       const tempViewport = {
@@ -849,25 +820,16 @@ class PageVirtualization {
 
         // PERMANENT errors - never retry
         if (errorType === RenderErrorType.PERMANENT) {
-          Logger.warn(`Page ${pageInfo.pageNumber} has permanent render error, skipping retry`, {
-            error: pageInfo.lastRenderError?.message,
-          });
           return false;
         }
 
         // TRANSIENT errors - retry up to 3 times
         const attempts = pageInfo.renderAttempts || 0;
         if (errorType === RenderErrorType.TRANSIENT && attempts >= 3) {
-          Logger.warn(`Page ${pageInfo.pageNumber} exceeded max retry attempts (${attempts}/3)`, {
-            error: pageInfo.lastRenderError?.message,
-          });
           return false;
         }
 
         // If we reach here, it's a transient error within retry limit - allow retry
-        Logger.info(`Page ${pageInfo.pageNumber} will retry render (attempt ${attempts + 1}/3)`, {
-          error: pageInfo.lastRenderError?.message,
-        });
       }
 
       // Standard rendering check (includes pages that need first render or scale change)
@@ -917,10 +879,6 @@ class PageVirtualization {
     if (pagesToQueue.length > 0) {
       this._renderScheduler.startProcessing();
     }
-
-    Logger.info(`Queued ${pagesToQueue.length} pages for rendering`, {
-      currentPage,
-    });
   }
 
   /**
@@ -935,7 +893,6 @@ class PageVirtualization {
     }
     // Prevent re-entrancy
     if (pageInfo.isTransitioningToFullRender) {
-      Logger.info(`Page ${pageInfo.pageNumber} is already transitioning to full render. Skipping.`);
       return;
     }
     pageInfo.isTransitioningToFullRender = true; // Set lock
@@ -948,7 +905,6 @@ class PageVirtualization {
           pageInfo.pdfPageProxy = await this._pdfDocument.getPage(pageInfo.pageNumber);
         } catch (error) {
           // console.error(`Failed to get page ${pageInfo.pageNumber} for full render:`, error);
-          Logger.error(`_transitionToFullRender: failed to fetch page ${pageInfo.pageNumber}`, error);
           pageInfo.renderFailed = true;
           return;
         }
@@ -959,12 +915,10 @@ class PageVirtualization {
 
       PageElement.createOrUpdatePageContainerDiv(pageInfo.pageNumber, viewport, this._pagePositions, this.instanceId, pageInfo.pageWrapperDiv);
 
-      Logger.info(`_transitionToFullRender → page ${pageInfo.pageNumber}`);
       await this._renderPageContent(pageInfo, viewport);
 
       // FIX: Only set isFullyRendered if canvas render succeeded (critical layer)
       if (pageInfo.renderFailed || !pageInfo.canvasState.isRendered) {
-        Logger.error(`_transitionToFullRender: canvas render failed for page ${pageInfo.pageNumber}`);
         return;
       }
 
@@ -1001,16 +955,7 @@ class PageVirtualization {
 
       pageInfo.isFullyRendered = allLayersComplete;
       pageInfo.renderedScale = currentScale;
-
-      Logger.info(`_transitionToFullRender done page ${pageInfo.pageNumber}`, {
-        renderedScale: pageInfo.renderedScale,
-        canvasRendered: pageInfo.canvasState.isRendered,
-        textLayerRendered: pageInfo.textLayerState.isRendered,
-        annotationLayerRendered: pageInfo.annotationLayerState.isRendered,
-        fullyRendered: pageInfo.isFullyRendered,
-      });
     } catch (error) {
-      Logger.error(`Unexpected error in _transitionToFullRender for page ${pageInfo.pageNumber}`, { rawError: error });
       pageInfo.renderFailed = true;
     } finally {
       pageInfo.isTransitioningToFullRender = false;
@@ -1041,11 +986,7 @@ class PageVirtualization {
     }
 
     // Use VirtualizationEngine to calculate initial page count
-    return VirtualizationEngine.calculateInitialPageCount(
-      containerHeight,
-      pageDimensions,
-      PageElement.gap
-    );
+    return VirtualizationEngine.calculateInitialPageCount(containerHeight, pageDimensions, PageElement.gap);
   }
 
   /**
@@ -1167,7 +1108,7 @@ class PageVirtualization {
         containerWidth: this._scrollableContainer.clientWidth,
       },
       this._pageDimensions,
-      this.state.currentPage
+      this.state.currentPage,
     );
   }
 
@@ -1227,15 +1168,15 @@ class PageVirtualization {
       this._cachedPages.forEach((pageInfo) => {
         if (pageInfo.isVisible && pageInfo.isFullyRendered && pageInfo.pdfPageProxy) {
           // Update tile visibility and render new visible tiles
-          this._updateTilesForVisiblePage(pageInfo).catch(err => {
-            Logger.warn(`Failed to update tiles for page ${pageInfo.pageNumber}`, err);
+          this._updateTilesForVisiblePage(pageInfo).catch(() => {
+            // Ignore tile update errors
           });
         }
       });
     }
 
     // AGGRESSIVE CACHE CLEANUP: If cache is still too large, remove oldest pages
-    const MAX_CACHE_SIZE = (this._pageBuffer * 2) + 10; // Keep buffer + some margin
+    const MAX_CACHE_SIZE = this._pageBuffer * 2 + 10; // Keep buffer + some margin
     if (this._cachedPages.size > MAX_CACHE_SIZE) {
       const pagesToPurge: number[] = [];
       this._cachedPages.forEach((_pageInfo, pageNum) => {
@@ -1250,8 +1191,6 @@ class PageVirtualization {
         this._removePageFromDom(pagesToPurge[i]);
       }
 
-      Logger.info(`Aggressive cache cleanup: removed ${Math.min(excessCount, pagesToPurge.length)} pages, cache size: ${this._cachedPages.size}`);
-
       // MEMORY OPTIMIZATION: Shrink canvas and wrapper pools after cleanup
       this._shrinkMemoryPools();
     }
@@ -1264,17 +1203,15 @@ class PageVirtualization {
   private _shrinkMemoryPools(): void {
     try {
       // Shrink canvas pool to minimal size (keep minimum for visible pages)
-      const currentVisiblePages = Array.from(this._cachedPages.values()).filter(p => p.isVisible).length;
+      const currentVisiblePages = Array.from(this._cachedPages.values()).filter((p) => p.isVisible).length;
       const minCanvasPool = Math.max(5, currentVisiblePages + 2);
       if (this.canvasPool && this.canvasPool.maxPoolSize > minCanvasPool) {
         this.canvasPool.maxPoolSize = minCanvasPool;
-        Logger.info(`Reduced canvas pool size to ${minCanvasPool} (visible: ${currentVisiblePages})`);
       }
 
       // Note: PageDomAdapter manages its own pool internally
     } catch (e) {
       // Ignore pool shrinking errors
-      Logger.warn('Failed to shrink memory pools', e);
     }
   }
 
@@ -1346,7 +1283,6 @@ class PageVirtualization {
         const currentViewport = pageInfo.pdfPageProxy.getViewport({ scale: this.state.scale });
         const currentWidth = parseInt(pageInfo.pageWrapperDiv.style.width || '0');
         if (Math.abs(currentWidth - currentViewport.width) > 2) {
-          Logger.info(`Correcting dimensions for existing page ${pageNumber}`);
           pageInfo.pageWrapperDiv.style.width = `${currentViewport.width}px`;
           pageInfo.pageWrapperDiv.style.height = `${currentViewport.height}px`;
           pageInfo.pageWrapperDiv.style.top = `${this._pagePositions.get(pageNumber) || 0}px`;
@@ -1363,7 +1299,6 @@ class PageVirtualization {
       placeholderViewport = tempPageForSize.getViewport({ scale: this.state.scale });
     } catch (e) {
       reportError(`getting page ${pageNumber} for placeholder size`, e);
-      Logger.error(`_addPageToDom: failed placeholder size for page ${pageNumber}`, e);
       placeholderViewport = { width: 200, height: 300, scale: this.state.scale, rotation: 0 } as PageViewport;
     }
 
@@ -1421,9 +1356,7 @@ class PageVirtualization {
     const currentViewport = pageInfo.pdfPageProxy.getViewport({ scale: currentScale });
 
     // Get zoomedImageContainer (same as in appendHighResImage)
-    const imageContainer = pageInfo.pageWrapperDiv.querySelector<HTMLElement>(
-      `#zoomedImageContainer-${pageInfo.pageNumber}`
-    );
+    const imageContainer = pageInfo.pageWrapperDiv.querySelector<HTMLElement>(`#zoomedImageContainer-${pageInfo.pageNumber}`);
 
     if (!imageContainer) {
       return;
@@ -1450,23 +1383,11 @@ class PageVirtualization {
       height: Math.max(0, intersectionBottom - intersectionTop),
     };
 
-    Logger.info(`Rendering HIGH-RES TILES for page ${pageInfo.pageNumber}`, {
-      scale: currentScale,
-      pageViewport: `${currentViewport.width}×${currentViewport.height}`,
-      visibleBounds: `${viewportBounds.width}×${viewportBounds.height}`,
-      visibleArea: `top:${viewportBounds.top}, left:${viewportBounds.left}`,
-    });
-
     // Render visible tiles at full resolution
-    const tiles = await this._tileManager.renderVisibleTiles(
-      pageInfo.pageNumber,
-      pageInfo.pdfPageProxy,
-      currentViewport,
-      viewportBounds
-    );
+    const tiles = await this._tileManager.renderVisibleTiles(pageInfo.pageNumber, pageInfo.pdfPageProxy, currentViewport, viewportBounds);
 
     // Append tiles to imageContainer (they replace the high-res bitmap)
-    tiles.forEach(tile => {
+    tiles.forEach((tile) => {
       if (tile.canvas && tile.isRendered) {
         tile.canvas.id = tile.id;
         imageContainer.appendChild(tile.canvas);
@@ -1474,10 +1395,6 @@ class PageVirtualization {
     });
 
     pageInfo.renderedScale = currentScale;
-
-    Logger.info(`✅ Rendered ${tiles.length} high-res tiles for page ${pageInfo.pageNumber}`, {
-      tileStats: this._tileManager.getStats(),
-    });
   }
 
   /**
@@ -1495,12 +1412,9 @@ class PageVirtualization {
     });
 
     // Get the zoomedImageContainer
-    const imageContainer = pageInfo.pageWrapperDiv.querySelector<HTMLElement>(
-      `#zoomedImageContainer-${pageInfo.pageNumber}`
-    );
+    const imageContainer = pageInfo.pageWrapperDiv.querySelector<HTMLElement>(`#zoomedImageContainer-${pageInfo.pageNumber}`);
 
     if (!imageContainer) {
-      Logger.warn(`No zoomedImageContainer found for page ${pageInfo.pageNumber}`);
       return;
     }
 
@@ -1533,35 +1447,31 @@ class PageVirtualization {
     this._tileManager.updateTileVisibility(pageInfo.pageNumber, viewportBounds);
 
     // Render any new visible tiles
-    const tiles = await this._tileManager.renderVisibleTiles(
-      pageInfo.pageNumber,
-      pageInfo.pdfPageProxy!,
-      currentViewport,
-      viewportBounds
-    );
+    const tiles = await this._tileManager.renderVisibleTiles(pageInfo.pageNumber, pageInfo.pdfPageProxy!, currentViewport, viewportBounds);
 
     // Add new tiles to the container (skip tiles that are already in DOM)
-    let newTilesAdded = 0;
     tiles.forEach((tile) => {
-      if (tile.canvas && tile.isRendered && !existingTileIds.has(tile.canvas.id)) {
-        imageContainer.appendChild(tile.canvas);
-        newTilesAdded++;
+      if (tile.canvas && tile.isRendered) {
+        // Ensure canvas has the correct ID
+        if (!tile.canvas.id) {
+          tile.canvas.id = tile.id;
+        }
+
+        // Only add if not already in DOM
+        if (!existingTileIds.has(tile.canvas.id)) {
+          imageContainer.appendChild(tile.canvas);
+        }
       }
     });
 
     // Remove tiles that are no longer visible
-    const visibleTileIds = new Set<string>(tiles.map(t => t.canvas?.id).filter(Boolean) as string[]);
+    const visibleTileIds = new Set<string>(tiles.map((t) => t.canvas?.id).filter(Boolean) as string[]);
+
     existingTileElements.forEach((canvas) => {
       if (!visibleTileIds.has(canvas.id)) {
         canvas.remove();
       }
     });
-
-    if (newTilesAdded > 0) {
-      Logger.info(`Updated tiles for page ${pageInfo.pageNumber}: added ${newTilesAdded} new tiles`, {
-        totalVisible: tiles.length,
-      });
-    }
   }
 
   /**
@@ -1571,23 +1481,13 @@ class PageVirtualization {
    * @returns {Promise<void>}
    */
   private async _renderPageContent(pageInfo: CachedPageInfo, viewport: PageViewport): Promise<void> {
-    Logger.info(`renderPageContent start`, {
-      page: pageInfo.pageNumber,
-      scale: this.state.scale,
-      width: viewport.width,
-      height: viewport.height,
-    });
     if (pageInfo.renderTask) {
-      Logger.warn(`cancelling in‐flight base render`, { page: pageInfo.pageNumber });
       const oldTask = pageInfo.renderTask;
       oldTask.cancel();
       try {
         await oldTask.promise;
       } catch (err: any) {
-        // expected RenderingCancelledException—ignore, but log if it's something else
-        if (err.name !== 'RenderingCancelledException') {
-          Logger.error(`unexpected error while cancelling`, { page: pageInfo.pageNumber, err });
-        }
+        // expected RenderingCancelledException—ignore
       }
       pageInfo.renderTask = undefined;
 
@@ -1621,12 +1521,9 @@ class PageVirtualization {
       if (baseResult.cancelled) {
         // Cancellation is NOT an error - it's expected behavior during scrolling
         // Don't set renderFailed, don't store error, don't increment attempts
-        Logger.info(`Base render cancelled for page ${pageInfo.pageNumber} (normal during scroll)`);
         return;
       } else {
         // This is a REAL canvas failure - track it in decoupled canvasState
-        Logger.error(`Base render failed for page ${pageInfo.pageNumber}`, baseResult.error);
-        Logger.download();
 
         // Update decoupled canvas state
         pageInfo.canvasState.renderFailed = true;
@@ -1670,29 +1567,19 @@ class PageVirtualization {
 
       // Render text layer directly
       try {
-        Logger.info(`Rendering text layer for page ${pageInfo.pageNumber}`);
-
         // CRITICAL: Clean up ALL existing text layer references to prevent memory leak
         if (pageInfo.textLayer) {
-          Logger.warn(`Destroying pageInfo.textLayer for page ${pageInfo.pageNumber}`);
           pageInfo.textLayer.destroy();
           pageInfo.textLayer = undefined;
         }
         if (this._activeTextLayers.has(pageInfo.pageNumber)) {
-          Logger.warn(`Destroying active text layer for page ${pageInfo.pageNumber}`);
           const existingTextLayer = this._activeTextLayers.get(pageInfo.pageNumber);
           existingTextLayer?.destroy();
           this._activeTextLayers.delete(pageInfo.pageNumber);
         }
 
         // Create text layer instance
-        const textLayer = new TextLayer(
-          this.containerId,
-          this.instanceId,
-          pageInfo.pageWrapperDiv,
-          pageInfo.pdfPageProxy,
-          viewport
-        );
+        const textLayer = new TextLayer(this.containerId, this.instanceId, pageInfo.pageWrapperDiv, pageInfo.pdfPageProxy, viewport);
 
         // Render text layer (returns [textLayerDiv, annotationHostDiv])
         // NOTE: We ignore annotationHostDiv - that's AnnotationLayer's job
@@ -1707,54 +1594,36 @@ class PageVirtualization {
         pageInfo.textLayerState.renderFailed = false;
         pageInfo.textLayerState.renderAttempts = 0;
         pageInfo.textLayerState.lastError = undefined;
-
-        Logger.info(`Text layer rendered successfully for page ${pageInfo.pageNumber}`);
       } catch (error: any) {
         // Text layer failed
         if ((error?.message || '').includes('was destroyed')) {
-          Logger.warn(`Text layer destroyed mid-create for page ${pageInfo.pageNumber}`);
+          // Text layer destroyed mid-create
         } else {
           pageInfo.textLayerState.renderFailed = true;
           pageInfo.textLayerState.lastError = error;
           pageInfo.textLayerState.renderAttempts++;
-          Logger.error(`Text layer failed for page ${pageInfo.pageNumber} (will retry)`, {
-            error: error?.message,
-            attempts: pageInfo.textLayerState.renderAttempts,
-          });
         }
       }
 
       // Render annotation layer directly (INDEPENDENT of text layer)
       try {
-        Logger.info(`Rendering annotation layer for page ${pageInfo.pageNumber}`);
-
         // CRITICAL: Clean up ALL existing annotation layer references to prevent memory leak
         if (pageInfo.annotationLayer) {
-          Logger.warn(`Destroying pageInfo.annotationLayer for page ${pageInfo.pageNumber}`);
           pageInfo.annotationLayer.destroy();
           pageInfo.annotationLayer = undefined;
         }
         if (this._activeAnnotationLayers.has(pageInfo.pageNumber)) {
-          Logger.warn(`Destroying active annotation layer for page ${pageInfo.pageNumber}`);
           const existingAnnotLayer = this._activeAnnotationLayers.get(pageInfo.pageNumber);
           existingAnnotLayer?.destroy();
           this._activeAnnotationLayers.delete(pageInfo.pageNumber);
         }
 
         // Create annotation layer instance
-        const annotationLayer = new AnnotationLayer(
-          pageInfo.pageWrapperDiv,
-          pageInfo.pdfPageProxy,
-          viewport
-        );
+        const annotationLayer = new AnnotationLayer(pageInfo.pageWrapperDiv, pageInfo.pdfPageProxy, viewport);
 
         // Render annotation layer
         // NOTE: We pass undefined for annotationHostDiv since we create our own
-        const annotationLayerDiv = await annotationLayer.createAnnotationLayer(
-          this._webViewer,
-          this._pdfDocument,
-          undefined
-        );
+        const annotationLayerDiv = await annotationLayer.createAnnotationLayer(this._webViewer, this._pdfDocument, undefined);
 
         // Track active annotation layer
         this._activeAnnotationLayers.set(pageInfo.pageNumber, annotationLayer);
@@ -1775,26 +1644,17 @@ class PageVirtualization {
           }
           this._searchHighlighter.registerPage(pageInfo.pageNumber);
           if (!this._webViewer.annotation.isAnnotationManagerRegistered(pageInfo.pageNumber)) {
-            this._webViewer.annotation.registerAnnotationManager(
-              pageInfo.pageNumber,
-              new AnnotationManager(annotationLayerDiv, this, this._selectionManager)
-            );
+            this._webViewer.annotation.registerAnnotationManager(pageInfo.pageNumber, new AnnotationManager(annotationLayerDiv, this, this._selectionManager));
           }
         }
-
-        Logger.info(`Annotation layer rendered successfully for page ${pageInfo.pageNumber}`);
       } catch (error: any) {
         // Annotation layer failed
         if ((error?.message || '').includes('was destroyed')) {
-          Logger.warn(`Annotation layer destroyed mid-create for page ${pageInfo.pageNumber}`);
+          // Annotation layer destroyed mid-create
         } else {
           pageInfo.annotationLayerState.renderFailed = true;
           pageInfo.annotationLayerState.lastError = error;
           pageInfo.annotationLayerState.renderAttempts++;
-          Logger.error(`Annotation layer failed for page ${pageInfo.pageNumber} (will retry)`, {
-            error: error?.message,
-            attempts: pageInfo.annotationLayerState.renderAttempts,
-          });
         }
       }
     } else {
@@ -1817,8 +1677,6 @@ class PageVirtualization {
 
     // Retry text layer if it failed and hasn't exceeded max attempts
     if (pageInfo.textLayerState.renderFailed && pageInfo.textLayerState.renderAttempts < 3) {
-      Logger.info(`Retrying text layer for page ${pageInfo.pageNumber} (attempt ${pageInfo.textLayerState.renderAttempts + 1}/3)`);
-
       try {
         // CRITICAL: Clean up ALL existing text layer references
         if (pageInfo.textLayer) {
@@ -1832,13 +1690,7 @@ class PageVirtualization {
         }
 
         // Create and render text layer
-        const textLayer = new TextLayer(
-          this.containerId,
-          this.instanceId,
-          pageInfo.pageWrapperDiv,
-          pageInfo.pdfPageProxy,
-          viewport
-        );
+        const textLayer = new TextLayer(this.containerId, this.instanceId, pageInfo.pageWrapperDiv, pageInfo.pdfPageProxy, viewport);
 
         await textLayer.createTextLayer();
 
@@ -1849,22 +1701,14 @@ class PageVirtualization {
         pageInfo.textLayerState.renderFailed = false;
         pageInfo.textLayerState.renderAttempts = 0;
         pageInfo.textLayerState.lastError = undefined;
-
-        Logger.info(`Text layer retry successful for page ${pageInfo.pageNumber}`);
       } catch (error: any) {
         pageInfo.textLayerState.renderAttempts++;
         pageInfo.textLayerState.lastError = error;
-        Logger.error(`Text layer retry failed for page ${pageInfo.pageNumber}`, {
-          error: error?.message,
-          attempts: pageInfo.textLayerState.renderAttempts,
-        });
       }
     }
 
     // Retry annotation layer independently (whether text layer succeeded or not)
     if (pageInfo.annotationLayerState.renderFailed && pageInfo.annotationLayerState.renderAttempts < 3) {
-      Logger.info(`Retrying annotation layer for page ${pageInfo.pageNumber} (attempt ${pageInfo.annotationLayerState.renderAttempts + 1}/3)`);
-
       try {
         // CRITICAL: Clean up ALL existing annotation layer references
         if (pageInfo.annotationLayer) {
@@ -1878,17 +1722,9 @@ class PageVirtualization {
         }
 
         // Create and render annotation layer
-        const annotationLayer = new AnnotationLayer(
-          pageInfo.pageWrapperDiv,
-          pageInfo.pdfPageProxy,
-          viewport
-        );
+        const annotationLayer = new AnnotationLayer(pageInfo.pageWrapperDiv, pageInfo.pdfPageProxy, viewport);
 
-        const annotationLayerDiv = await annotationLayer.createAnnotationLayer(
-          this._webViewer,
-          this._pdfDocument,
-          undefined
-        );
+        const annotationLayerDiv = await annotationLayer.createAnnotationLayer(this._webViewer, this._pdfDocument, undefined);
 
         // Track and update state
         this._activeAnnotationLayers.set(pageInfo.pageNumber, annotationLayer);
@@ -1897,8 +1733,6 @@ class PageVirtualization {
         pageInfo.annotationLayerState.renderFailed = false;
         pageInfo.annotationLayerState.renderAttempts = 0;
         pageInfo.annotationLayerState.lastError = undefined;
-
-        Logger.info(`Annotation layer retry successful for page ${pageInfo.pageNumber}`);
 
         // Register annotation features
         if (annotationLayerDiv) {
@@ -1909,19 +1743,12 @@ class PageVirtualization {
           }
           this._searchHighlighter.registerPage(pageInfo.pageNumber);
           if (!this._webViewer.annotation.isAnnotationManagerRegistered(pageInfo.pageNumber)) {
-            this._webViewer.annotation.registerAnnotationManager(
-              pageInfo.pageNumber,
-              new AnnotationManager(annotationLayerDiv, this, this._selectionManager)
-            );
+            this._webViewer.annotation.registerAnnotationManager(pageInfo.pageNumber, new AnnotationManager(annotationLayerDiv, this, this._selectionManager));
           }
         }
       } catch (error: any) {
         pageInfo.annotationLayerState.renderAttempts++;
         pageInfo.annotationLayerState.lastError = error;
-        Logger.error(`Annotation layer retry failed for page ${pageInfo.pageNumber}`, {
-          error: error?.message,
-          attempts: pageInfo.annotationLayerState.renderAttempts,
-        });
       }
     }
   }
@@ -2210,20 +2037,20 @@ class PageVirtualization {
     this._tileManager.destroy();
 
     // Destroy all active layers
-    this._activeTextLayers.forEach((textLayer, pageNumber) => {
+    this._activeTextLayers.forEach((textLayer) => {
       try {
         textLayer.destroy();
       } catch (error) {
-        Logger.error(`Error destroying text layer for page ${pageNumber}`, error);
+        // Ignore errors
       }
     });
     this._activeTextLayers.clear();
 
-    this._activeAnnotationLayers.forEach((annotationLayer, pageNumber) => {
+    this._activeAnnotationLayers.forEach((annotationLayer) => {
       try {
         annotationLayer.destroy();
       } catch (error) {
-        Logger.error(`Error destroying annotation layer for page ${pageNumber}`, error);
+        // Ignore errors
       }
     });
     this._activeAnnotationLayers.clear();
@@ -2242,7 +2069,6 @@ class PageVirtualization {
       pageInfo.annotationLayerState.lastError = undefined;
       pageInfo.lastRenderError = undefined;
 
-      Logger.info('destroying PageVirtualization');
       this._removePageFromDom(pageNumber);
     });
     this._cachedPages.clear();
