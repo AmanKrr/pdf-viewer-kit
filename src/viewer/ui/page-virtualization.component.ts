@@ -897,6 +897,11 @@ class PageVirtualization {
     }
     pageInfo.isTransitioningToFullRender = true; // Set lock
 
+    // Show loader while page is rendering (only if not already rendered)
+    if (!pageInfo.canvasState.isRendered) {
+      this._showPageLoader(pageInfo);
+    }
+
     try {
       pageInfo.renderFailed = false;
 
@@ -906,10 +911,14 @@ class PageVirtualization {
         } catch (error) {
           // console.error(`Failed to get page ${pageInfo.pageNumber} for full render:`, error);
           pageInfo.renderFailed = true;
+          this._hidePageLoader(pageInfo);
           return;
         }
       }
-      if (!pageInfo.pdfPageProxy || pageInfo.renderFailed) return;
+      if (!pageInfo.pdfPageProxy || pageInfo.renderFailed) {
+        this._hidePageLoader(pageInfo);
+        return;
+      }
 
       const viewport = pageInfo.pdfPageProxy.getViewport({ scale: currentScale });
 
@@ -955,8 +964,13 @@ class PageVirtualization {
 
       pageInfo.isFullyRendered = allLayersComplete;
       pageInfo.renderedScale = currentScale;
+
+      // Hide loader when page is fully rendered
+      this._hidePageLoader(pageInfo);
     } catch (error) {
       pageInfo.renderFailed = true;
+      // Hide loader on error
+      this._hidePageLoader(pageInfo);
     } finally {
       pageInfo.isTransitioningToFullRender = false;
     }
@@ -1288,6 +1302,10 @@ class PageVirtualization {
           pageInfo.pageWrapperDiv.style.top = `${this._pagePositions.get(pageNumber) || 0}px`;
         }
       }
+      // Show loader if page is not rendered yet
+      if (!pageInfo.isFullyRendered && !pageInfo.canvasState.isRendered) {
+        this._showPageLoader(pageInfo);
+      }
       return pageInfo;
     }
 
@@ -1335,6 +1353,9 @@ class PageVirtualization {
       annotationLayerState: { isRendered: false, renderFailed: false, renderAttempts: 0 },
     };
     this._cachedPages.set(pageNumber, pageInfo);
+
+    // Show loader immediately when page placeholder is added
+    this._showPageLoader(pageInfo);
 
     if (this._pageIntersectionObserver) {
       this._pageIntersectionObserver.observe(pageWrapperDiv);
@@ -1754,6 +1775,48 @@ class PageVirtualization {
   }
 
   /**
+   * Shows a loading indicator on the page while it's being rendered.
+   * @param pageInfo The page information object.
+   */
+  private _showPageLoader(pageInfo: CachedPageInfo): void {
+    const loaderId = `page-loader-${pageInfo.pageNumber}`;
+
+    // Don't add if already exists
+    if (pageInfo.pageWrapperDiv.querySelector(`#${loaderId}`)) {
+      return;
+    }
+
+    const loaderContainer = document.createElement('div');
+    loaderContainer.id = loaderId;
+    loaderContainer.className = 'page-loader-container';
+
+    const loader = document.createElement('div');
+    loader.className = 'page-loader';
+
+    // Create three dots
+    for (let i = 0; i < 3; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'page-loader-dot';
+      loader.appendChild(dot);
+    }
+
+    loaderContainer.appendChild(loader);
+    pageInfo.pageWrapperDiv.appendChild(loaderContainer);
+  }
+
+  /**
+   * Hides the loading indicator from the page.
+   * @param pageInfo The page information object.
+   */
+  private _hidePageLoader(pageInfo: CachedPageInfo): void {
+    const loaderId = `page-loader-${pageInfo.pageNumber}`;
+    const loader = pageInfo.pageWrapperDiv.querySelector(`#${loaderId}`);
+    if (loader) {
+      loader.remove();
+    }
+  }
+
+  /**
    * Ensures there's a `<div id="canvasPresentation-<N>">` inside the
    * page wrapper div, and clears it if it exists.
    */
@@ -1806,6 +1869,10 @@ class PageVirtualization {
     if (!pageInfo) return;
 
     pageInfo.isVisible = false;
+
+    // Hide loader if present
+    this._hidePageLoader(pageInfo);
+
     this._clearPageRenderArtifacts(pageInfo, true); // true to destroy layers fully
 
     this._pageIntersectionObserver?.unobserve(pageInfo.pageWrapperDiv);
