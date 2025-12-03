@@ -34,12 +34,9 @@ import {
   MemoryManager,
   MemoryPressure,
   RenderScheduler,
-  PageDomAdapter,
   VirtualizationEngine,
   TileManager,
-  type MemoryStats,
-  type RenderTask as EngineRenderTask,
-  type RenderResult as EngineRenderResult,
+  PageDomAdapter,
   type PageDimensions,
   type ViewportBounds,
 } from '../../core/engine';
@@ -222,7 +219,7 @@ class PageVirtualization {
       instanceId: this.instanceId,
       containerId: this._options.containerId,
       pageGap: 10,
-      maxPooledWrappers: 10, // Initial pool size, can be expanded
+      maxPooledWrappers: 10, // Will be updated after calculating initial pages
     });
     this._tileManager = new TileManager({
       tileSize: this._options.tileConfig?.tileSize ?? 512,
@@ -325,7 +322,8 @@ class PageVirtualization {
     this._setupPeriodicCancellation();
     this.canvasPool.maxPoolSize = this._maxPooledWrappers > 0 ? this._maxPooledWrappers + 2 : 5;
 
-    // PageDomAdapter initializes pool in constructor, no need to initialize here
+    // PageDomAdapter already initializes its pool in constructor, just update the size
+    // The pool is managed internally by PageDomAdapter
 
     await this.calculatePagePositions();
 
@@ -565,10 +563,6 @@ class PageVirtualization {
       }, 5000); // Every 5 seconds
     }
   }
-
-  /**
-   * Creates a pool of recycled page wrapper DIVs.
-   */
 
   /** Read-only map of cached page info. */
   get cachedPages(): ReadonlyMap<number, CachedPageInfo> {
@@ -1290,37 +1284,20 @@ class PageVirtualization {
   private async _addPageToDom(pageNumber: number): Promise<CachedPageInfo | undefined> {
     let pageInfo = this._cachedPages.get(pageNumber);
 
-    if (pageInfo && pageInfo.pageWrapperDiv.parentElement) {
-      pageInfo.isVisible = true;
-      //  FIX: Ensure existing pages have correct dimensions
-      if (pageInfo.pdfPageProxy) {
-        const currentViewport = pageInfo.pdfPageProxy.getViewport({ scale: this.state.scale });
-        const currentWidth = parseInt(pageInfo.pageWrapperDiv.style.width || '0');
-        if (Math.abs(currentWidth - currentViewport.width) > 2) {
-          pageInfo.pageWrapperDiv.style.width = `${currentViewport.width}px`;
-          pageInfo.pageWrapperDiv.style.height = `${currentViewport.height}px`;
-          pageInfo.pageWrapperDiv.style.top = `${this._pagePositions.get(pageNumber) || 0}px`;
-        }
-      }
-      // Show loader if page is not rendered yet
-      if (!pageInfo.isFullyRendered && !pageInfo.canvasState.isRendered) {
-        this._showPageLoader(pageInfo);
-      }
-      return pageInfo;
-    }
-
-    let pdfPageProxy: PDFPageProxy | null = null;
+    // Get page proxy and viewport (needed for both new and recycled pages)
+    let pdfPageProxy: PDFPageProxy | null = pageInfo?.pdfPageProxy || null;
     let placeholderViewport: PageViewport;
     try {
-      const tempPageForSize = await this._pdfDocument.getPage(pageNumber);
-      pdfPageProxy = tempPageForSize;
-      placeholderViewport = tempPageForSize.getViewport({ scale: this.state.scale });
+      if (!pdfPageProxy) {
+        pdfPageProxy = await this._pdfDocument.getPage(pageNumber);
+      }
+      placeholderViewport = pdfPageProxy.getViewport({ scale: this.state.scale });
     } catch (e) {
       reportError(`getting page ${pageNumber} for placeholder size`, e);
       placeholderViewport = { width: 200, height: 300, scale: this.state.scale, rotation: 0 } as PageViewport;
     }
 
-    // Use PageDomAdapter to get or create wrapper
+    // Use PageDomAdapter to get or create wrapper (handles showing hidden wrappers)
     const wrapper = this._pageDomAdapter.getOrCreateWrapper({
       pageNumber,
       width: placeholderViewport.width,
@@ -1332,29 +1309,45 @@ class PageVirtualization {
 
     const pageWrapperDiv = wrapper.element;
 
+    // IMPORTANT: Set placeholder styling BEFORE showing (prevents blank flash)
     this._pageDomAdapter.setPlaceholder(pageNumber, '#fff');
+
+    // Additional setup for PageElement
     PageElement.createOrUpdatePageContainerDiv(pageNumber, placeholderViewport, this._pagePositions, this.instanceId, pageWrapperDiv);
+
+    // Observe with intersection observer
     if (this._intersectionObserver) {
       this._intersectionObserver.observe(pageWrapperDiv);
     }
 
-    pageInfo = {
-      pageNumber,
-      pdfPageProxy,
-      pageWrapperDiv,
-      isVisible: true,
-      isFullyRendered: false,
-      renderFailed: false,
-      isTransitioningToFullRender: false,
-      renderedScale: undefined,
-      // Initialize decoupled layer states
-      canvasState: { isRendered: false, renderFailed: false, renderAttempts: 0 },
-      textLayerState: { isRendered: false, renderFailed: false, renderAttempts: 0 },
-      annotationLayerState: { isRendered: false, renderFailed: false, renderAttempts: 0 },
-    };
-    this._cachedPages.set(pageNumber, pageInfo);
+    // Update or create pageInfo
+    if (pageInfo) {
+      // Recycled page - update existing info
+      pageInfo.isVisible = true;
+      pageInfo.pageWrapperDiv = pageWrapperDiv;
+      if (!pageInfo.pdfPageProxy) {
+        pageInfo.pdfPageProxy = pdfPageProxy;
+      }
+    } else {
+      // New page - create pageInfo
+      pageInfo = {
+        pageNumber,
+        pdfPageProxy,
+        pageWrapperDiv,
+        isVisible: true,
+        isFullyRendered: false,
+        renderFailed: false,
+        isTransitioningToFullRender: false,
+        renderedScale: undefined,
+        // Initialize decoupled layer states
+        canvasState: { isRendered: false, renderFailed: false, renderAttempts: 0 },
+        textLayerState: { isRendered: false, renderFailed: false, renderAttempts: 0 },
+        annotationLayerState: { isRendered: false, renderFailed: false, renderAttempts: 0 },
+      };
+      this._cachedPages.set(pageNumber, pageInfo);
+    }
 
-    // Show loader immediately when page placeholder is added
+    // Show loader immediately (for both new and recycled pages)
     this._showPageLoader(pageInfo);
 
     if (this._pageIntersectionObserver) {
@@ -1779,16 +1772,14 @@ class PageVirtualization {
    * @param pageInfo The page information object.
    */
   private _showPageLoader(pageInfo: CachedPageInfo): void {
-    const loaderId = `page-loader-${pageInfo.pageNumber}`;
+    // Clean up any existing loaders first (in case of recycled wrapper)
+    this._hidePageLoader(pageInfo);
 
-    // Don't add if already exists
-    if (pageInfo.pageWrapperDiv.querySelector(`#${loaderId}`)) {
-      return;
-    }
-
+    const loaderId = `page-loader-${this.instanceId}-${pageInfo.pageNumber}`;
     const loaderContainer = document.createElement('div');
     loaderContainer.id = loaderId;
     loaderContainer.className = 'page-loader-container';
+    loaderContainer.setAttribute('data-page-number', pageInfo.pageNumber.toString());
 
     const loader = document.createElement('div');
     loader.className = 'page-loader';
@@ -1809,11 +1800,16 @@ class PageVirtualization {
    * @param pageInfo The page information object.
    */
   private _hidePageLoader(pageInfo: CachedPageInfo): void {
-    const loaderId = `page-loader-${pageInfo.pageNumber}`;
-    const loader = pageInfo.pageWrapperDiv.querySelector(`#${loaderId}`);
-    if (loader) {
-      loader.remove();
+    // Remove by ID (most specific)
+    const loaderId = `page-loader-${this.instanceId}-${pageInfo.pageNumber}`;
+    const loaderById = pageInfo.pageWrapperDiv.querySelector(`#${loaderId}`);
+    if (loaderById) {
+      loaderById.remove();
     }
+
+    // Also remove any other loaders that might be present (fallback for recycled wrappers)
+    const allLoaders = pageInfo.pageWrapperDiv.querySelectorAll('.page-loader-container');
+    allLoaders.forEach((loader) => loader.remove());
   }
 
   /**
@@ -1877,6 +1873,8 @@ class PageVirtualization {
 
     this._pageIntersectionObserver?.unobserve(pageInfo.pageWrapperDiv);
     this._intersectionObserver?.unobserve(pageInfo.pageWrapperDiv);
+
+    // Use PageDomAdapter to remove wrapper (handles hiding/cleanup internally)
     this._pageDomAdapter.removeWrapper(pageNumber);
 
     if (pageInfo.pdfPageProxy) {
@@ -2139,6 +2137,8 @@ class PageVirtualization {
       this._removePageFromDom(pageNumber);
     });
     this._cachedPages.clear();
+
+    // PageDomAdapter handles cleanup of wrapper pool in its destroy() method
 
     if (this.canvasPool) {
       this.canvasPool.destroy();

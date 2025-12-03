@@ -116,21 +116,8 @@ export class PageDomAdapter {
       ...config,
     };
 
-    this.initializePool();
-  }
-
-  /**
-   * Initialize the wrapper pool
-   */
-  private initializePool(): void {
-    for (let i = 0; i < this.config.maxPooledWrappers; i++) {
-      const wrapper = this.createFreshWrapper();
-      // Append to DOM with display: none (original behavior)
-      wrapper.element.style.display = 'none';
-      wrapper.element.classList.add('recycled-page-wrapper');
-      this.pagesParentDiv.appendChild(wrapper.element);
-      this.wrapperPool.push(wrapper);
-    }
+    // Don't pre-create wrappers - use lazy initialization
+    // Wrappers will be created on-demand and recycled when released
   }
 
   /**
@@ -159,19 +146,34 @@ export class PageDomAdapter {
     // Check if wrapper already exists for this page
     const existing = this.activeWrappers.get(options.pageNumber);
     if (existing) {
+      // Wrapper exists but might be hidden - ensure it's visible
+      if (existing.element.style.display === 'none') {
+        existing.element.style.display = '';
+        existing.element.classList.remove('recycled-page-wrapper');
+        existing.element.classList.add('active-page-wrapper');
+      }
       this.updateWrapper(existing, options);
       return existing;
     }
 
-    // Get wrapper from pool or create new one
+    // Try to reuse a wrapper from the pool (hidden wrappers)
     let wrapper = this.wrapperPool.find((w) => !w.inUse);
 
     if (!wrapper) {
-      // Pool exhausted, create new transient wrapper
-      wrapper = this.createFreshWrapper();
-      wrapper.element.classList.add('transient-page-wrapper');
-      // Transient wrappers need to be appended
-      this.pagesParentDiv.appendChild(wrapper.element);
+      // No available wrapper in pool - create new one and add to pool (up to max limit)
+      if (this.wrapperPool.length < this.config.maxPooledWrappers) {
+        // Create and add to pool
+        wrapper = this.createFreshWrapper();
+        wrapper.element.style.display = 'none';
+        wrapper.element.classList.add('recycled-page-wrapper');
+        this.pagesParentDiv.appendChild(wrapper.element);
+        this.wrapperPool.push(wrapper);
+      } else {
+        // Pool is at max capacity - create transient wrapper (won't be pooled)
+        wrapper = this.createFreshWrapper();
+        wrapper.element.classList.add('transient-page-wrapper');
+        this.pagesParentDiv.appendChild(wrapper.element);
+      }
     }
 
     // Configure wrapper
@@ -184,10 +186,14 @@ export class PageDomAdapter {
     // Add to active wrappers
     this.activeWrappers.set(options.pageNumber, wrapper);
 
+    // IMPORTANT: Set white background BEFORE making visible (prevents blank flash)
+    wrapper.element.style.backgroundColor = '#fff';
+    wrapper.element.classList.add('page-placeholder');
+
     // Make wrapper visible (toggle display)
     wrapper.element.style.display = '';
     wrapper.element.classList.remove('recycled-page-wrapper');
-    wrapper.element.classList.add('pooled-page-wrapper');
+    wrapper.element.classList.add('active-page-wrapper');
 
     return wrapper;
   }
@@ -225,7 +231,7 @@ export class PageDomAdapter {
     if (isPooled) {
       // Pooled wrapper: Hide it (don't remove from DOM)
       wrapper.element.style.display = 'none';
-      wrapper.element.classList.remove('pooled-page-wrapper');
+      wrapper.element.classList.remove('active-page-wrapper');
       wrapper.element.classList.add('recycled-page-wrapper');
     } else {
       // Transient wrapper: Remove from DOM completely
