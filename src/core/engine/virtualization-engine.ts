@@ -99,10 +99,7 @@ export class VirtualizationEngine {
    * @param config Virtualization configuration
    * @returns Map of page number to page dimensions with positions
    */
-  static calculatePagePositions(
-    pageDimensions: Array<{ pageNumber: number; width: number; height: number }>,
-    config: VirtualizationConfig
-  ): Map<number, PageDimensions> {
+  static calculatePagePositions(pageDimensions: Array<{ pageNumber: number; width: number; height: number }>, config: VirtualizationConfig): Map<number, PageDimensions> {
     const positions = new Map<number, PageDimensions>();
     let currentYOffset = config.pageGap;
     let maxPageWidth = 0;
@@ -138,10 +135,7 @@ export class VirtualizationEngine {
    * @param config Virtualization configuration
    * @returns Total height in pixels
    */
-  static calculateTotalHeight(
-    pagePositions: Map<number, PageDimensions>,
-    config: VirtualizationConfig
-  ): number {
+  static calculateTotalHeight(pagePositions: Map<number, PageDimensions>, config: VirtualizationConfig): number {
     if (pagePositions.size === 0) return 0;
 
     let maxBottom = 0;
@@ -178,25 +172,64 @@ export class VirtualizationEngine {
    * @param currentPage Current page number (fallback)
    * @returns Page number at viewport center
    */
-  static determineCenterPage(
-    viewport: ViewportState,
-    pagePositions: Map<number, PageDimensions>,
-    currentPage: number
-  ): number {
+  static determineCenterPage(viewport: ViewportState, pagePositions: Map<number, PageDimensions>, currentPage: number): number {
     const viewportCenter = viewport.scrollTop + viewport.containerHeight / 2;
 
+    // Pages are ordered sequentially, so we can find the center page quickly
+
+    const pageNumbers = Array.from(pagePositions.keys()).sort((a, b) => a - b);
+
+    if (pageNumbers.length === 0) return currentPage;
+    if (pageNumbers.length === 1) return pageNumbers[0];
+
+    // Binary search to find the page containing or closest to viewportCenter
+    let left = 0;
+    let right = pageNumbers.length - 1;
     let closestPageNum = currentPage;
     let minDistance = Infinity;
 
-    pagePositions.forEach((dims, pageNum) => {
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      const pageNum = pageNumbers[mid];
+      const dims = pagePositions.get(pageNum)!;
+      const pageTop = dims.top;
+      const pageBottom = dims.top + dims.height;
       const pageCenter = dims.top + dims.height / 2;
-      const distance = Math.abs(viewportCenter - pageCenter);
 
+      // Check distance to this page
+      const distance = Math.abs(viewportCenter - pageCenter);
       if (distance < minDistance) {
         minDistance = distance;
         closestPageNum = pageNum;
       }
-    });
+
+      // Navigate binary search
+      if (viewportCenter < pageTop) {
+        right = mid - 1;
+      } else if (viewportCenter > pageBottom) {
+        left = mid + 1;
+      } else {
+        // viewportCenter is within this page - it's the answer
+        return pageNum;
+      }
+    }
+
+    // Check immediate neighbors of the closest page found to ensure accuracy
+    const closestIndex = pageNumbers.indexOf(closestPageNum);
+    for (let offset = -1; offset <= 1; offset++) {
+      const neighborIndex = closestIndex + offset;
+      if (neighborIndex >= 0 && neighborIndex < pageNumbers.length) {
+        const pageNum = pageNumbers[neighborIndex];
+        const dims = pagePositions.get(pageNum)!;
+        const pageCenter = dims.top + dims.height / 2;
+        const distance = Math.abs(viewportCenter - pageCenter);
+
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestPageNum = pageNum;
+        }
+      }
+    }
 
     return closestPageNum;
   }
@@ -214,7 +247,7 @@ export class VirtualizationEngine {
     viewport: ViewportState,
     pagePositions: Map<number, PageDimensions>,
     config: VirtualizationConfig,
-    currentlyRendered: Set<number>
+    currentlyRendered: Set<number>,
   ): ViewportCalculation {
     // Handle specific page mode
     if (config.specificPageOnly !== undefined) {
@@ -222,9 +255,7 @@ export class VirtualizationEngine {
         visiblePages: new Set([config.specificPageOnly]),
         centerPage: config.specificPageOnly,
         pagesToRender: new Set([config.specificPageOnly]),
-        pagesToRemove: Array.from(currentlyRendered).filter(
-          (p) => p !== config.specificPageOnly
-        ),
+        pagesToRemove: Array.from(currentlyRendered).filter((p) => p !== config.specificPageOnly),
       };
     }
 
@@ -279,11 +310,7 @@ export class VirtualizationEngine {
    * @param pagePositions Map of page positions
    * @returns True if page is visible
    */
-  static isPageVisible(
-    pageNumber: number,
-    viewport: ViewportState,
-    pagePositions: Map<number, PageDimensions>
-  ): boolean {
+  static isPageVisible(pageNumber: number, viewport: ViewportState, pagePositions: Map<number, PageDimensions>): boolean {
     const dims = pagePositions.get(pageNumber);
     if (!dims) return false;
 
@@ -303,11 +330,7 @@ export class VirtualizationEngine {
    * @param pageGap Gap between pages
    * @returns Number of pages that fit in viewport
    */
-  static calculateInitialPageCount(
-    containerHeight: number,
-    pageDimensions: Array<{ pageNumber: number; width: number; height: number }>,
-    pageGap: number
-  ): number {
+  static calculateInitialPageCount(containerHeight: number, pageDimensions: Array<{ pageNumber: number; width: number; height: number }>, pageGap: number): number {
     if (containerHeight <= 0 || pageDimensions.length === 0) return 1;
 
     let accumulatedHeight = 0;
@@ -351,11 +374,7 @@ export class VirtualizationEngine {
    * @param isVisible Is the page currently visible in viewport
    * @returns Priority value (0 = highest, higher numbers = lower priority)
    */
-  static calculateRenderPriority(
-    pageNumber: number,
-    centerPage: number,
-    isVisible: boolean
-  ): number {
+  static calculateRenderPriority(pageNumber: number, centerPage: number, isVisible: boolean): number {
     const distance = this.calculatePageDistance(pageNumber, centerPage);
 
     // Visible pages get priority boost
