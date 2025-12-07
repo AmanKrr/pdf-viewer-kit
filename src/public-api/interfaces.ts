@@ -16,6 +16,7 @@
 
 import { PDFDocumentProxy } from 'pdfjs-dist';
 import { Events } from '../types/events.types';
+import type { ToolbarPluginManager } from '../internal';
 
 /**
  * Public events that users can listen to.
@@ -63,6 +64,9 @@ export interface IPDFViewerInstance {
 
   /** Search functionality interface */
   readonly search: IPDFViewerSearch;
+
+  /** Toolbar plugin manager for customization */
+  readonly toolbar: IPDFViewerToolbar;
 
   /** Navigation methods */
   goToPage(pageNumber: number): void;
@@ -412,6 +416,18 @@ export interface ISearchResult {
 
   /** Navigate to this search result */
   goTo(): void;
+}
+
+/**
+ * Public interface for toolbar plugin management.
+ * Allows users to customize the toolbar with plugins.
+ */
+export interface IPDFViewerToolbar {
+  /** Access to the toolbar plugin manager for registering custom plugins */
+  readonly pluginManager: ToolbarPluginManager;
+
+  /** Re-render the toolbar after adding/removing plugins */
+  render(): void;
 }
 
 /**

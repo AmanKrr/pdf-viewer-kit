@@ -253,14 +253,13 @@ class WebViewer {
     );
 
     if (!this._options.disableToolbar) {
-      const toolbarHost = shadowRoot?.querySelector(`#${PDF_VIEWER_IDS.TOOLBAR_CONTAINER}-${this._instance.instanceId}`)! as HTMLElement;
-      const buttons = this._options.customToolbarItems ?? [];
-      const opts = this._options.toolbarOptions ?? {};
-      this._toolbar = this._options.customToolbar ? this._options.customToolbar : (new Toolbar(this, buttons, opts) as any);
-      if (typeof this._toolbar?.render === 'function') {
-        this._toolbar.render(toolbarHost);
-      } else {
-        throw new Error('Custom toolbar must implement a render method.');
+      const toolbarHost = shadowRoot?.querySelector(`#${PDF_VIEWER_IDS.TOOLBAR_CONTAINER}-${this._instance.instanceId}`) as HTMLElement;
+      if (toolbarHost) {
+        const customPlugins = this._options.customToolbarPlugins ?? [];
+        const opts = this._options.toolbarOptions ?? {};
+        const toolbar = new Toolbar(this, customPlugins, opts) as any;
+        toolbar.render(toolbarHost);
+        this._toolbar = toolbar;
       }
     }
 
@@ -681,6 +680,11 @@ class WebViewer {
     const currentPageInputField = shadowRoot?.querySelector(`#${PDF_VIEWER_IDS.CURRENT_PAGE_INPUT}-${this.instanceId}`);
     if (currentPageInputField) {
       (currentPageInputField as HTMLInputElement).value = String(this.currentPageNumber);
+    }
+
+    // Update toolbar plugins if using plugin architecture
+    if (this._toolbar && typeof (this._toolbar as any).update === 'function') {
+      (this._toolbar as any).update();
     }
   }
 

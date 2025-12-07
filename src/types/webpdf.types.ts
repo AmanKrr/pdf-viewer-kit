@@ -15,7 +15,8 @@
 */
 
 import { DocumentInitParameters, TypedArray } from 'pdfjs-dist/types/src/display/api';
-import { IToolbar, ToolbarButtonConfig, ToolbarOptions } from './toolbar.types';
+import { ToolbarOptions } from './toolbar.types';
+import type { ToolbarPlugin } from '../viewer/ui/plugins/toolbar.plugin';
 
 /**
  * Represents the options for loading a PDF document in the web viewer.
@@ -57,9 +58,13 @@ export interface LoadOptions extends DocumentInitParameters {
   /** Specifies a specific page number to render only that page (optional). */
   renderSpecificPageOnly?: number | null;
 
+  /** If `true`, disables the default toolbar completely (optional). */
   disableToolbar?: boolean;
-  customToolbar?: IToolbar;
-  customToolbarItems?: ToolbarButtonConfig[];
+
+  /** Array of custom toolbar plugins to add to the default toolbar (optional). */
+  customToolbarPlugins?: ToolbarPlugin[];
+
+  /** Toolbar configuration options (optional). */
   toolbarOptions?: ToolbarOptions;
 
   /** If `true`, enables credentials for cross-origin requests (optional). */

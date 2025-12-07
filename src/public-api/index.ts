@@ -15,7 +15,7 @@
 */
 
 // Core interfaces
-export type { IPDFViewerInstance, IPDFViewerEvents, IPDFViewerAnnotations, IPDFViewerSearch } from './interfaces';
+export type { IPDFViewerInstance, IPDFViewerEvents, IPDFViewerAnnotations, IPDFViewerSearch, IPDFViewerToolbar } from './interfaces';
 
 // Annotation system
 export type { IAnnotation, IAnnotationConfig, IAnnotationPosition, IAnnotationStyle } from './interfaces';
@@ -34,3 +34,24 @@ export type { PublicEvents, EventListener } from './interfaces';
 
 // Facade implementation
 export { PDFViewerInstanceFacade } from './facade';
+
+// Toolbar Plugin System
+export type { ToolbarPlugin, ToolbarPluginContext } from '../internal';
+export { ToolbarPluginPriority, BaseToolbarPlugin, ToolbarPluginManager } from '../internal';
+export {
+  ThumbnailButtonPlugin,
+  FirstPageButtonPlugin,
+  PreviousPageButtonPlugin,
+  NextPageButtonPlugin,
+  LastPageButtonPlugin,
+  ZoomInButtonPlugin,
+  ZoomOutButtonPlugin,
+  SearchButtonPlugin,
+  AnnotationButtonPlugin,
+  DownloadButtonPlugin,
+} from '../internal';
+export { PageNumberPlugin } from '../internal';
+
+// Annotation Toolbar Plugin System
+export type { AnnotationToolbarPlugin, AnnotationContext } from '../internal';
+export { BaseAnnotationToolbarPlugin, AnnotationToolbarPluginManager } from '../internal';

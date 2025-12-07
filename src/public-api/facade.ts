@@ -14,8 +14,9 @@
   limitations under the License.
 */
 
-import { IPDFViewerInstance, IPDFViewerEvents, IPDFViewerAnnotations, IPDFViewerSearch, PublicEvents, EventListener } from './interfaces';
+import { IPDFViewerInstance, IPDFViewerEvents, IPDFViewerAnnotations, IPDFViewerSearch, IPDFViewerToolbar, PublicEvents, EventListener } from './interfaces';
 import { PDFDocumentProxy } from 'pdfjs-dist';
+import { PDF_VIEWER_IDS } from '../constants/pdf-viewer-selectors';
 
 /**
  * Runtime-protected facade for PDF viewer instances.
@@ -27,6 +28,7 @@ export class PDFViewerInstanceFacade implements IPDFViewerInstance {
   private readonly _events: PDFViewerEventsFacade;
   private readonly _annotations: PDFViewerAnnotationsFacade;
   private readonly _search: PDFViewerSearchFacade;
+  private readonly _toolbar: PDFViewerToolbarFacade;
 
   constructor(instance: any) {
     this._instance = instance;
@@ -35,6 +37,7 @@ export class PDFViewerInstanceFacade implements IPDFViewerInstance {
     this._events = new PDFViewerEventsFacade(instance.events);
     this._annotations = new PDFViewerAnnotationsFacade(instance);
     this._search = new PDFViewerSearchFacade(instance);
+    this._toolbar = new PDFViewerToolbarFacade(instance);
 
     // Freeze this object to prevent property addition/modification
     Object.freeze(this);
@@ -83,6 +86,10 @@ export class PDFViewerInstanceFacade implements IPDFViewerInstance {
 
   get search(): IPDFViewerSearch {
     return this._search;
+  }
+
+  get toolbar(): IPDFViewerToolbar {
+    return this._toolbar;
   }
 
   // Public methods - delegate to internal webViewer
@@ -412,5 +419,37 @@ class PDFViewerSearchFacade implements IPDFViewerSearch {
       return this._instance.webViewer.searchBar.isActive || false;
     }
     return false;
+  }
+}
+
+/**
+ * Runtime-protected facade for PDF viewer toolbar.
+ * Provides access to toolbar plugin customization.
+ */
+class PDFViewerToolbarFacade implements IPDFViewerToolbar {
+  private readonly _instance: any;
+
+  constructor(instance: any) {
+    this._instance = instance;
+    Object.freeze(this);
+  }
+
+  get pluginManager(): any {
+    if (this._instance.webViewer?._toolbar) {
+      return this._instance.webViewer._toolbar.pluginManager;
+    }
+    throw new Error('Toolbar not available');
+  }
+
+  render(): void {
+    if (this._instance.webViewer?._toolbar) {
+      const shadowRoot = document.getElementById(this._instance.containerId)?.shadowRoot;
+      const toolbarContainer = shadowRoot?.querySelector(`#${PDF_VIEWER_IDS.TOOLBAR_CONTAINER}-${this._instance.instanceId}`);
+      if (toolbarContainer) {
+        this._instance.webViewer._toolbar.render(toolbarContainer as HTMLElement);
+      }
+    } else {
+      throw new Error('Toolbar not available');
+    }
   }
 }

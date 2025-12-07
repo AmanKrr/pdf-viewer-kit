@@ -64,6 +64,7 @@
   box-sizing: border-box;
   overflow-x: auto;
   overflow-y: hidden;
+  gap: 0;
 }
 
 /* Hide toolbar when PDF is loading */
@@ -78,15 +79,24 @@
 .a-toolbar-items .a-toolbar-item {
   width: 30px;
   height: 30px;
-  margin-inline: 2.5px;
+  margin: 0 2.5px;
+  flex-shrink: 0;
+  flex-grow: 0;
+}
+
+/* Page number container needs fit-content width */
+.a-toolbar-items .a-toolbar-item.pageNumber-item {
+  width: fit-content;
 }
 
 /* Separator between toolbar buttons */
-.a-toolbar-items .a-toolbar-item-separator {
-  margin-left: 10px;
+.a-toolbar-items .a-toolbar-separator {
+  margin: 0 10px;
   width: 1px;
+  min-width: 1px;
   height: 22px;
   background-color: var(--toolbar-separator-color);
+  flex-shrink: 0;
 }
 
 /* General button styling */
@@ -166,19 +176,19 @@
 /* Page Number Input Field */
 /* ========================== */
 
-.a-toolbar-item.a-page-number-container {
+.a-toolbar-item .a-page-number-container {
   width: fit-content;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-.a-toolbar-item.a-page-number-container .a-page-input-container {
+.a-toolbar-item .a-page-number-container .a-page-input-container {
   min-width: 50px;
 }
 
 /* Page input field */
-.a-toolbar-item.a-page-number-container .a-page-input-container .a-current-page-number-input-field {
+.a-toolbar-item .a-page-number-container .a-page-input-container .a-current-page-number-input-field {
   height: 22px;
   width: 50px;
   border: 1px solid var(--border-primary);
@@ -188,30 +198,31 @@
 }
 
 /* Remove number input arrows */
-.a-toolbar-item.a-page-number-container .a-page-input-container input::-webkit-outer-spin-button,
-.a-toolbar-item.a-page-number-container .a-page-input-container input::-webkit-inner-spin-button {
+.a-toolbar-item .a-page-number-container .a-page-input-container input::-webkit-outer-spin-button,
+.a-toolbar-item .a-page-number-container .a-page-input-container input::-webkit-inner-spin-button {
   -webkit-appearance: none;
+  margin: 0;
 }
 
 /* Page input hover effect */
-.a-toolbar-item.a-page-number-container .a-page-input-container .a-current-page-number-input-field:hover {
+.a-toolbar-item .a-page-number-container .a-page-input-container .a-current-page-number-input-field:hover {
   border: 1px solid var(--button-primary-hover-background);
 }
 
-/* Page number separator */
-.a-toolbar-item.a-page-number-container div p {
+/* Page number separator text */
+.a-toolbar-item .a-page-number-container div p {
   font-size: 14px;
+  margin: 0;
 }
 
-/* Adjusts spacing between the page number input and the "of" label */
-.a-toolbar-item.a-page-number-container div:nth-child(2) {
+/* Spacing between the page number input and the "of" label */
+.a-toolbar-item .a-page-number-container div:nth-child(2) {
   margin-left: 8px;
 }
 
-/* Adjusts spacing between the "of" label and the total page number */
-.a-toolbar-item.a-page-number-container div:last-child {
-  margin-left: 5px;
-  margin-right: 5px;
+/* Spacing between the "of" label and the total page number */
+.a-toolbar-item .a-page-number-container div:last-child {
+  margin: 0 5px;
 }
 
 /* ========================== */
@@ -599,7 +610,7 @@
 }
 
 .a-annotation-shape-properties button {
-  height: 25px
+  height: 25px;
 }
 
 .a-annotation-shape-properties:nth-child(1) button,
@@ -611,14 +622,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px
+  width: 52px;
 }
 
 .a-annotation-shape-properties.a-annotation-shape-properties-thickness button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px
+  width: 52px;
 }
 
 .a-annotation-dropdown-slider-container {
@@ -636,7 +647,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 5px;
-  z-index: 11
+  z-index: 11;
 }
 
 .a-annotation-shape-properties.a-annotation-shape-properties-thickness .a-annotation-dropdown-slider-container {

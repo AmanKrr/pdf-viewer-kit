@@ -44,6 +44,27 @@ export { Toolbar } from '../viewer/ui/toolbar.component';
 export { AnnotationToolbar } from '../viewer/ui/annotation-toolbar.component';
 export { AnnotationToolbarStateManager } from '../viewer/ui/annotation-toolbar-state.component';
 
+// Toolbar Plugins
+export type { ToolbarPlugin, ToolbarPluginContext } from '../viewer/ui/plugins/toolbar.plugin';
+export { ToolbarPluginPriority, BaseToolbarPlugin, ToolbarPluginManager } from '../viewer/ui/plugins/toolbar.plugin';
+export {
+  ThumbnailButtonPlugin,
+  FirstPageButtonPlugin,
+  PreviousPageButtonPlugin,
+  NextPageButtonPlugin,
+  LastPageButtonPlugin,
+  ZoomInButtonPlugin,
+  ZoomOutButtonPlugin,
+  SearchButtonPlugin,
+  AnnotationButtonPlugin,
+  DownloadButtonPlugin,
+} from '../viewer/ui/plugins/toolbar-buttons.plugin';
+export { PageNumberPlugin } from '../viewer/ui/plugins/page-number.plugin';
+
+// Annotation Toolbar Plugins
+export type { AnnotationToolbarPlugin, AnnotationContext } from '../viewer/ui/plugins/annotation-toolbar.plugin';
+export { BaseAnnotationToolbarPlugin, AnnotationToolbarPluginManager } from '../viewer/ui/plugins/annotation-toolbar.plugin';
+
 // Services
 export { AnnotationService } from '../viewer/services/annotation.service';
 export { PasswordManagerService } from '../viewer/services/password-manager.service';
