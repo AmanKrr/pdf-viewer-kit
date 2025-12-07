@@ -782,7 +782,7 @@ class PageVirtualization {
 
     await this._updateRenderedPagesOnScroll(scrollTop);
     this._debouncedEnsureVisiblePagesRendered();
-  }, 100);
+  }, 50); // Reduced from 100ms to 50ms for faster response during rapid scroll
 
   /**
    * Debounced function to ensure visible pages are rendered.
@@ -790,7 +790,15 @@ class PageVirtualization {
    */
   private _debouncedEnsureVisiblePagesRendered = debounce(() => {
     this._ensureVisiblePagesRendered();
-  }, 100);
+  }, 200); // Increased from 100ms to 200ms to reduce render churn during rapid scroll
+
+  /**
+   * Throttled function to notify WebViewer of page changes.
+   * Prevents excessive updates during rapid scrolling.
+   */
+  private _throttledPageChangeNotification = throttle((pageNumber: number) => {
+    this._webViewer.onPageChange(pageNumber);
+  }, 100); // Reduced from 150ms to 100ms for more responsive page number updates
 
   /**
    * Ensures that visible pages are queued for rendering with appropriate priorities.
@@ -1131,6 +1139,8 @@ class PageVirtualization {
     const centralPageNum = this._determineCenterPageInViewport(scrollTop);
     if (this.state.currentPage !== centralPageNum) {
       this.state.currentPage = centralPageNum;
+      // Notify WebViewer of page change to update toolbar input (throttled to prevent jumps)
+      this._throttledPageChangeNotification(centralPageNum);
     }
 
     const pagesToKeepInDom = new Set<number>();
@@ -1157,13 +1167,27 @@ class PageVirtualization {
     this._cancelOffscreenRenders();
 
     // Add or restore pages that should be visible
+    // Use Promise.all to add pages in parallel for better performance during rapid scrolling
+    const pageAddPromises: Promise<void>[] = [];
     for (const pageNum of pagesToKeepInDom) {
       let pageInfo = this._cachedPages.get(pageNum);
       if (!pageInfo) {
-        pageInfo = await this._addPageToDom(pageNum);
+        // Add pages in parallel to prevent blocking during rapid scroll
+        pageAddPromises.push(
+          this._addPageToDom(pageNum).then(() => {
+            // Page added successfully
+          }).catch(() => {
+            // Ignore errors during page addition
+          })
+        );
       } else {
         pageInfo.isVisible = true;
       }
+    }
+
+    // Wait for all pages to be added (placeholders are shown immediately)
+    if (pageAddPromises.length > 0) {
+      await Promise.all(pageAddPromises);
     }
 
     // 🎨 UPDATE TILES ON SCROLL: Re-render tiles for visible pages when scrolling
@@ -1284,17 +1308,45 @@ class PageVirtualization {
   private async _addPageToDom(pageNumber: number): Promise<CachedPageInfo | undefined> {
     let pageInfo = this._cachedPages.get(pageNumber);
 
-    // Get page proxy and viewport (needed for both new and recycled pages)
+    // Try to use cached dimensions for immediate placeholder creation
+    const cachedDimensions = this._pageDimensions.get(pageNumber);
     let pdfPageProxy: PDFPageProxy | null = pageInfo?.pdfPageProxy || null;
     let placeholderViewport: PageViewport;
-    try {
+
+    if (cachedDimensions) {
+      // Use cached dimensions immediately (non-blocking)
+      placeholderViewport = {
+        width: cachedDimensions.width,
+        height: cachedDimensions.height,
+        scale: this.state.scale,
+        rotation: 0,
+      } as PageViewport;
+
+      // Fetch PDF page asynchronously in background (if not already cached)
       if (!pdfPageProxy) {
-        pdfPageProxy = await this._pdfDocument.getPage(pageNumber);
+        this._pdfDocument
+          .getPage(pageNumber)
+          .then((proxy) => {
+            const existingPageInfo = this._cachedPages.get(pageNumber);
+            if (existingPageInfo && !existingPageInfo.pdfPageProxy) {
+              existingPageInfo.pdfPageProxy = proxy;
+            }
+          })
+          .catch((e) => {
+            reportError(`fetching page ${pageNumber} in background`, e);
+          });
       }
-      placeholderViewport = pdfPageProxy.getViewport({ scale: this.state.scale });
-    } catch (e) {
-      reportError(`getting page ${pageNumber} for placeholder size`, e);
-      placeholderViewport = { width: 200, height: 300, scale: this.state.scale, rotation: 0 } as PageViewport;
+    } else {
+      // Fallback: No cached dimensions, must fetch page synchronously
+      try {
+        if (!pdfPageProxy) {
+          pdfPageProxy = await this._pdfDocument.getPage(pageNumber);
+        }
+        placeholderViewport = pdfPageProxy.getViewport({ scale: this.state.scale });
+      } catch (e) {
+        reportError(`getting page ${pageNumber} for placeholder size`, e);
+        placeholderViewport = { width: 200, height: 300, scale: this.state.scale, rotation: 0 } as PageViewport;
+      }
     }
 
     // Use PageDomAdapter to get or create wrapper (handles showing hidden wrappers)
@@ -2085,6 +2137,8 @@ class PageVirtualization {
     (this._debouncedEnsureVisiblePagesRendered as any) = null;
     this._throttledScrollHandler.cancel();
     (this._throttledScrollHandler as any) = null;
+    this._throttledPageChangeNotification.cancel();
+    (this._throttledPageChangeNotification as any) = null;
 
     // Disconnect observers BEFORE clearing pages
     this._intersectionObserver?.disconnect();

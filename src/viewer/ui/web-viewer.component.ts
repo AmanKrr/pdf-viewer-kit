@@ -26,10 +26,10 @@ import {
   AnnotationService,
   SelectionManager,
   AnnotationToolbarStateManager,
+  PDFViewerInstance,
 } from '../../internal';
 import { LoadOptions, ViewerLoadOptions } from '../../types/webpdf.types';
 import { IToolbar } from '../../interface/IToolbar';
-import { PDFViewerInstance } from '../../core/viewer-instance.core';
 import { scrollElementIntoView } from '../../utils/web-ui-utils';
 
 /**
@@ -682,6 +682,17 @@ class WebViewer {
     if (currentPageInputField) {
       (currentPageInputField as HTMLInputElement).value = String(this.currentPageNumber);
     }
+  }
+
+  /**
+   * Called when the current page changes during scroll.
+   * Updates the toolbar page number input immediately.
+   *
+   * @param pageNumber - The new current page number
+   */
+  public onPageChange(pageNumber: number): void {
+    this._updateCurrentPageInput();
+    this._syncThumbnailScrollWithMainPageContainer();
   }
 
   /**
