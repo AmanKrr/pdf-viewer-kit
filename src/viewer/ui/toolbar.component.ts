@@ -31,6 +31,7 @@ import {
   DownloadButtonPlugin,
 } from './plugins/toolbar-buttons.plugin';
 import { PageNumberPlugin } from './plugins/page-number.plugin';
+import { ZoomDropdownPlugin } from './plugins/zoom-dropdown.plugin';
 
 /**
  * Implements the main toolbar UI for the PDF viewer.
@@ -63,6 +64,7 @@ export class Toolbar implements IToolbar {
       showLastPage: true,
       showPageNumber: true,
       showZoom: true,
+      useZoomDropdown: false,
       showSearch: false,
       showThumbnail: false,
       showAnnotation: true,
@@ -144,8 +146,14 @@ export class Toolbar implements IToolbar {
     }
 
     if (this._opts.showZoom) {
-      plugins.push(new ZoomInButtonPlugin());
-      plugins.push(new ZoomOutButtonPlugin());
+      if (this._opts.useZoomDropdown) {
+        // Use zoom dropdown plugin (includes zoom in/out and fit options)
+        plugins.push(new ZoomDropdownPlugin());
+      } else {
+        // Use traditional separate zoom in/out buttons
+        plugins.push(new ZoomInButtonPlugin());
+        plugins.push(new ZoomOutButtonPlugin());
+      }
     }
 
     if (this._opts.showSearch) {

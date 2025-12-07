@@ -90,7 +90,7 @@ export abstract class BaseToolbarPlugin implements ToolbarPlugin {
   ) {
     this.name = name;
     this.version = options.version || '1.0.0';
-    this.priority = options.priority || ToolbarPluginPriority.NORMAL;
+    this.priority = options.priority ?? ToolbarPluginPriority.NORMAL;
     this.showSeparatorBefore = options.showSeparatorBefore;
     this.alignRight = options.alignRight;
   }

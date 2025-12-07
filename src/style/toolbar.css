@@ -89,6 +89,12 @@
   width: fit-content;
 }
 
+/* Zoom dropdown container needs fit-content width */
+.a-toolbar-items .a-toolbar-item.zoomDropdown-item {
+  width: fit-content;
+  display: flex;
+}
+
 /* Separator between toolbar buttons */
 .a-toolbar-items .a-toolbar-separator {
   margin: 0 10px;
@@ -249,6 +255,92 @@
 .a-toolbar-button .fit-width-icon::before {
   content: '\f779';
   font-size: 1.4rem !important;
+}
+
+/* ========================== */
+/* Zoom Dropdown */
+/* ========================== */
+
+.a-zoom-dropdown-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.a-zoom-dropdown-button {
+  min-width: 80px !important;
+  width: 80px !important;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.a-zoom-dropdown-button::after {
+  content: '\e5c5';
+  /* Material Icons: arrow_drop_down */
+  font-family: 'Material Symbols Outlined';
+  font-size: 18px;
+  margin-left: -2px;
+}
+
+.a-zoom-dropdown {
+  background: var(--search-container-background);
+  border: 1px solid var(--search-container-border);
+  border-radius: 4px;
+  padding: 4px 0;
+  box-shadow: 0px 2px 8px var(--search-container-shadow);
+  min-width: 160px;
+  z-index: 1000;
+  display: none;
+  /* Hidden by default, Popper will position it */
+}
+
+.a-zoom-dropdown.a-zoom-dropdown-hidden {
+  display: none;
+}
+
+.a-zoom-option {
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.15s ease;
+}
+
+.a-zoom-option:hover {
+  background-color: var(--option-button-hover-background);
+}
+
+.a-zoom-option.active {
+  background-color: var(--button-primary-hover-background);
+  color: var(--toolbar-button-hover-text);
+}
+
+.a-zoom-fit-option {
+  padding: 10px 16px;
+}
+
+.a-zoom-fit-option .a-toolbar-icon::before {
+  font-family: 'Material Symbols Outlined';
+  font-size: 1.2rem;
+  color: var(--toolbar-button-text);
+}
+
+.a-zoom-fit-option:hover .a-toolbar-icon::before {
+  color: var(--toolbar-button-hover-text);
+}
+
+.a-zoom-dropdown-separator {
+  height: 1px;
+  background-color: var(--toolbar-separator-color);
+  margin: 4px 0;
 }
 
 /* ========================== */

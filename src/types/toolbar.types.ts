@@ -40,6 +40,8 @@ export interface ToolbarOptions {
   showPageNumber?: boolean;
   /** Show "Zoom In/Out" buttons */
   showZoom?: boolean;
+  /** Use zoom dropdown instead of separate zoom in/out buttons (requires showZoom: true) */
+  useZoomDropdown?: boolean;
   /** Show "Search" button */
   showSearch?: boolean;
   /** Show "Thumbnail" toggle button */

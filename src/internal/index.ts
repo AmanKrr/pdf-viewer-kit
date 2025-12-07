@@ -60,6 +60,7 @@ export {
   DownloadButtonPlugin,
 } from '../viewer/ui/plugins/toolbar-buttons.plugin';
 export { PageNumberPlugin } from '../viewer/ui/plugins/page-number.plugin';
+export { ZoomDropdownPlugin } from '../viewer/ui/plugins/zoom-dropdown.plugin';
 
 // Annotation Toolbar Plugins
 export type { AnnotationToolbarPlugin, AnnotationContext } from '../viewer/ui/plugins/annotation-toolbar.plugin';
