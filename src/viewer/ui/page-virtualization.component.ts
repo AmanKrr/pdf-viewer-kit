@@ -719,7 +719,7 @@ class PageVirtualization {
     // 🎨 SMART TILING: Use tiles only when scale > 1 (zoomed in)
     // At scale <= 1, use ImageBitmap since entire page is usually visible
     const currentScale = this.state.scale;
-    const useTiling = (this._options.enableTiling ?? true) && currentScale > 1;
+    const useTiling = this._options.enableTiling ?? true;
 
     for (const pageInfo of pagesToRefresh) {
       if (pageInfo.isVisible && pageInfo.pdfPageProxy) {
@@ -945,11 +945,11 @@ class PageVirtualization {
         await this._retryFailedLayers(pageInfo);
       }
 
-      // Render high-resolution content (only if zoom > 1x)
-      if (!pageInfo.renderFailed && currentScale != 1) {
+      // Render high-resolution content
+      if (!pageInfo.renderFailed) {
         // 🎨 SMART TILING: Use tiles only when scale > 1 (zoomed in)
         // At scale <= 1, use ImageBitmap since entire page is usually visible
-        const useTiling = (this._options.enableTiling ?? true) && currentScale > 1;
+        const useTiling = this._options.enableTiling ?? true;
 
         if (useTiling) {
           // Use tiles (memory efficient, only visible tiles when zoomed)
@@ -1205,7 +1205,7 @@ class PageVirtualization {
     // 🎨 UPDATE TILES ON SCROLL: Re-render tiles for visible pages when scrolling
     // Only update tiles if tiling is enabled AND scale > 1 (zoomed in)
     const currentScale = this.state.scale;
-    const useTiling = (this._options.enableTiling ?? true) && currentScale > 1;
+    const useTiling = this._options.enableTiling ?? true;
 
     if (useTiling) {
       // Update tiles for all visible pages (horizontal/vertical scroll)
