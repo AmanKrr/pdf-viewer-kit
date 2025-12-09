@@ -23,3 +23,9 @@
   z-index: 4;
   pointer-events: none;
 }
+
+/* Annotation drawing mode - CSS-based cursor styling for better performance */
+.a-pdf-viewer.annotation-drawing-mode .a-annotation-drawing-layer {
+  cursor: crosshair !important;
+  pointer-events: all !important;
+}

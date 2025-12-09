@@ -14,7 +14,7 @@
   limitations under the License.
 */
 
-import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewer-selectors';
+import { PDF_VIEWER_CLASSNAMES } from '../../constants/pdf-viewer-selectors';
 import { IAnnotation } from '../../interface/IAnnotation';
 import { ShapeType } from '../../types/geometry.types';
 import { ToolbarButtonConfig } from '../../types/toolbar.types';
@@ -362,21 +362,30 @@ export class AnnotationToolbar {
 
   /**
    * Enable or disable annotation drawing cursors and listeners.
+   * Uses CSS class for cursor styling to avoid DOM query overhead.
    */
   private _toggleAnnotationDrawing(enable: boolean): void {
-    for (const page of this._viewer.visiblePageNumbers) {
-      const selector = `[data-page-number="${page}"] #${PDF_VIEWER_IDS.ANNOTATION_DRAWING_LAYER}-${this.instanceId}`;
-      const container = document.getElementById(this.containerId)?.shadowRoot?.querySelector<HTMLElement>(selector);
-      if (!container) continue;
+    // Use CSS class approach - single DOM operation instead of looping through pages
+    const shadowRoot = document.getElementById(this.containerId)?.shadowRoot;
+    const pdfViewer = shadowRoot?.querySelector<HTMLElement>(`.${PDF_VIEWER_CLASSNAMES.A_PDF_VIEWER}`);
 
-      if (enable) {
+    if (!pdfViewer) return;
+
+    if (enable) {
+      // Add CSS class to enable crosshair cursor on all annotation layers
+      pdfViewer.classList.add('annotation-drawing-mode');
+
+      // Initialize listeners for all visible pages
+      for (const page of this._viewer.visiblePageNumbers) {
         this._initAnnotationListeners(true, page);
-        container.style.cursor = 'crosshair';
-        container.style.pointerEvents = 'all';
-      } else {
+      }
+    } else {
+      // Remove CSS class to disable crosshair cursor
+      pdfViewer.classList.remove('annotation-drawing-mode');
+
+      // Cleanup listeners for all visible pages
+      for (const page of this._viewer.visiblePageNumbers) {
         this._initAnnotationListeners(false, page);
-        container.style.removeProperty('cursor');
-        container.style.removeProperty('pointer-events');
       }
     }
   }

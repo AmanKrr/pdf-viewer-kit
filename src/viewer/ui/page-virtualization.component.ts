@@ -1711,11 +1711,8 @@ class PageVirtualization {
 
         // Register annotation features using the CORRECT layer (annotationDrawingLayerDiv from text layer)
         if (annotationDrawingLayerDiv) {
-          const annotationState = this._webViewer.annotationState;
-          if (annotationState?.state.isAnnotationEnabled) {
-            annotationDrawingLayerDiv.style.cursor = 'crosshair';
-            annotationDrawingLayerDiv.style.pointerEvents = 'all';
-          }
+          // Note: Cursor styling is now handled by CSS class 'annotation-drawing-mode' on .a-pdf-viewer
+          // No need to set cursor/pointerEvents inline - CSS cascade handles it automatically
           this._searchHighlighter.registerPage(pageInfo.pageNumber);
           if (!this._webViewer.annotation.isAnnotationManagerRegistered(pageInfo.pageNumber)) {
             this._webViewer.annotation.registerAnnotationManager(pageInfo.pageNumber, new AnnotationManager(annotationDrawingLayerDiv, this, this._selectionManager));
@@ -1810,11 +1807,8 @@ class PageVirtualization {
 
         // Register annotation features
         if (annotationLayerDiv) {
-          const annotationState = this._webViewer.annotationState;
-          if (annotationState?.state.isAnnotationEnabled) {
-            annotationLayerDiv.style.cursor = 'crosshair';
-            annotationLayerDiv.style.pointerEvents = 'all';
-          }
+          // Note: Cursor styling is now handled by CSS class 'annotation-drawing-mode' on .a-pdf-viewer
+          // No need to set cursor/pointerEvents inline - CSS cascade handles it automatically
           this._searchHighlighter.registerPage(pageInfo.pageNumber);
           if (!this._webViewer.annotation.isAnnotationManagerRegistered(pageInfo.pageNumber)) {
             this._webViewer.annotation.registerAnnotationManager(pageInfo.pageNumber, new AnnotationManager(annotationLayerDiv, this, this._selectionManager));
