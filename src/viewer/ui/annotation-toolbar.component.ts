@@ -18,12 +18,18 @@ import { PDF_VIEWER_CLASSNAMES, PDF_VIEWER_IDS } from '../../constants/pdf-viewe
 import { IAnnotation } from '../../interface/IAnnotation';
 import { ShapeType } from '../../types/geometry.types';
 import { ToolbarButtonConfig } from '../../types/toolbar.types';
+import { AnnotationToolbarOptions, DEFAULT_SHAPE_OPTIONS, DEFAULT_PROPERTY_PLUGINS } from '../../types/annotation-toolbar.types';
 import WebViewer from './web-viewer.component';
 import { Instance as PopperInstance } from '@popperjs/core';
 import { AnnotationToolbarStateManager, DrawConfig } from './annotation-toolbar-state.component';
 import { AnnotationToolbarPluginManager } from './plugins/annotation-toolbar.plugin';
 import { ShapeSelectionPlugin } from './plugins/shape-selection.plugin';
-import { AnnotationPropertiesPlugin } from './plugins/annotation-properties.plugin';
+import { PropertyContainerPlugin } from './plugins/property-container.plugin';
+import { ColorPropertyPlugin } from './plugins/color-property.plugin';
+import { FillPropertyPlugin } from './plugins/fill-property.plugin';
+import { OpacityPropertyPlugin } from './plugins/opacity-property.plugin';
+import { ThicknessPropertyPlugin } from './plugins/thickness-property.plugin';
+import { BorderStylePropertyPlugin } from './plugins/border-style-property.plugin';
 
 /**
  * A toolbar for creating and configuring annotations using only DOM APIs.
@@ -33,6 +39,7 @@ export class AnnotationToolbar {
   private _stateManager: AnnotationToolbarStateManager;
   private _pluginManager: AnnotationToolbarPluginManager;
   private _popper: PopperInstance | null = null;
+  private _options: Required<AnnotationToolbarOptions>;
 
   private _toolbarContainer!: HTMLElement | undefined;
   private _toolbarPropertiesContainer!: HTMLElement | undefined;
@@ -45,19 +52,53 @@ export class AnnotationToolbar {
   /**
    * @param viewer    The WebViewer instance containing PDF pages.
    * @param stateManager The annotation state manager from WebViewer.
+   * @param options   Configuration options for the annotation toolbar.
    */
-  constructor(viewer: WebViewer, stateManager: AnnotationToolbarStateManager) {
+  constructor(viewer: WebViewer, stateManager: AnnotationToolbarStateManager, options: AnnotationToolbarOptions = {}) {
     this._viewer = viewer;
 
     // Use the shared state manager from WebViewer
     this._stateManager = stateManager;
 
+    // Merge options with defaults
+    this._options = {
+      enableShapeSelection: true,
+      shapeOptions: DEFAULT_SHAPE_OPTIONS,
+      propertyPlugins: DEFAULT_PROPERTY_PLUGINS,
+      customPlugins: [],
+      showDeleteButton: true,
+      showBackButton: true,
+      ...options,
+    } as Required<AnnotationToolbarOptions>;
+
     // Initialize plugin manager
     this._pluginManager = new AnnotationToolbarPluginManager();
 
-    // Register default plugins
-    this._pluginManager.registerPlugin(new ShapeSelectionPlugin());
-    this._pluginManager.registerPlugin(new AnnotationPropertiesPlugin());
+    // Register shape selection plugin
+    if (this._options.enableShapeSelection) {
+      this._pluginManager.registerPlugin(new ShapeSelectionPlugin(this._options.shapeOptions));
+    }
+
+    // Register property container plugin (creates the container for property plugins)
+    // This MUST be registered before individual property plugins
+    if (this._options.propertyPlugins) {
+      // If shape selection is disabled, show properties by default
+      // Otherwise, properties will be shown when a shape is selected
+      const showByDefault = !this._options.enableShapeSelection;
+      this._pluginManager.registerPlugin(new PropertyContainerPlugin({ showByDefault }));
+    }
+
+    // Register individual property plugins
+    if (this._options.propertyPlugins) {
+      this.registerIndividualPropertyPlugins(this._options.propertyPlugins);
+    }
+
+    // Register custom plugins if provided
+    if (this._options.customPlugins && this._options.customPlugins.length > 0) {
+      this._options.customPlugins.forEach((plugin) => {
+        this._pluginManager.registerPlugin(plugin);
+      });
+    }
 
     // Set the plugin context with the shared state manager
     this._pluginManager.setContext({
@@ -72,6 +113,96 @@ export class AnnotationToolbar {
 
     // Subscribe to state changes for automatic updates
     this._setupStateSubscriptions();
+
+    // If shape selection is disabled, set a default shape (rectangle)
+    // so users can start drawing immediately
+    // This must be done AFTER subscriptions are set up so the shape change triggers properly
+    if (this._options.propertyPlugins && !this._options.enableShapeSelection) {
+      this._stateManager.setState({
+        selectedShape: 'rectangle',
+        selectedShapeIcon: 'rectangle',
+      });
+      // The subscription to 'selectedShape' will automatically call _updateAnnotationDrawingForShape
+    }
+  }
+
+  /**
+   * Register individual property plugins (Phase 2)
+   * Each property gets its own plugin instance for fine-grained control
+   */
+  private registerIndividualPropertyPlugins(propertyPlugins: any): void {
+    // Default priorities for natural ordering
+    const defaultPriorities = {
+      color: 100,
+      fill: 90,
+      opacity: 80,
+      thickness: 70,
+      border: 60,
+    };
+
+    // Register color property plugin
+    if (propertyPlugins.color !== false) {
+      const colorConfig = typeof propertyPlugins.color === 'object' ? propertyPlugins.color : {};
+      this._pluginManager.registerPlugin(
+        new ColorPropertyPlugin({
+          priority: colorConfig.priority ?? defaultPriorities.color,
+          label: colorConfig.label,
+          includeTransparent: colorConfig.includeTransparent,
+        })
+      );
+    }
+
+    // Register fill property plugin
+    if (propertyPlugins.fill !== false) {
+      const fillConfig = typeof propertyPlugins.fill === 'object' ? propertyPlugins.fill : {};
+      this._pluginManager.registerPlugin(
+        new FillPropertyPlugin({
+          priority: fillConfig.priority ?? defaultPriorities.fill,
+          label: fillConfig.label,
+          includeTransparent: fillConfig.includeTransparent,
+        })
+      );
+    }
+
+    // Register opacity property plugin
+    if (propertyPlugins.opacity !== false) {
+      const opacityConfig = typeof propertyPlugins.opacity === 'object' ? propertyPlugins.opacity : {};
+      this._pluginManager.registerPlugin(
+        new OpacityPropertyPlugin({
+          priority: opacityConfig.priority ?? defaultPriorities.opacity,
+          label: opacityConfig.label,
+          min: opacityConfig.min,
+          max: opacityConfig.max,
+          displayFormat: opacityConfig.displayFormat,
+        })
+      );
+    }
+
+    // Register thickness property plugin
+    if (propertyPlugins.thickness !== false) {
+      const thicknessConfig = typeof propertyPlugins.thickness === 'object' ? propertyPlugins.thickness : {};
+      this._pluginManager.registerPlugin(
+        new ThicknessPropertyPlugin({
+          priority: thicknessConfig.priority ?? defaultPriorities.thickness,
+          label: thicknessConfig.label,
+          min: thicknessConfig.min,
+          max: thicknessConfig.max,
+          displayFormat: thicknessConfig.displayFormat,
+        })
+      );
+    }
+
+    // Register border style property plugin
+    if (propertyPlugins.border !== false) {
+      const borderConfig = typeof propertyPlugins.border === 'object' ? propertyPlugins.border : {};
+      this._pluginManager.registerPlugin(
+        new BorderStylePropertyPlugin({
+          priority: borderConfig.priority ?? defaultPriorities.border,
+          label: borderConfig.label,
+          styles: borderConfig.styles,
+        })
+      );
+    }
   }
 
   get state() {
@@ -304,7 +435,10 @@ export class AnnotationToolbar {
     this._toolbarContainer = document.createElement('div');
     this._toolbarContainer.classList.add(PDF_VIEWER_CLASSNAMES.A_ANNOTATON_TOOLBAR_CONTAINER, PDF_VIEWER_CLASSNAMES.A_TOOLBAR_ITEMS);
 
-    this._createGoBackButton();
+    // Conditionally create back button
+    if (this._options.showBackButton) {
+      this._createGoBackButton();
+    }
 
     const rightContainer = document.createElement('div');
     rightContainer.classList.add('a-annotation-toolbar-right-container');
@@ -312,8 +446,10 @@ export class AnnotationToolbar {
     rightContainer.style.alignItems = 'center';
     this._toolbarContainer.appendChild(rightContainer);
 
-    // Create delete button in the right container
-    this._createDeleteButton(rightContainer);
+    // Conditionally create delete button in the right container
+    if (this._options.showDeleteButton) {
+      this._createDeleteButton(rightContainer);
+    }
 
     // Update plugin context with current state
     this._pluginManager.setContext({
@@ -326,7 +462,7 @@ export class AnnotationToolbar {
     // Render plugins
     this._pluginManager.renderPlugins(rightContainer);
 
-    // Properties panel is now handled by AnnotationPropertiesPlugin
+    // Properties panel is now handled by PropertyContainerPlugin
     this._injectToolbarContainers(true, false);
   }
 
@@ -358,7 +494,7 @@ export class AnnotationToolbar {
 
   /** Remove the properties panel from the DOM. */
   private _removeToolbarPropertiesContainer(): void {
-    // Properties panel is now handled by AnnotationPropertiesPlugin
+    // Properties panel is now handled by PropertyContainerPlugin
     // No manual cleanup needed
   }
 

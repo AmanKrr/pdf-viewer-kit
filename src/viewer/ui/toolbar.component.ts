@@ -16,6 +16,7 @@
 
 import WebViewer from './web-viewer.component';
 import { IToolbar, ToolbarOptions } from '../../types/toolbar.types';
+import { AnnotationToolbarOptions } from '../../types/annotation-toolbar.types';
 import { AnnotationToolbar } from './annotation-toolbar.component';
 import { ToolbarPluginManager, ToolbarPluginContext, ToolbarPlugin } from './plugins/toolbar.plugin';
 import {
@@ -54,8 +55,9 @@ export class Toolbar implements IToolbar {
    * @param viewer - The WebViewer instance to control
    * @param customPlugins - Optional array of custom plugins to add
    * @param options - Toolbar options to enable/disable specific features
+   * @param annotationToolbarOptions - Annotation toolbar configuration options
    */
-  constructor(viewer: WebViewer, customPlugins: ToolbarPlugin[] = [], options: ToolbarOptions = {}) {
+  constructor(viewer: WebViewer, customPlugins: ToolbarPlugin[] = [], options: ToolbarOptions = {}, annotationToolbarOptions?: AnnotationToolbarOptions) {
     this._viewer = viewer;
 
     this._opts = {
@@ -73,7 +75,7 @@ export class Toolbar implements IToolbar {
       ...options,
     };
 
-    this._annotationToolbar = new AnnotationToolbar(this._viewer, this._viewer.annotationState);
+    this._annotationToolbar = new AnnotationToolbar(this._viewer, this._viewer.annotationState, annotationToolbarOptions);
 
     // Initialize plugin manager
     this._pluginManager = new ToolbarPluginManager();

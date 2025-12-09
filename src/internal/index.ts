@@ -65,6 +65,17 @@ export { ZoomDropdownPlugin } from '../viewer/ui/plugins/zoom-dropdown.plugin';
 // Annotation Toolbar Plugins
 export type { AnnotationToolbarPlugin, AnnotationContext } from '../viewer/ui/plugins/annotation-toolbar.plugin';
 export { BaseAnnotationToolbarPlugin, AnnotationToolbarPluginManager } from '../viewer/ui/plugins/annotation-toolbar.plugin';
+export { ShapeSelectionPlugin } from '../viewer/ui/plugins/shape-selection.plugin';
+
+// Individual Property Plugins
+export { BasePropertyPlugin, PropertyDropdownManager } from '../viewer/ui/plugins/base-property.plugin';
+export { PropertyContainerPlugin } from '../viewer/ui/plugins/property-container.plugin';
+export type { PropertyContainerPluginConfig } from '../viewer/ui/plugins/property-container.plugin';
+export { ColorPropertyPlugin } from '../viewer/ui/plugins/color-property.plugin';
+export { FillPropertyPlugin } from '../viewer/ui/plugins/fill-property.plugin';
+export { OpacityPropertyPlugin } from '../viewer/ui/plugins/opacity-property.plugin';
+export { ThicknessPropertyPlugin } from '../viewer/ui/plugins/thickness-property.plugin';
+export { BorderStylePropertyPlugin } from '../viewer/ui/plugins/border-style-property.plugin';
 
 // Services
 export { AnnotationService } from '../viewer/services/annotation.service';
@@ -94,6 +105,7 @@ export * from '../types/geometry.types';
 export * from '../types/page-virtualization.types';
 export * from '../types/thumbnail.types';
 export * from '../types/toolbar.types';
+export * from '../types/annotation-toolbar.types';
 export * from '../types/webpdf.types';
 
 // Utils

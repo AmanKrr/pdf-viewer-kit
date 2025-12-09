@@ -257,7 +257,8 @@ class WebViewer {
       if (toolbarHost) {
         const customPlugins = this._options.customToolbarPlugins ?? [];
         const opts = this._options.toolbarOptions ?? {};
-        const toolbar = new Toolbar(this, customPlugins, opts) as any;
+        const annotationOpts = this._options.annotationToolbarOptions;
+        const toolbar = new Toolbar(this, customPlugins, opts, annotationOpts) as any;
         toolbar.render(toolbarHost);
         this._toolbar = toolbar;
       }

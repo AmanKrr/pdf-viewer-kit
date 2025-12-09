@@ -174,16 +174,28 @@ export class AnnotationToolbarPluginManager {
 
   /**
    * Render all active plugins into a container
+   * Plugins are rendered in order of priority (higher priority first)
+   * Plugins with the same priority are rendered in registration order
    */
   renderPlugins(container: HTMLElement): void {
     if (!this.context) {
       throw new Error('Plugin context not set');
     }
 
-    this.plugins.forEach((plugin) => {
-      if (plugin.isActive) {
-        plugin.render(container, this.context!);
-      }
+    // Get all active plugins and sort by priority
+    const sortedPlugins = Array.from(this.plugins.values())
+      .filter((plugin) => plugin.isActive)
+      .sort((a, b) => {
+        // Check if plugins have priority property (property plugins)
+        const priorityA = (a as any).priority ?? 0;
+        const priorityB = (b as any).priority ?? 0;
+        // Higher priority comes first
+        return priorityB - priorityA;
+      });
+
+    // Render plugins in priority order
+    sortedPlugins.forEach((plugin) => {
+      plugin.render(container, this.context!);
     });
   }
 

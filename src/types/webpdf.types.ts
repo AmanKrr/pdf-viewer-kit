@@ -16,6 +16,7 @@
 
 import { DocumentInitParameters, TypedArray } from 'pdfjs-dist/types/src/display/api';
 import { ToolbarOptions } from './toolbar.types';
+import { AnnotationToolbarOptions } from './annotation-toolbar.types';
 import type { ToolbarPlugin } from '../viewer/ui/plugins/toolbar.plugin';
 
 /**
@@ -66,6 +67,9 @@ export interface LoadOptions extends DocumentInitParameters {
 
   /** Toolbar configuration options (optional). */
   toolbarOptions?: ToolbarOptions;
+
+  /** Annotation toolbar configuration options (optional). */
+  annotationToolbarOptions?: AnnotationToolbarOptions;
 
   /** If `true`, enables credentials for cross-origin requests (optional). */
   withCredentials?: boolean;

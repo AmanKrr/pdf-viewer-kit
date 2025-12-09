@@ -16,21 +16,16 @@
 
 import { PDF_VIEWER_CLASSNAMES } from '../../../constants/pdf-viewer-selectors';
 import { AnnotationContext, BaseAnnotationToolbarPlugin } from './annotation-toolbar.plugin';
+import { ShapeOption } from '../../../types/annotation-toolbar.types';
 import { ShapeType } from '../../../types/geometry.types';
 import { createPopper, Instance as PopperInstance } from '@popperjs/core';
-
-export interface ShapeOption {
-  id: string;
-  name: string;
-  type: ShapeType;
-  icon: string;
-}
 
 /**
  * Plugin for handling shape selection in the annotation toolbar
  */
 export class ShapeSelectionPlugin extends BaseAnnotationToolbarPlugin {
   name = 'ShapeSelectionPlugin';
+  public readonly priority = 1000; // Higher priority than property plugins to render first
 
   private shapeButton?: HTMLButtonElement;
   private arrowButton?: HTMLButtonElement;
@@ -62,14 +57,17 @@ export class ShapeSelectionPlugin extends BaseAnnotationToolbarPlugin {
   private _boundAnnotationCreatedHandler: (() => void) | undefined;
   private _boundClickOutsideHandler: ((event: Event) => void) | undefined;
 
-  private shapeOptions: ShapeOption[] = [
-    { id: 'rectangle', name: 'Rectangle', type: 'rectangle', icon: 'rectangle' },
-    { id: 'ellipse', name: 'Ellipse', type: 'ellipse', icon: 'circle' },
-    { id: 'line', name: 'Line', type: 'line', icon: 'pen_size_1' },
-  ];
+  private shapeOptions: ShapeOption[];
 
-  constructor() {
+  constructor(shapeOptions?: ShapeOption[]) {
     super('shape-selection', '1.0.0');
+
+    // Use provided shapes or default to rectangle, ellipse, line
+    this.shapeOptions = shapeOptions || [
+      { id: 'rectangle', name: 'Rectangle', type: 'rectangle', icon: 'rectangle' },
+      { id: 'ellipse', name: 'Ellipse', type: 'ellipse', icon: 'circle' },
+      { id: 'line', name: 'Line', type: 'line', icon: 'pen_size_1' },
+    ];
   }
 
   protected onInitialize(context: AnnotationContext): void {

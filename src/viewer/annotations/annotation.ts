@@ -15,8 +15,8 @@
 */
 
 import { InstanceEventEmitter } from '../../core/event/event-emitter.core';
-import { InstanceState } from '../../core/viewer-state.core';
 import { IAnnotation } from '../../interface/IAnnotation';
+import { InstanceState } from '../../internal';
 import { EllipseConfig, RectangleConfig } from '../../types/geometry.types';
 
 /**

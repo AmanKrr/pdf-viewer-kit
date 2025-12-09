@@ -15,7 +15,7 @@
 */
 
 import { PDF_VIEWER_CLASSNAMES } from '../../constants/pdf-viewer-selectors';
-import { AnnotationPropertiesPlugin } from '../ui/plugins/annotation-properties.plugin';
+import { PropertyDropdownManager } from '../ui/plugins/base-property.plugin';
 import { ToolbarComponent } from './toolbar-component';
 import { createPopper, Instance as PopperInstance } from '@popperjs/core';
 
@@ -253,7 +253,7 @@ export class ColorPicker extends ToolbarComponent {
       this.popperInstance.update();
 
       // Use the simple dropdown manager to close any previously open dropdown
-      AnnotationPropertiesPlugin.setDropdownOpen(this.dropdown);
+      PropertyDropdownManager.setDropdownOpen(this.dropdown, this.popperInstance);
     } else {
       console.error('ColorPicker: No color button found');
     }
@@ -270,7 +270,7 @@ export class ColorPicker extends ToolbarComponent {
 
   private hideDropdown(): void {
     // Use the dropdown manager to properly track this dropdown as closed
-    AnnotationPropertiesPlugin.closeDropdown(this.dropdown);
+    PropertyDropdownManager.closeOpenDropdown();
 
     // Reset internal state
     this.isDropdownOpen = false;
@@ -300,6 +300,13 @@ export class ColorPicker extends ToolbarComponent {
    */
   getCurrentColor(): string {
     return this.colorButton.style.background;
+  }
+
+  /**
+   * Destroy the color picker and clean up all resources
+   */
+  public destroy(): void {
+    this.onDestroy();
   }
 
   protected onDestroy(): void {
