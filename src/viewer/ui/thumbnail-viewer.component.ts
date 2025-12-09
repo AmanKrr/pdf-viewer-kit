@@ -21,6 +21,7 @@ import { PDFLinkService } from '../services/link.service';
 
 /**
  * Manages the creation, rendering, and interaction of PDF thumbnails in the sidebar.
+ * Optimized for minimal memory footprint using Blob URLs and canvas pooling.
  */
 class ThumbnailViewer {
   private _container: HTMLElement;
@@ -31,6 +32,11 @@ class ThumbnailViewer {
   private _canvas: HTMLCanvasElement | null = null;
   private _thumbnailDiv: HTMLElement | null = null;
   private _clickHandler: ((e: MouseEvent) => void) | null = null;
+  private _imageUrl: string | null = null; // Blob URL for cleanup
+
+  // Static canvas pool for reuse across all thumbnails
+  private static _canvasPool: HTMLCanvasElement[] = [];
+  private static readonly MAX_POOL_SIZE = 10;
 
   /**
    * Constructs a `ThumbnailViewer` instance.
@@ -117,26 +123,27 @@ class ThumbnailViewer {
 
   /**
    * Renders the thumbnail image for the corresponding PDF page.
+   * Uses Blob URLs and JPEG compression for optimal memory usage.
    *
    * @param {HTMLElement} thumbnailDiv - The container for the thumbnail.
    */
   private async _renderThumbnail(thumbnailDiv: HTMLElement): Promise<void> {
     const page: PDFPageProxy = await this._pdfDocument.getPage(this._pageNumber);
 
-    // Set thumbnail scale
-    const scale = 0.2; // Render at a higher scale for better quality
-    const viewport = page.getViewport({ scale });
+    // Set thumbnail scale - 0.2 for compact display
+    const THUMBNAIL_SCALE = 0.2;
+    const viewport = page.getViewport({ scale: THUMBNAIL_SCALE });
 
-    // Create and configure canvas
-    const upscaleFactor = 1.9; // Render at 2x resolution
+    // Create and configure canvas (render at higher resolution for quality)
+    const upscaleFactor = 2.0; // Render at 2x resolution for sharp display
     const canvasWidth = viewport.width * upscaleFactor;
     const canvasHeight = viewport.height * upscaleFactor;
 
-    this._canvas = document.createElement('canvas');
+    this._canvas = this._getCanvasFromPool();
     this._canvas.width = canvasWidth;
     this._canvas.height = canvasHeight;
 
-    const ctx = this._canvas.getContext('2d', { alpha: false, willReadFrequently: true });
+    const ctx = this._canvas.getContext('2d', { alpha: false, willReadFrequently: false });
     if (!ctx) {
       throw new Error('Canvas context unavailable');
     }
@@ -144,11 +151,15 @@ class ThumbnailViewer {
     const transform = [upscaleFactor, 0, 0, upscaleFactor, 0, 0];
 
     // Render the page onto the canvas
-    await page.render({ canvasContext: ctx, viewport, transform }).promise;
+    await page.render({ canvas: this._canvas, canvasContext: ctx, viewport, transform }).promise;
 
-    // snapshot to an <img>
+    // Convert to Blob URL (JPEG for better compression) instead of base64 PNG
+    const blob = await this._canvasToBlob(this._canvas);
+    this._imageUrl = URL.createObjectURL(blob);
+
+    // Create image element with Blob URL
     const img = document.createElement('img');
-    img.src = this._canvas.toDataURL('image/png');
+    img.src = this._imageUrl;
     img.className = 'thumbnail-image';
     img.style.width = `${viewport.width}px`;
     img.style.height = `${viewport.height}px`;
@@ -159,7 +170,64 @@ class ThumbnailViewer {
     label.textContent = String(this._pageNumber);
     thumbnailDiv.appendChild(label);
 
-    this.destroyCanvasOnly();
+    // Return canvas to pool for reuse
+    this._returnCanvasToPool();
+  }
+
+  /**
+   * Converts canvas to Blob using JPEG compression
+   * Fallback to PNG if JPEG is not supported
+   *
+   * @param canvas - Canvas element to convert
+   * @returns Promise resolving to Blob
+   */
+  private _canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      // Try JPEG first (better compression)
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            // Fallback to PNG if JPEG fails
+            canvas.toBlob(
+              (pngBlob) => {
+                if (pngBlob) {
+                  resolve(pngBlob);
+                } else {
+                  reject(new Error('Failed to create blob from canvas'));
+                }
+              },
+              'image/png'
+            );
+          }
+        },
+        'image/jpeg',
+        0.85 // 85% quality - good balance between size and quality
+      );
+    });
+  }
+
+  /**
+   * Gets a canvas from the pool or creates a new one
+   */
+  private _getCanvasFromPool(): HTMLCanvasElement {
+    return ThumbnailViewer._canvasPool.pop() || document.createElement('canvas');
+  }
+
+  /**
+   * Returns canvas to pool for reuse
+   */
+  private _returnCanvasToPool(): void {
+    if (this._canvas && ThumbnailViewer._canvasPool.length < ThumbnailViewer.MAX_POOL_SIZE) {
+      // Clear canvas before returning to pool
+      const ctx = this._canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+      }
+      ThumbnailViewer._canvasPool.push(this._canvas);
+    }
+    this._canvas = null;
   }
 
   /**
@@ -192,23 +260,41 @@ class ThumbnailViewer {
   /** only remove the canvas bit, keep thumbnail DIV & listener intact */
   private destroyCanvasOnly(): void {
     if (this._canvas) {
-      this._canvas.remove();
-      this._canvas = null;
+      this._returnCanvasToPool();
     }
   }
 
   /**
-   * Cleans up resources and removes the canvas to free memory.
+   * Cleans up resources and removes the thumbnail to free memory.
+   * Revokes Blob URLs to prevent memory leaks.
    */
   public destroy(): void {
+    // Revoke Blob URL to free memory
+    if (this._imageUrl) {
+      URL.revokeObjectURL(this._imageUrl);
+      this._imageUrl = null;
+    }
+
+    // Remove event listener
     if (this._thumbnailDiv && this._clickHandler) {
       this._thumbnailDiv.removeEventListener('click', this._clickHandler);
     }
+
+    // Remove DOM element
     if (this._thumbnailDiv) {
       this._thumbnailDiv.remove();
       this._thumbnailDiv = null;
     }
+
     this.destroyCanvasOnly();
+  }
+
+  /**
+   * Static method to clear the entire canvas pool
+   * Call this when destroying all thumbnails or during cleanup
+   */
+  public static clearCanvasPool(): void {
+    ThumbnailViewer._canvasPool = [];
   }
 }
 

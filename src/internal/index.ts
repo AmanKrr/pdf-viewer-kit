@@ -40,6 +40,7 @@ export { default as PageVirtualization } from '../viewer/ui/page-virtualization.
 export { default as ZoomHandler } from '../viewer/ui/zoom-handler.component';
 export { default as SearchBar } from '../viewer/ui/searchbar.component';
 export { default as ThumbnailViewer } from '../viewer/ui/thumbnail-viewer.component';
+export { ThumbnailManager } from '../viewer/ui/thumbnail-manager.component';
 export { Toolbar } from '../viewer/ui/toolbar.component';
 export { AnnotationToolbar } from '../viewer/ui/annotation-toolbar.component';
 export { AnnotationToolbarStateManager } from '../viewer/ui/annotation-toolbar-state.component';

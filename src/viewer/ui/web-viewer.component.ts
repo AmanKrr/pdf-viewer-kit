@@ -363,10 +363,20 @@ class WebViewer {
 
   /**
    * Synchronizes the thumbnail sidebar scroll position with the currently viewed page.
+   * Works with virtualized thumbnails - delegates to ThumbnailManager if available.
    */
   private _syncThumbnailScrollWithMainPageContainer() {
-    const shadowRoot = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
     const pageNumber = this.currentPageNumber;
+
+    // Use ThumbnailManager if available (virtualized thumbnails)
+    const thumbnailManager = this._pageVirtualization.thumbnailManager;
+    if (thumbnailManager) {
+      thumbnailManager.setActiveThumbnail(pageNumber);
+      return;
+    }
+
+    // Fallback to legacy DOM-based approach (for backwards compatibility)
+    const shadowRoot = document.getElementById(this.containerId)?.shadowRoot as ShadowRoot | null;
     const previousActiveThumbnail = shadowRoot?.querySelector(`.thumbnail.thumbnail-active`);
     if (previousActiveThumbnail) {
       previousActiveThumbnail.classList.remove(`thumbnail-active`);

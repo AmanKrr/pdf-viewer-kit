@@ -18,7 +18,7 @@ import { PageViewport, PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-
 import TextLayer from './text-layer.component';
 import PageElement from './page-element.component';
 import { debounce, throttle } from 'lodash';
-import ThumbnailViewer from './thumbnail-viewer.component';
+import { ThumbnailManager } from './thumbnail-manager.component';
 import WebViewer from './web-viewer.component';
 import { ViewerLoadOptions } from '../../types/webpdf.types';
 import AnnotationLayer from './annotation-layer.component';
@@ -136,7 +136,7 @@ class PageVirtualization {
   private _maxPooledWrappers!: number;
   private _cachedPages: Map<number, CachedPageInfo> = new Map();
 
-  private _thumbnailViewer: ThumbnailViewer | null = null;
+  private _thumbnailManager: ThumbnailManager | null = null;
   private _pagePositions: Map<number, number> = new Map();
   private _pageDimensions: Map<number, PageDimensions> = new Map();
   private _webViewer: WebViewer;
@@ -289,6 +289,13 @@ class PageVirtualization {
 
   get canvasPool() {
     return this._webViewer.canvasPool;
+  }
+
+  /**
+   * Gets the thumbnail manager instance for virtualized thumbnail rendering
+   */
+  get thumbnailManager() {
+    return this._thumbnailManager;
   }
 
   /** call when first screenful of pages fully rendered */
@@ -1024,28 +1031,31 @@ class PageVirtualization {
   }
 
   /**
-   * Generates thumbnails for all pages.
+   * Generates thumbnails using virtualized rendering for optimal performance.
+   * Only renders visible thumbnails + buffer zone.
    * @returns {Promise<void>}
    */
   public async generateThumbnails(): Promise<void> {
     if (this._totalPages === 0) return;
-    const isSpecificPage = this.isRenderingSpecificPageOnly;
-    const thumbnailContainer = ThumbnailViewer.createThumbnailContainer(this._options!.containerId);
+
     const linkService = new PDFLinkService({ pdfViewer: this._webViewer });
 
-    for (let pageNum = isSpecificPage ?? 1; pageNum <= (isSpecificPage ?? this._totalPages); pageNum++) {
-      const thumbnail = new ThumbnailViewer({
-        container: thumbnailContainer as HTMLElement,
-        pageNumber: pageNum,
-        pdfDocument: this._pdfDocument,
-        linkService,
-      });
-      await thumbnail.initThumbnail();
-      if (pageNum === (isSpecificPage ?? this.state.currentPage)) {
-        thumbnail.activeThumbnail = this.state.currentPage;
-      }
-      this._thumbnailViewer = thumbnail;
-    }
+    // Create and initialize thumbnail manager with virtualization
+    this._thumbnailManager = new ThumbnailManager({
+      containerId: this._options!.containerId,
+      pdfDocument: this._pdfDocument,
+      linkService,
+      bufferSize: 5, // Render 5 thumbnails above and below visible area
+    });
+
+    await this._thumbnailManager.initialize();
+
+    // Set initial active thumbnail
+    this._thumbnailManager.setActiveThumbnail(this.state.currentPage);
+
+    // Debug logging to verify virtualization is working
+    console.log(`[ThumbnailManager] Virtualization enabled. Rendered: ${this._thumbnailManager.getRenderedCount()} / ${this._totalPages} thumbnails`);
+    console.log(`[ThumbnailManager] Estimated memory: ${(this._thumbnailManager.estimateMemoryUsage() / 1024 / 1024).toFixed(2)} MB`);
   }
 
   /**
@@ -2176,9 +2186,9 @@ class PageVirtualization {
     });
     this._activeAnnotationLayers.clear();
 
-    // Clear render queue
-    this._thumbnailViewer?.destroy();
-    this._thumbnailViewer = null;
+    // Clear thumbnail manager
+    this._thumbnailManager?.destroy();
+    this._thumbnailManager = null;
     this._scrollableContainer.removeEventListener('scroll', this._scrollHandler);
     this.events.off('scaleChange', this._boundOnScaleChange);
 

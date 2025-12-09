@@ -35,7 +35,9 @@
   justify-content: center;
   align-items: flex-start;
   background-color: var(--sidebar-background);
-  width: max-content;
+  width: auto;
+  min-width: 200px; /* Ensure minimum width for thumbnails */
+  max-width: max-content;
   min-height: calc(100% - 40px);
   /* Adjust height to match viewer minus toolbar */
   overflow: auto;
@@ -55,8 +57,28 @@
 .a-inner-sidebar-container-content {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
+}
+
+/* Virtual scroll container for virtualized thumbnails */
+.thumbnail-virtual-scroll-container {
+  position: relative;
+  min-width: 180px; /* Minimum width to accommodate thumbnails at 0.3 scale */
+  width: max-content;
+}
+
+/* Wrapper for individual thumbnails in virtual scroll */
+.thumbnail-wrapper {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  white-space: nowrap;
+  /* Wrapper needs to account for child's margin-bottom to prevent overlap */
+  padding-bottom: 20px;
 }
 
 /* ========================== */
@@ -67,10 +89,20 @@
 .thumbnail {
   width: max-content;
   height: max-content;
-  margin-bottom: 20px;
+  margin-bottom: 0; /* Moved to wrapper's padding-bottom for better control */
   padding: 4px;
   border-radius: 1px;
   background-color: var(--thumbnail-background);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Thumbnail image styling */
+.thumbnail-image {
+  display: block;
+  max-width: none;
+  min-width: 150px; /* Ensure minimum readable size */
 }
 
 /* Hover effect on thumbnails */
@@ -84,11 +116,6 @@
 .thumbnail-active {
   background-color: var(--thumbnail-active-background);
   color: white;
-}
-
-/* Remove bottom margin for the last thumbnail */
-.thumbnail:last-child {
-  margin-bottom: 0;
 }
 
 /* ========================== */

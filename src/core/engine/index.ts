@@ -107,3 +107,11 @@ export {
   type TileRenderResult,
   type TileCanvasPool,
 } from './tile-manager';
+
+// ThumbnailVirtualizationEngine exports
+export {
+  ThumbnailVirtualizationEngine,
+  type ThumbnailVirtualizationConfig,
+  type ThumbnailRange,
+  type ThumbnailPosition,
+} from './thumbnail-virtualization-engine';
