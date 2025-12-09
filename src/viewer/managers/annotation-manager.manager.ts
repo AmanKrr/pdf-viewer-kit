@@ -372,7 +372,7 @@ export class AnnotationManager {
   }
 
   /**
-   * Handler for mouse up (stop drawing).
+   * Handler for mouse down (start drawing).
    */
   private _onMouseDown(event: MouseEvent) {
     if (!this._annotationDrawerContainer || !this._activeAnnotation) return;

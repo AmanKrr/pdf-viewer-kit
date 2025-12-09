@@ -1174,11 +1174,13 @@ class PageVirtualization {
       if (!pageInfo) {
         // Add pages in parallel to prevent blocking during rapid scroll
         pageAddPromises.push(
-          this._addPageToDom(pageNum).then(() => {
-            // Page added successfully
-          }).catch(() => {
-            // Ignore errors during page addition
-          })
+          this._addPageToDom(pageNum)
+            .then(() => {
+              // Page added successfully
+            })
+            .catch(() => {
+              // Ignore errors during page addition
+            }),
         );
       } else {
         pageInfo.isVisible = true;
@@ -1631,6 +1633,9 @@ class PageVirtualization {
     if (this._options && !this._options.disableTextSelection) {
       if (!pageInfo.pdfPageProxy || !viewport || !pageInfo.isVisible) return;
 
+      // Variable to store annotation drawing layer div across try-catch blocks
+      let annotationDrawingLayerDiv: HTMLDivElement | undefined;
+
       // Render text layer directly
       try {
         // CRITICAL: Clean up ALL existing text layer references to prevent memory leak
@@ -1648,8 +1653,11 @@ class PageVirtualization {
         const textLayer = new TextLayer(this.containerId, this.instanceId, pageInfo.pageWrapperDiv, pageInfo.pdfPageProxy, viewport);
 
         // Render text layer (returns [textLayerDiv, annotationHostDiv])
-        // NOTE: We ignore annotationHostDiv - that's AnnotationLayer's job
-        const [textLayerDiv] = await textLayer.createTextLayer();
+        // NOTE: annotationHostDiv is the ANNOTATION_DRAWING_LAYER for user-drawn annotations
+        const [textLayerDiv, annotationHostDiv] = await textLayer.createTextLayer();
+
+        // Store annotation drawing layer for later use
+        annotationDrawingLayerDiv = annotationHostDiv;
 
         // Track active text layer
         this._activeTextLayers.set(pageInfo.pageNumber, textLayer);
@@ -1701,16 +1709,16 @@ class PageVirtualization {
         pageInfo.annotationLayerState.renderAttempts = 0;
         pageInfo.annotationLayerState.lastError = undefined;
 
-        // Register annotation features
-        if (annotationLayerDiv) {
+        // Register annotation features using the CORRECT layer (annotationDrawingLayerDiv from text layer)
+        if (annotationDrawingLayerDiv) {
           const annotationState = this._webViewer.annotationState;
           if (annotationState?.state.isAnnotationEnabled) {
-            annotationLayerDiv.style.cursor = 'crosshair';
-            annotationLayerDiv.style.pointerEvents = 'all';
+            annotationDrawingLayerDiv.style.cursor = 'crosshair';
+            annotationDrawingLayerDiv.style.pointerEvents = 'all';
           }
           this._searchHighlighter.registerPage(pageInfo.pageNumber);
           if (!this._webViewer.annotation.isAnnotationManagerRegistered(pageInfo.pageNumber)) {
-            this._webViewer.annotation.registerAnnotationManager(pageInfo.pageNumber, new AnnotationManager(annotationLayerDiv, this, this._selectionManager));
+            this._webViewer.annotation.registerAnnotationManager(pageInfo.pageNumber, new AnnotationManager(annotationDrawingLayerDiv, this, this._selectionManager));
           }
         }
       } catch (error: any) {
