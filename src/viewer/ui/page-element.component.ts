@@ -104,7 +104,10 @@ class PageElement {
     // In Shadow DOM, :host and :host, * selectors are needed for root styling.
     // html, body selectors do not match anything in shadow root.
     // So, use :host and * for global font and sizing.
+    // IMPORTANT: baseCss must come first because it contains @import rules
+    // which must appear at the top of the stylesheet
     coreStyle.textContent = `
+      ${baseCss}
       :host, * {
         margin: 0;
         padding: 0;
@@ -118,7 +121,6 @@ class PageElement {
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
       }
-      ${baseCss}
     `;
     shadowRoot.appendChild(coreStyle);
 
