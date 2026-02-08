@@ -376,7 +376,7 @@ export class TileManager {
         canvasContext: context,
         canvas,
         viewport: tileViewport,
-        annotationMode: 0, // Disable annotations for tiles
+        annotationMode: 2, // Enable annotations for tiles
       };
 
       const renderTask = page.render(renderParams);
